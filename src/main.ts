@@ -1,7 +1,17 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
+
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('learnfrontend', process.execPath, [
+      path.resolve(process.argv[1]),
+    ]);
+  }
+} else {
+  app.setAsDefaultProtocolClient('learnfrontend');
+}
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -10,9 +20,11 @@ if (started) {
 
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
+let mainWindow: BrowserWindow | null = null;
+
 const createWindow = () => {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
     webPreferences: {
@@ -31,10 +43,25 @@ const createWindow = () => {
   mainWindow.webContents.openDevTools();
 };
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+// Check for single instance lock
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+    // the commandLine is array of strings in which last element is deep link url
+    dialog.showErrorBox('Welcome Back', `You arrived from: ${commandLine.pop()}`);
+  });
+
+  // Create mainWindow, load the rest of the app, etc...
+  app.whenReady().then(createWindow);
+}
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -51,6 +78,10 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+app.on('open-url', (event, url) => {
+  dialog.showErrorBox('Welcome Back', `You arrived from: ${url}`);
 });
 
 // In this file you can include the rest of your app's specific main process
