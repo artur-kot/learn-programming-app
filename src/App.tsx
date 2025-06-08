@@ -7,7 +7,6 @@ export const App = () => {
   return (
     <MantineProvider>
       <HashRouter>
-        <Counter />
         <Routes>
           <Route path="/" Component={HomePage} />
         </Routes>
