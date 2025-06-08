@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
+import 'dotenv/config';
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
