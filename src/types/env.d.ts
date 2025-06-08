@@ -1,6 +1,6 @@
 declare namespace NodeJS {
   interface ProcessEnv {
-    APPWRITE_ENDPOINT: string;
-    APPWRITE_PROJECT_ID: string;
+    VITE_APPWRITE_ENDPOINT: string;
+    VITE_APPWRITE_PROJECT_ID: string;
   }
 }
