@@ -1,6 +1,4 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../store';
 import { useCurrentUser } from '~/services/auth';
 import { useAppSelector } from '~/store/hooks';
 
