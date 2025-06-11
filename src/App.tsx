@@ -11,6 +11,7 @@ import { RegisterPage } from './pages/auth/RegisterPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { TopBar } from './components/layout/TopBar';
 import { useCurrentUser } from './services/auth';
+import './i18n/i18n';
 
 const AppContent = () => {
   return (

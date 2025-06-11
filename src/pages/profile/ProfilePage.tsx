@@ -1,8 +1,9 @@
-import { PasswordInput, Button, Paper, Title, Container, Text } from '@mantine/core';
+import { PasswordInput, Button, Paper, Title, Container, Text, Select } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useCurrentUser } from '../../services/auth';
 import { account } from '../../services/appwrite';
 import { notifications } from '@mantine/notifications';
+import { useTranslation } from 'react-i18next';
 
 interface ChangePasswordForm {
   currentPassword: string;
@@ -12,6 +13,7 @@ interface ChangePasswordForm {
 
 export const ProfilePage = () => {
   const user = useCurrentUser();
+  const { t, i18n } = useTranslation();
 
   const form = useForm<ChangePasswordForm>({
     initialValues: {
@@ -20,11 +22,10 @@ export const ProfilePage = () => {
       confirmPassword: '',
     },
     validate: {
-      currentPassword: (value) =>
-        value.length < 6 ? 'Password must be at least 6 characters' : null,
-      newPassword: (value) => (value.length < 6 ? 'Password must be at least 6 characters' : null),
+      currentPassword: (value) => (value.length < 6 ? t('common.passwordLength') : null),
+      newPassword: (value) => (value.length < 6 ? t('common.passwordLength') : null),
       confirmPassword: (value, values) =>
-        value !== values.newPassword ? 'Passwords did not match' : null,
+        value !== values.newPassword ? t('common.passwordsDoNotMatch') : null,
     },
   });
 
@@ -33,50 +34,69 @@ export const ProfilePage = () => {
       await account.updatePassword(values.newPassword, values.currentPassword);
       form.reset();
       notifications.show({
-        title: 'Success',
-        message: 'Password updated successfully!',
+        title: t('common.success'),
+        message: t('profile.passwordUpdated'),
         color: 'green',
       });
     } catch (error) {
       console.error('Error updating password:', error);
       notifications.show({
-        title: 'Error',
-        message: 'Failed to update password. Please check your current password and try again.',
+        title: t('common.error'),
+        message: t('profile.passwordUpdateError'),
         color: 'red',
       });
     }
   };
 
+  const handleLanguageChange = (value: string | null) => {
+    if (value) {
+      i18n.changeLanguage(value);
+    }
+  };
+
   return (
     <Container size={420} my={40}>
-      <Title ta="center">Profile Settings</Title>
+      <Title ta="center">{t('profile.title')}</Title>
       <Paper withBorder shadow="md" p={30} mt={30} radius="md">
         <Text size="lg" mb="md">
-          Email: {user?.email}
+          {t('auth.email')}: {user?.email}
         </Text>
+
+        <Select
+          label={t('profile.language')}
+          placeholder={t('profile.selectLanguage')}
+          value={i18n.language}
+          onChange={handleLanguageChange}
+          data={[
+            { value: 'en', label: t('profile.english') },
+            { value: 'pl', label: t('profile.polish') },
+          ]}
+          mb="xl"
+        />
+
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <PasswordInput
-            label="Current Password"
-            placeholder="Enter your current password"
+            label={t('profile.currentPassword')}
+            placeholder={t('profile.enterCurrentPassword')}
             required
             {...form.getInputProps('currentPassword')}
           />
           <PasswordInput
-            label="New Password"
-            placeholder="Enter your new password"
+            label={t('profile.newPassword')}
+            placeholder={t('profile.enterNewPassword')}
             required
             mt="md"
             {...form.getInputProps('newPassword')}
           />
           <PasswordInput
-            label="Confirm New Password"
-            placeholder="Confirm your new password"
+            label={t('profile.confirmNewPassword')}
+            placeholder={t('profile.confirmNewPassword')}
             required
             mt="md"
             {...form.getInputProps('confirmPassword')}
           />
           <Button fullWidth mt="xl" type="submit">
-            Update Password
+            {t('profile.updatePassword')}
           </Button>
         </form>
       </Paper>
