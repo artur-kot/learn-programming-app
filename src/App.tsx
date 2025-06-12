@@ -12,6 +12,7 @@ import { ProfilePage } from './pages/profile/ProfilePage';
 import { TopBar } from './components/layout/TopBar';
 import { useCurrentUser } from './services/auth';
 import './i18n/i18n';
+import { UnauthorizedRoute } from './components/auth/UnauthorizedRoute';
 
 const AppContent = () => {
   const location = useLocation();
@@ -42,9 +43,30 @@ const AppContent = () => {
           />
 
           {/* Auth routes */}
-          <Route path="/auth/login" element={<LoginPage />} />
-          <Route path="/auth/register" element={<RegisterPage />} />
-          <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+          <Route
+            path="/auth/login"
+            element={
+              <UnauthorizedRoute>
+                <LoginPage />
+              </UnauthorizedRoute>
+            }
+          />
+          <Route
+            path="/auth/register"
+            element={
+              <UnauthorizedRoute>
+                <RegisterPage />
+              </UnauthorizedRoute>
+            }
+          />
+          <Route
+            path="/auth/forgot-password"
+            element={
+              <UnauthorizedRoute>
+                <ForgotPasswordPage />
+              </UnauthorizedRoute>
+            }
+          />
         </Routes>
       </AppShell.Main>
     </AppShell>

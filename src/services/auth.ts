@@ -71,10 +71,12 @@ export const useCurrentUser = () => {
   useEffect(() => {
     const fetchUser = async () => {
       const { user, error } = await getCurrentUser();
+      console.log('user', user, error);
       if (error) {
         dispatch(setStatus('error'));
       } else {
         dispatch(setUser(user));
+        dispatch(setStatus('finished'));
       }
     };
     if (!user) {

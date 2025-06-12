@@ -8,11 +8,12 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const user = useCurrentUser();
-  const userStatus = useAppSelector(store => store.auth.status);
+  const userStatus = useAppSelector((store) => store.auth.status);
   const location = useLocation();
 
-  if (!user && userStatus === 'finished') {
-    window.alert('You are not logged in');
+  console.log('user', user, userStatus);
+
+  if ((!user && userStatus === 'finished') || userStatus === 'error') {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 

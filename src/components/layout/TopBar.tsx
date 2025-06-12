@@ -4,6 +4,7 @@ import { useCurrentUser } from '~/services/auth';
 import { links } from '~/pages/links';
 import { RiUserLine, RiLogoutBoxLine, RiArrowDownSLine } from 'react-icons/ri';
 import { account } from '~/services/appwrite';
+import logo from '~/public/learnfrontend-logo.svg';
 
 export const TopBar = () => {
   const user = useCurrentUser();
@@ -30,7 +31,7 @@ export const TopBar = () => {
             c="inherit"
             style={{ textDecoration: 'none' }}
           >
-            LearnFrontend
+            <img src={logo} alt="logo" style={{ height: '60px' }} />
           </Text>
         </Group>
 

@@ -3,11 +3,12 @@ import { useForm } from '@mantine/form';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { login } from '../../services/auth';
-import { setStatus, setUser } from '../../store/features/authSlice';
+import { setStatus } from '../../store/features/authSlice';
 import { links } from '../links';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
+import logo from '~/public/learnfrontend-logo.svg';
 
 interface LoginForm {
   email: string;
@@ -60,8 +61,9 @@ export const LoginPage = () => {
   };
 
   return (
-    <Container size={420} my={40}>
-      <Title ta="center">{t('auth.login')}</Title>
+    <Container size={420} py={40}>
+      {/* <Title ta="center">{t('auth.login')}</Title> */}
+      <img src={logo} alt="logo" style={{width: '100%'}} />
       <Paper withBorder shadow="md" p={30} mt={30} radius="md">
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <TextInput
