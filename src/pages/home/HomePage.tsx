@@ -3,8 +3,9 @@ import { useCurrentUser } from '~/services/auth';
 import { Link } from 'react-router-dom';
 import { links } from '../links';
 import { useTranslation } from 'react-i18next';
+import { withProtectedRoute } from '~/components/auth/ProtectedRoute';
 
-export const HomePage = () => {
+export const HomePage = withProtectedRoute(() => {
   const user = useCurrentUser();
   const { t } = useTranslation();
 
@@ -19,4 +20,4 @@ export const HomePage = () => {
       </Button>
     </Container>
   );
-};
+});

@@ -9,13 +9,14 @@ import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
 import logo from '~/public/learnfrontend-logo.svg';
+import { withUnauthorizedRoute } from '~/components/auth/UnauthorizedRoute';
 
 interface LoginForm {
   email: string;
   password: string;
 }
 
-export const LoginPage = () => {
+export const LoginPage = withUnauthorizedRoute(() => {
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -97,4 +98,4 @@ export const LoginPage = () => {
       </Paper>
     </Container>
   );
-};
+});

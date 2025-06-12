@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { useMantineColorScheme } from '@mantine/core';
 import { RiMoonFill, RiSunFill, RiComputerLine } from 'react-icons/ri';
+import { withProtectedRoute } from '~/components/auth/ProtectedRoute';
 
 interface ChangePasswordForm {
   currentPassword: string;
@@ -25,7 +26,7 @@ interface ChangePasswordForm {
   confirmPassword: string;
 }
 
-export const ProfilePage = () => {
+export const ProfilePage = withProtectedRoute(() => {
   const [loading, setLoading] = useState(false);
   const user = useCurrentUser();
   const { t, i18n } = useTranslation();
@@ -164,4 +165,4 @@ export const ProfilePage = () => {
       </Paper>
     </Container>
   );
-};
+});

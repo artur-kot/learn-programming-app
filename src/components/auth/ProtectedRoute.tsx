@@ -19,3 +19,11 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   return <>{children}</>;
 };
+
+export const withProtectedRoute = (Component: React.ComponentType<any>) => {
+  return (props: any) => (
+    <ProtectedRoute>
+      <Component {...props} />
+    </ProtectedRoute>
+  );
+};

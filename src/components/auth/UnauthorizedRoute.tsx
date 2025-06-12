@@ -14,3 +14,11 @@ export const UnauthorizedRoute = ({ children }: UnauthorizedRouteProps) => {
 
   return <>{children}</>;
 };
+
+export const withUnauthorizedRoute = (Component: React.ComponentType<any>) => {
+  return (props: any) => (
+    <UnauthorizedRoute>
+      <Component {...props} />
+    </UnauthorizedRoute>
+  );
+};
