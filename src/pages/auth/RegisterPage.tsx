@@ -1,4 +1,13 @@
-import { TextInput, PasswordInput, Button, Paper, Title, Container, Text } from '@mantine/core';
+import {
+  TextInput,
+  PasswordInput,
+  Button,
+  Paper,
+  Title,
+  Container,
+  Text,
+  FocusTrap,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
@@ -8,6 +17,7 @@ import { links } from '../links';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
+import logo from '~/public/learnfrontend-logo.svg';
 
 interface RegisterForm {
   email: string;
@@ -53,41 +63,44 @@ export const RegisterPage = () => {
   };
 
   return (
-    <Container size={420} my={40}>
-      <Title ta="center">{t('auth.register')}</Title>
-      <Paper withBorder shadow="md" p={30} mt={30} radius="md">
-        <form onSubmit={form.onSubmit(handleSubmit)}>
-          <TextInput
-            label={t('auth.email')}
-            placeholder="you@example.com"
-            required
-            {...form.getInputProps('email')}
-          />
-          <PasswordInput
-            label={t('auth.password')}
-            placeholder={t('auth.password')}
-            required
-            mt="md"
-            {...form.getInputProps('password')}
-          />
-          <PasswordInput
-            label={t('auth.confirmPassword')}
-            placeholder={t('auth.confirmPassword')}
-            required
-            mt="md"
-            {...form.getInputProps('confirmPassword')}
-          />
-          <Button fullWidth mt="xl" type="submit" loading={loading}>
-            {t('auth.register')}
-          </Button>
-          <Text ta="center" mt="md">
-            {t('auth.haveAccount')}{' '}
-            <Link to={links.login} style={{ textDecoration: 'none' }}>
-              {t('auth.login')}
-            </Link>
-          </Text>
-        </form>
-      </Paper>
-    </Container>
+    <FocusTrap>
+      <Container size={420} my={40}>
+        {/* <Title ta="center">{t('auth.register')}</Title> */}
+        <img src={logo} alt="logo" style={{ width: '100%' }} />
+        <Paper withBorder shadow="md" p={30} mt={30} radius="md">
+          <form onSubmit={form.onSubmit(handleSubmit)}>
+            <TextInput
+              label={t('auth.email')}
+              placeholder="you@example.com"
+              required
+              {...form.getInputProps('email')}
+            />
+            <PasswordInput
+              label={t('auth.password')}
+              placeholder={t('auth.password')}
+              required
+              mt="md"
+              {...form.getInputProps('password')}
+            />
+            <PasswordInput
+              label={t('auth.confirmPassword')}
+              placeholder={t('auth.confirmPassword')}
+              required
+              mt="md"
+              {...form.getInputProps('confirmPassword')}
+            />
+            <Button fullWidth mt="xl" type="submit" loading={loading}>
+              {t('auth.register')}
+            </Button>
+            <Text ta="center" mt="md">
+              {t('auth.haveAccount')}{' '}
+              <Link to={links.login} style={{ textDecoration: 'none' }}>
+                {t('auth.login')}
+              </Link>
+            </Text>
+          </form>
+        </Paper>
+      </Container>
+    </FocusTrap>
   );
 };

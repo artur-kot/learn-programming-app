@@ -1,4 +1,4 @@
-import { TextInput, PasswordInput, Button, Paper, Title, Container, Text } from '@mantine/core';
+import { TextInput, PasswordInput, Button, Paper, Title, Container, Text, FocusTrap } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
@@ -60,7 +60,7 @@ export const LoginPage = () => {
     dispatch(setStatus('finished'));
   };
 
-  return (
+  return <FocusTrap>
     <Container size={420} py={40}>
       {/* <Title ta="center">{t('auth.login')}</Title> */}
       <img src={logo} alt="logo" style={{ width: '100%' }} />
@@ -93,8 +93,8 @@ export const LoginPage = () => {
               {t('auth.forgotPassword')}
             </Link>
           </Text>
-        </form>
-      </Paper>
-    </Container>
-  );
+          </form>
+        </Paper>
+      </Container>
+    </FocusTrap>
 };
