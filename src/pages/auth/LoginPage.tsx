@@ -3,7 +3,7 @@ import { useForm } from '@mantine/form';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { login } from '../../services/auth';
-import { setUser } from '../../store/features/authSlice';
+import { setStatus, setUser } from '../../store/features/authSlice';
 import { links } from '../links';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
@@ -35,13 +35,14 @@ export const LoginPage = () => {
 
   const handleSubmit = async (values: LoginForm) => {
     setLoading(true);
+    dispatch(setStatus('loading'));
     const { user, error } = await login(values.email, values.password);
 
     if (error) {
       if (error.code === 429) {
         notifications.show({
           title: t('common.error'),
-          message: 'Too many login attempts. Please try again later.',
+          message: t('auth.tooManyLoginAttempts'),
           color: 'red',
         });
       } else {
@@ -52,10 +53,10 @@ export const LoginPage = () => {
         });
       }
     } else if (user) {
-      dispatch(setUser(user));
       navigate(from, { replace: true });
     }
     setLoading(false);
+    dispatch(setStatus('finished'));
   };
 
   return (

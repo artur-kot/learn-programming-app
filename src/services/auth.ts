@@ -51,7 +51,7 @@ export const login = async (email: string, password: string) => {
 
 export const resetPassword = async (email: string) => {
   try {
-    await account.createRecovery(email, 'http://localhost:3000/reset-password');
+    await account.createRecovery(email, 'http://localhost:5173/reset-password');
     return { success: true, error: null };
   } catch (error: any) {
     return {
@@ -70,13 +70,11 @@ export const useCurrentUser = () => {
 
   useEffect(() => {
     const fetchUser = async () => {
-      dispatch(setStatus('loading'));
       const { user, error } = await getCurrentUser();
       if (error) {
         dispatch(setStatus('error'));
       } else {
         dispatch(setUser(user));
-        dispatch(setStatus('finished'));
       }
     };
     if (!user) {

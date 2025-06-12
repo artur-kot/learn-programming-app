@@ -17,12 +17,9 @@ export const authSlice = createSlice({
   reducers: {
     setUser: (state, action: PayloadAction<Models.Preferences | null>) => {
       state.user = action.payload;
-      state.status = 'finished';
     },
     setStatus: (state, action: PayloadAction<AuthState['status']>) => {
       state.status = action.payload;
-      if (action.payload !== 'error') {
-      }
     },
   },
 });

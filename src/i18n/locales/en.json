@@ -42,6 +42,7 @@
     "haveAccount": "Already have an account?",
     "noAccount": "Don't have an account?",
     "rememberPassword": "Remember your password?",
-    "resetPasswordEmailSent": "Password reset email has been sent. Please check your inbox."
+    "resetPasswordEmailSent": "Password reset email has been sent. Please check your inbox.",
+    "tooManyLoginAttempts": "Too many login attempts. Try again in an hour."
   }
 } 

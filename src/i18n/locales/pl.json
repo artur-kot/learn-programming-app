@@ -42,6 +42,7 @@
     "haveAccount": "Masz już konto?",
     "noAccount": "Nie masz konta?",
     "rememberPassword": "Pamiętasz hasło?",
-    "resetPasswordEmailSent": "Email do resetowania hasła został wysłany. Sprawdź swoją skrzynkę."
+    "resetPasswordEmailSent": "Email do resetowania hasła został wysłany. Sprawdź swoją skrzynkę.",
+    "tooManyLoginAttempts": "Za dużo prób logowania. Spróbuj ponownie za godzinę."
   }
 } 
