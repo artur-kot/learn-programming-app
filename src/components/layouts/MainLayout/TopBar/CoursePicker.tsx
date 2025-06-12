@@ -1,0 +1,81 @@
+import { Combobox, Group, Input, InputBase, Text, useCombobox } from '@mantine/core';
+import { useState } from 'react';
+import { Course } from '~/types/shared.types';
+import { RiHtml5Line, RiCss3Line, RiJavascriptLine, RiReactjsLine, RiNextjsLine } from 'react-icons/ri';
+
+interface Item {
+  icon: React.ReactNode;
+  value: Course;
+  label: string;
+}
+
+const courses: Item[] = [
+  { icon: <RiHtml5Line />, value: Course.HTML, label: 'HTML' },
+  { icon: <RiCss3Line />, value: Course.CSS, label: 'CSS' },
+  { icon: <RiJavascriptLine />, value: Course.JS, label: 'JavaScript' },
+  { icon: <RiJavascriptLine />, value: Course.TS, label: 'TypeScript' },
+  { icon: <RiReactjsLine />, value: Course.REACT, label: 'React' },
+  { icon: <RiNextjsLine />, value: Course.NEXT, label: 'Next.js' },
+];
+
+function SelectOption({ icon, label }: Item) {
+  return (
+    <Group>
+      <Text fz={20} c="gray.5">{icon}</Text>
+      <div>
+        <Text fz="sm" fw={500}>
+          {label}
+        </Text>
+      </div>
+    </Group>
+  );
+}
+
+export function CoursePicker() {
+  const combobox = useCombobox({
+    onDropdownClose: () => combobox.resetSelectedOption(),
+  });
+
+  const [value, setValue] = useState<string | null>(null);
+  const selectedOption = courses.find((item) => item.value === value);
+
+  const options = courses.map((item) => (
+    <Combobox.Option value={item.value} key={item.value}>
+      <SelectOption {...item} />
+    </Combobox.Option>
+  ));
+
+  return (
+    <Combobox
+      store={combobox}
+      withinPortal={false}
+      onOptionSubmit={(val) => {
+        setValue(val);
+        combobox.closeDropdown();
+      }}
+    >
+      <Combobox.Target>
+        <InputBase
+          miw={200}
+          component="button"
+          type="button"
+          pointer
+          rightSection={<Combobox.Chevron />}
+          onClick={() => combobox.toggleDropdown()}
+          rightSectionPointerEvents="none"
+          multiline
+        >
+          {selectedOption ? (
+            <SelectOption {...selectedOption} />
+          ) : (
+            <Input.Placeholder>Pick a course</Input.Placeholder>
+          )}
+        </InputBase>
+      </Combobox.Target>
+
+      <Combobox.Dropdown>
+        <Combobox.Options>{options}</Combobox.Options>
+      </Combobox.Dropdown>
+    </Combobox>
+  );
+}

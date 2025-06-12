@@ -1,6 +1,6 @@
 import { Container } from '@mantine/core';
 import { Outlet } from 'react-router-dom';
-import { withUnauthorized } from '../auth/UnauthorizedRoute';
+import { withUnauthorized } from '../../auth/UnauthorizedRoute';
 
 export const AuthLayout = withUnauthorized(() => {
   return (

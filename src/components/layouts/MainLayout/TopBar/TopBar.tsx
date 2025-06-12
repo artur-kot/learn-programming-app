@@ -7,6 +7,7 @@ import { account } from '~/services/appwrite';
 import logo from '~/public/learnfrontend-logo.svg';
 import { setUser } from '~/store/features/authSlice';
 import { useDispatch } from 'react-redux';
+import { CoursePicker } from './CoursePicker';
 
 export const TopBar = () => {
   const user = useCurrentUser();
@@ -39,8 +40,12 @@ export const TopBar = () => {
           </Text>
         </Group>
 
-        {user && (
-          <Group>
+        <Group>
+          <CoursePicker />
+        </Group>
+
+        <Group>
+          {user && (
             <Menu
               width={200}
               position="bottom-end"
@@ -73,8 +78,8 @@ export const TopBar = () => {
                 </Menu.Item>
               </Menu.Dropdown>
             </Menu>
-          </Group>
-        )}
+          )}
+        </Group>
       </Group>
     </AppShell.Header>
   );

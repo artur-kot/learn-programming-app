@@ -1,7 +1,7 @@
 import { AppShell } from '@mantine/core';
 import { Outlet } from 'react-router-dom';
-import { TopBar } from './TopBar';
-import { withProtected } from '../auth/ProtectedRoute';
+import { TopBar } from './TopBar/TopBar';
+import { withProtected } from '../../auth/ProtectedRoute';
 
 export const MainLayout = withProtected(() => {
   return (

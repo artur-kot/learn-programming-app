@@ -10,8 +10,8 @@ import { RegisterPage } from './pages/auth/RegisterPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import './i18n/i18n';
 import { useColorScheme } from '@mantine/hooks';
-import { MainLayout } from './components/layouts/MainLayout';
-import { AuthLayout } from './components/layouts/AuthLayout';
+import { MainLayout } from './components/layouts/MainLayout/MainLayout';
+import { AuthLayout } from './components/layouts/AuthLayout/AuthLayout';
 
 const AppContent = () => {
   return (

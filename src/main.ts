@@ -24,8 +24,6 @@ const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 let mainWindow: BrowserWindow | null = null;
 
 const createWindow = () => {
-  // Create the browser window.
-
   const screenSize = screen.getPrimaryDisplay().workAreaSize;
   mainWindow = new BrowserWindow({
     show: false,
