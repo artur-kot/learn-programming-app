@@ -4,6 +4,7 @@ import { useCurrentUser } from '../../services/auth';
 import { account } from '../../services/appwrite';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
+import { useState } from 'react';
 
 interface ChangePasswordForm {
   currentPassword: string;
@@ -12,6 +13,7 @@ interface ChangePasswordForm {
 }
 
 export const ProfilePage = () => {
+  const [loading, setLoading] = useState(false);
   const user = useCurrentUser();
   const { t, i18n } = useTranslation();
 
@@ -30,6 +32,7 @@ export const ProfilePage = () => {
   });
 
   const handleSubmit = async (values: ChangePasswordForm) => {
+    setLoading(true);
     try {
       await account.updatePassword(values.newPassword, values.currentPassword);
       form.reset();
@@ -46,6 +49,7 @@ export const ProfilePage = () => {
         color: 'red',
       });
     }
+    setLoading(false);
   };
 
   const handleLanguageChange = (value: string | null) => {
@@ -95,7 +99,7 @@ export const ProfilePage = () => {
             mt="md"
             {...form.getInputProps('confirmPassword')}
           />
-          <Button fullWidth mt="xl" type="submit">
+          <Button fullWidth mt="xl" type="submit" loading={loading}>
             {t('profile.updatePassword')}
           </Button>
         </form>

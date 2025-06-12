@@ -1,4 +1,4 @@
-import { HashRouter, Route, Routes } from 'react-router';
+import { HashRouter, Route, Routes, useLocation } from 'react-router';
 import { MantineProvider, AppShell } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { Provider } from 'react-redux';
@@ -14,9 +14,12 @@ import { useCurrentUser } from './services/auth';
 import './i18n/i18n';
 
 const AppContent = () => {
+  const location = useLocation();
+  const showTopBar = !location.pathname.startsWith('/auth');
+
   return (
-    <AppShell header={{ height: 60 }}>
-      <TopBar />
+    <AppShell header={{ height: showTopBar ? 60 : 0 }}>
+      {showTopBar && <TopBar />}
       <AppShell.Main>
         <Routes>
           {/* Protected routes */}

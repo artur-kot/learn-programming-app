@@ -36,6 +36,12 @@
     "register": "Zarejestruj się",
     "email": "Email",
     "password": "Hasło",
-    "confirmPassword": "Potwierdź hasło"
+    "confirmPassword": "Potwierdź hasło",
+    "forgotPassword": "Zapomniałeś hasła",
+    "resetPassword": "Resetuj hasło",
+    "haveAccount": "Masz już konto?",
+    "noAccount": "Nie masz konta?",
+    "rememberPassword": "Pamiętasz hasło?",
+    "resetPasswordEmailSent": "Email do resetowania hasła został wysłany. Sprawdź swoją skrzynkę."
   }
 } 

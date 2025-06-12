@@ -5,6 +5,9 @@ import { useDispatch } from 'react-redux';
 import { login } from '../../services/auth';
 import { setUser } from '../../store/features/authSlice';
 import { links } from '../links';
+import { useTranslation } from 'react-i18next';
+import { notifications } from '@mantine/notifications';
+import { useState } from 'react';
 
 interface LoginForm {
   email: string;
@@ -12,6 +15,8 @@ interface LoginForm {
 }
 
 export const LoginPage = () => {
+  const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
@@ -24,48 +29,65 @@ export const LoginPage = () => {
     },
     validate: {
       email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Invalid email'),
-      password: (value) => (value.length < 6 ? 'Password must be at least 6 characters' : null),
+      password: (value) => (value.length < 6 ? t('common.passwordLength') : null),
     },
   });
 
   const handleSubmit = async (values: LoginForm) => {
-    const user = await login(values.email, values.password);
-    if (user) {
+    setLoading(true);
+    const { user, error } = await login(values.email, values.password);
+
+    if (error) {
+      if (error.code === 429) {
+        notifications.show({
+          title: t('common.error'),
+          message: 'Too many login attempts. Please try again later.',
+          color: 'red',
+        });
+      } else {
+        notifications.show({
+          title: t('common.error'),
+          message: error.message,
+          color: 'red',
+        });
+      }
+    } else if (user) {
       dispatch(setUser(user));
       navigate(from, { replace: true });
     }
+    setLoading(false);
   };
 
   return (
     <Container size={420} my={40}>
-      <Title ta="center">Welcome back!</Title>
+      <Title ta="center">{t('auth.login')}</Title>
       <Paper withBorder shadow="md" p={30} mt={30} radius="md">
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <TextInput
-            label="Email"
+            label={t('auth.email')}
             placeholder="you@example.com"
             required
             {...form.getInputProps('email')}
           />
           <PasswordInput
-            label="Password"
-            placeholder="Your password"
+            label={t('auth.password')}
+            placeholder={t('auth.password')}
             required
             mt="md"
             {...form.getInputProps('password')}
           />
-          <Button fullWidth mt="xl" type="submit">
-            Sign in
+          <Button fullWidth mt="xl" type="submit" loading={loading}>
+            {t('auth.login')}
           </Button>
           <Text ta="center" mt="md">
-            Don't have an account?{' '}
+            {t('auth.noAccount')}{' '}
             <Link to={links.register} style={{ textDecoration: 'none' }}>
-              Register
+              {t('auth.register')}
             </Link>
           </Text>
           <Text ta="center" mt="xs">
             <Link to={links.forgotPassword} style={{ textDecoration: 'none' }}>
-              Forgot password?
+              {t('auth.forgotPassword')}
             </Link>
           </Text>
         </form>

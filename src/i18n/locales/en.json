@@ -36,6 +36,12 @@
     "register": "Register",
     "email": "Email",
     "password": "Password",
-    "confirmPassword": "Confirm Password"
+    "confirmPassword": "Confirm Password",
+    "forgotPassword": "Forgot Password",
+    "resetPassword": "Reset Password",
+    "haveAccount": "Already have an account?",
+    "noAccount": "Don't have an account?",
+    "rememberPassword": "Remember your password?",
+    "resetPasswordEmailSent": "Password reset email has been sent. Please check your inbox."
   }
 } 
