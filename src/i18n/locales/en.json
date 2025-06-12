@@ -28,7 +28,13 @@
     "enterNewPassword": "Enter your new password",
     "updatePassword": "Update Password",
     "passwordUpdated": "Password updated successfully!",
-    "passwordUpdateError": "Failed to update password. Please check your current password and try again."
+    "passwordUpdateError": "Failed to update password. Please check your current password and try again.",
+    "theme": {
+      "title": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    }
   },
   "auth": {
     "login": "Login",

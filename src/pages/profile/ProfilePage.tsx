@@ -1,10 +1,23 @@
-import { PasswordInput, Button, Paper, Title, Container, Text, Select } from '@mantine/core';
+import {
+  PasswordInput,
+  Button,
+  Paper,
+  Title,
+  Container,
+  Text,
+  Select,
+  SegmentedControl,
+  Center,
+  Flex,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useCurrentUser } from '../../services/auth';
 import { account } from '../../services/appwrite';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
+import { useMantineColorScheme } from '@mantine/core';
+import { RiMoonFill, RiSunFill, RiComputerLine } from 'react-icons/ri';
 
 interface ChangePasswordForm {
   currentPassword: string;
@@ -16,6 +29,7 @@ export const ProfilePage = () => {
   const [loading, setLoading] = useState(false);
   const user = useCurrentUser();
   const { t, i18n } = useTranslation();
+  const { setColorScheme, colorScheme } = useMantineColorScheme();
 
   const form = useForm<ChangePasswordForm>({
     initialValues: {
@@ -65,6 +79,50 @@ export const ProfilePage = () => {
         <Text size="lg" mb="md">
           {t('auth.email')}: {user?.email}
         </Text>
+
+        <Text size="sm" fw={500} mb="xs">
+          {t('profile.theme.title')}
+        </Text>
+        <SegmentedControl
+          value={colorScheme}
+          onChange={(value) => setColorScheme(value as 'light' | 'dark' | 'auto')}
+          data={[
+            {
+              value: 'light',
+              label: (
+                <Center>
+                  <Flex gap="xs" align="center">
+                    <RiSunFill size="1rem" />
+                    {t('profile.theme.light')}
+                  </Flex>
+                </Center>
+              ),
+            },
+            {
+              value: 'dark',
+              label: (
+                <Center>
+                  <Flex gap="xs" align="center">
+                    <RiMoonFill size="1rem" />
+                    {t('profile.theme.dark')}
+                  </Flex>
+                </Center>
+              ),
+            },
+            {
+              value: 'auto',
+              label: (
+                <Center>
+                  <Flex gap="xs" align="center">
+                    <RiComputerLine size="1rem" />
+                    {t('profile.theme.system')}
+                  </Flex>
+                </Center>
+              ),
+            },
+          ]}
+          mb="xl"
+        />
 
         <Select
           label={t('profile.language')}

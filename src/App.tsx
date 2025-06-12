@@ -10,9 +10,9 @@ import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { TopBar } from './components/layout/TopBar';
-import { useCurrentUser } from './services/auth';
 import './i18n/i18n';
 import { UnauthorizedRoute } from './components/auth/UnauthorizedRoute';
+import { useColorScheme } from '@mantine/hooks';
 
 const AppContent = () => {
   const location = useLocation();
@@ -74,9 +74,11 @@ const AppContent = () => {
 };
 
 export const App = () => {
+  const colorScheme = useColorScheme();
+
   return (
     <Provider store={store}>
-      <MantineProvider>
+      <MantineProvider defaultColorScheme={colorScheme}>
         <Notifications />
         <HashRouter>
           <AppContent />

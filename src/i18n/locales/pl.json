@@ -28,7 +28,13 @@
     "enterNewPassword": "Wprowadź nowe hasło",
     "updatePassword": "Aktualizuj hasło",
     "passwordUpdated": "Hasło zostało zaktualizowane!",
-    "passwordUpdateError": "Nie udało się zaktualizować hasła. Sprawdź swoje aktualne hasło i spróbuj ponownie."
+    "passwordUpdateError": "Nie udało się zaktualizować hasła. Sprawdź swoje aktualne hasło i spróbuj ponownie.",
+    "theme": {
+      "title": "Motyw",
+      "light": "Jasny",
+      "dark": "Ciemny",
+      "system": "System"
+    }
   },
   "auth": {
     "login": "Zaloguj się",
