@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, screen } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
@@ -25,15 +25,22 @@ let mainWindow: BrowserWindow | null = null;
 
 const createWindow = () => {
   // Create the browser window.
+
+  const screenSize = screen.getPrimaryDisplay().workAreaSize;
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    show: false,
+    width: screenSize.width,
+    height: screenSize.height,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
-
-  mainWindow.setMinimumSize(1200, 800);
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.setMinimumSize(1200, 800);
+    mainWindow?.setMenuBarVisibility(false);
+    mainWindow?.maximize();
+    mainWindow?.show();
+  });
 
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
