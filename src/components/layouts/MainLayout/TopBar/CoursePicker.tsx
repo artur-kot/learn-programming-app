@@ -2,6 +2,9 @@ import { Combobox, Group, Input, InputBase, Text, useCombobox } from '@mantine/c
 import { useState } from 'react';
 import { Course } from '~/types/shared.types';
 import { RiHtml5Line, RiCss3Line, RiJavascriptLine, RiReactjsLine, RiNextjsLine } from 'react-icons/ri';
+import { RootState } from '~/store';
+import { useDispatch, useSelector } from 'react-redux';
+import { setCourse } from '~/store/features/globalSlice';
 
 interface Item {
   icon: React.ReactNode;
@@ -32,12 +35,13 @@ function SelectOption({ icon, label }: Item) {
 }
 
 export function CoursePicker() {
+  const selectedCourse = useSelector((state: RootState) => state.global.course);
+  const dispatch = useDispatch();
   const combobox = useCombobox({
     onDropdownClose: () => combobox.resetSelectedOption(),
   });
 
-  const [value, setValue] = useState<string | null>(null);
-  const selectedOption = courses.find((item) => item.value === value);
+  const selectedOption = courses.find((item) => item.value === selectedCourse);
 
   const options = courses.map((item) => (
     <Combobox.Option value={item.value} key={item.value}>
@@ -50,7 +54,7 @@ export function CoursePicker() {
       store={combobox}
       withinPortal={false}
       onOptionSubmit={(val) => {
-        setValue(val);
+        dispatch(setCourse(val));
         combobox.closeDropdown();
       }}
     >
