@@ -31,7 +31,6 @@ export const NavigationBar = ({ topics }: NavigationBarProps) => {
   const NavItem = ({
     name,
     index,
-    isSubtopic = false,
     hasSubtopics = false,
   }: {
     name: string;
@@ -48,61 +47,68 @@ export const NavigationBar = ({ topics }: NavigationBarProps) => {
     };
 
     return (
-      <Button
-        variant="subtle"
-        color={isSelected(name) ? 'blue' : 'gray'}
-        justify="flex-start"
-        w="100%"
-        styles={{
-          label: {
-            width: '100%',
-          },
-        }}
-        leftSection={
-          <Text size="sm" fw={500}>
-            {index}.
-          </Text>
-        }
-        rightSection={
-          showChevron && (
-            <UnstyledButton
-              onClick={handleChevronClick}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <RiArrowDownSLine
-                size={20}
-                style={{
-                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 200ms ease',
-                }}
-              />
-            </UnstyledButton>
-          )
-        }
-        onClick={() => {
-          dispatch(setSelectedTopic(name));
-        }}
-      >
-        <Group justify="space-between" wrap="nowrap" w="100%" flex={1}>
-          <Group gap="xs" wrap="nowrap">
+      <Group gap={0}>
+        <Button
+          variant="subtle"
+          color={isSelected(name) ? 'blue' : 'gray'}
+          justify="flex-start"
+          flex={1}
+          size="compact-lg"
+          styles={{
+            label: {
+              width: '100%',
+            },
+          }}
+          leftSection={
             <Text size="sm" fw={500}>
-              {name}
+              {index}.
             </Text>
+          }
+          onClick={() => {
+            if (hasSubtopics && !isExpanded) {
+              toggleTopic(name);
+            }
+            dispatch(setSelectedTopic(name));
+          }}
+        >
+          <Group justify="space-between" wrap="nowrap" w="100%" flex={1}>
+            <Group gap="xs" wrap="nowrap">
+              <Text size="sm" fw={500}>
+                {name}
+              </Text>
+            </Group>
           </Group>
-        </Group>
-      </Button>
+        </Button>
+        {showChevron && (
+          <Button
+            variant="subtle"
+            size="xs"
+            color="gray"
+            onClick={handleChevronClick}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <RiArrowDownSLine
+              size={20}
+              style={{
+                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 200ms ease',
+              }}
+            />
+          </Button>
+        )}
+      </Group>
     );
   };
 
   return (
     <AppShell.Navbar p="xs" style={{ width: 300 }}>
-      <Stack gap="xs">
+      <Stack gap={0}>
         {topics[course].map((topic, index) => (
           <div key={topic.name}>
             <NavItem name={topic.name} index={index + 1} hasSubtopics={!!topic.subtopics?.length} />
             {topic.subtopics && (
               <Collapse in={expandedTopics[topic.name]}>
-                <Stack gap="xs" pl="md" mt="xs">
+                <Stack gap={0} pl="md" my="xs">
                   {topic.subtopics.map((subtopic, subIndex) => (
                     <NavItem key={subtopic} name={subtopic} index={subIndex + 1} isSubtopic />
                   ))}
