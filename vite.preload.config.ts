@@ -10,7 +10,7 @@ export default defineConfig({
     lib: {
       entry: 'src/main.ts',
       name: 'main',
-      formats: ['es'],
+      formats: ['umd'],
     },
   },
 });
