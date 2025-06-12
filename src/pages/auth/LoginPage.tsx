@@ -9,14 +9,13 @@ import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
 import logo from '~/public/learnfrontend-logo.svg';
-import { withUnauthorizedRoute } from '~/components/auth/UnauthorizedRoute';
 
 interface LoginForm {
   email: string;
   password: string;
 }
 
-export const LoginPage = withUnauthorizedRoute(() => {
+export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -64,7 +63,7 @@ export const LoginPage = withUnauthorizedRoute(() => {
   return (
     <Container size={420} py={40}>
       {/* <Title ta="center">{t('auth.login')}</Title> */}
-      <img src={logo} alt="logo" style={{width: '100%'}} />
+      <img src={logo} alt="logo" style={{ width: '100%' }} />
       <Paper withBorder shadow="md" p={30} mt={30} radius="md">
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <TextInput
@@ -98,4 +97,4 @@ export const LoginPage = withUnauthorizedRoute(() => {
       </Paper>
     </Container>
   );
-});
+};

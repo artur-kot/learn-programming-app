@@ -1,4 +1,4 @@
-import { HashRouter, Route, Routes, useLocation } from 'react-router';
+import { HashRouter, Route, Routes } from 'react-router';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { Provider } from 'react-redux';
@@ -11,37 +11,22 @@ import { ProfilePage } from './pages/profile/ProfilePage';
 import './i18n/i18n';
 import { useColorScheme } from '@mantine/hooks';
 import { MainLayout } from './components/layouts/MainLayout';
+import { AuthLayout } from './components/layouts/AuthLayout';
 
 const AppContent = () => {
   return (
-        <Routes>
-          {/* Protected routes */}
-          <Route path="/" element={<MainLayout />}>
-            <Route
-              path="/"
-              index
-              element={<HomePage />}
-            />
-            <Route
-              path="/profile"
-              element={<ProfilePage />}
-            />
-          </Route>
+    <Routes>
+      <Route path="/" element={<MainLayout />}>
+        <Route path="/" index element={<HomePage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+      </Route>
 
-          {/* Auth routes */}
-          <Route
-            path="/auth/login"
-            element={<LoginPage />}
-          />
-          <Route
-            path="/auth/register"
-            element={<RegisterPage />}
-          />
-          <Route
-            path="/auth/forgot-password"
-            element={<ForgotPasswordPage />}
-          />
-      </Routes>
+      <Route path="/auth" element={<AuthLayout />}>
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/register" element={<RegisterPage />} />
+        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+      </Route>
+    </Routes>
   );
 };
 

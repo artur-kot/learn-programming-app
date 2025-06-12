@@ -15,7 +15,7 @@ export const UnauthorizedRoute = ({ children }: UnauthorizedRouteProps) => {
   return <>{children}</>;
 };
 
-export const withUnauthorizedRoute = (Component: React.ComponentType<any>) => {
+export const withUnauthorized = (Component: React.ComponentType<any>) => {
   return (props: any) => (
     <UnauthorizedRoute>
       <Component {...props} />

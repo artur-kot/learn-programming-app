@@ -8,7 +8,6 @@ import { links } from '../links';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
-import { withUnauthorizedRoute } from '~/components/auth/UnauthorizedRoute';
 
 interface RegisterForm {
   email: string;
@@ -16,7 +15,7 @@ interface RegisterForm {
   confirmPassword: string;
 }
 
-export const RegisterPage = withUnauthorizedRoute(() => {
+export const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -91,4 +90,4 @@ export const RegisterPage = withUnauthorizedRoute(() => {
       </Paper>
     </Container>
   );
-});
+};

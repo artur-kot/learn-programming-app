@@ -6,13 +6,12 @@ import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
 import { links } from '../links';
-import { withUnauthorizedRoute } from '~/components/auth/UnauthorizedRoute';
 
 interface ForgotPasswordForm {
   email: string;
 }
 
-export const ForgotPasswordPage = withUnauthorizedRoute(() => {
+export const ForgotPasswordPage = () => {
   const [loading, setLoading] = useState(false);
   const { t } = useTranslation();
 
@@ -70,4 +69,4 @@ export const ForgotPasswordPage = withUnauthorizedRoute(() => {
       </Paper>
     </Container>
   );
-});
+};
