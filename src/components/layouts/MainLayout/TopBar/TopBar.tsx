@@ -26,11 +26,9 @@ export const TopBar = () => {
 
   return (
     <AppShell.Header>
-      <Group h="100%" px="md" justify="space-between">
-        <Group>
+      <Group h="100%" px="md" align='center' justify="space-between">
+        {/* <Group align='center' h='100%'>
           <Text
-            size="xl"
-            fw={700}
             component={Link}
             to={links.home}
             c="inherit"
@@ -38,7 +36,7 @@ export const TopBar = () => {
           >
             <img src={logo} alt="logo" style={{ height: '60px' }} />
           </Text>
-        </Group>
+        </Group> */}
 
         <Group>
           <CoursePicker />

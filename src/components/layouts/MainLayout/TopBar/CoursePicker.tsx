@@ -1,7 +1,15 @@
 import { CheckIcon, Combobox, Group, Input, InputBase, Text, useCombobox } from '@mantine/core';
 import { useState } from 'react';
 import { Course } from '~/types/shared.types';
-import { RiHtml5Line, RiCss3Line, RiJavascriptLine, RiReactjsLine, RiNextjsLine, RiArrowDownSLine, RiCheckLine } from 'react-icons/ri';
+import {
+  RiHtml5Line,
+  RiCss3Line,
+  RiJavascriptLine,
+  RiReactjsLine,
+  RiNextjsLine,
+  RiArrowDownSLine,
+  RiCheckLine,
+} from 'react-icons/ri';
 import { RootState } from '~/store';
 import { useDispatch, useSelector } from 'react-redux';
 import { setCourse } from '~/store/features/globalSlice';
@@ -24,14 +32,20 @@ const courses: Item[] = [
 
 function SelectOption({ icon, label, active }: Item) {
   return (
-    <Group align='center' gap='xs' justify='space-between' w='100%'>
-      <Text fz={20} c="gray.5" style={{ marginTop: 2 }}>{icon}</Text>
+    <Group align="center" gap="xs" justify="space-between" w="100%">
+      <Text fz={20} c="gray.5" style={{ marginTop: 2 }}>
+        {icon}
+      </Text>
       <div style={{ flex: 1 }}>
         <Text fz="sm" fw={500}>
           {label}
         </Text>
       </div>
-      {active && <Text fz="xs" c="gray.5"><RiCheckLine size={16} style={{ marginTop: 2 }} /></Text>}
+      {active && (
+        <Text fz="xs" c="gray.5">
+          <RiCheckLine size={16} style={{ marginTop: 2 }} />
+        </Text>
+      )}
     </Group>
   );
 }
@@ -54,9 +68,9 @@ export function CoursePicker() {
   return (
     <Combobox
       store={combobox}
-      withinPortal={false}
+      withinPortal={true}
       onOptionSubmit={(val) => {
-        dispatch(setCourse(val));
+        dispatch(setCourse(val as Course));
         combobox.closeDropdown();
       }}
     >
@@ -79,7 +93,7 @@ export function CoursePicker() {
         </InputBase>
       </Combobox.Target>
 
-      <Combobox.Dropdown>
+      <Combobox.Dropdown style={{ zIndex: 1000 }}>
         <Combobox.Options>{options}</Combobox.Options>
       </Combobox.Dropdown>
     </Combobox>
