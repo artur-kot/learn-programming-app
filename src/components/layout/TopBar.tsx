@@ -5,14 +5,18 @@ import { links } from '~/pages/links';
 import { RiUserLine, RiLogoutBoxLine, RiArrowDownSLine } from 'react-icons/ri';
 import { account } from '~/services/appwrite';
 import logo from '~/public/learnfrontend-logo.svg';
+import { setUser } from '~/store/features/authSlice';
+import { useDispatch } from 'react-redux';
 
 export const TopBar = () => {
   const user = useCurrentUser();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const handleLogout = async () => {
     try {
       await account.deleteSession('current');
+      dispatch(setUser(null));
       navigate(links.login);
     } catch (error) {
       console.error('Error logging out:', error);
