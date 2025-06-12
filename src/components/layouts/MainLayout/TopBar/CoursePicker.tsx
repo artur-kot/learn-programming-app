@@ -23,8 +23,8 @@ const courses: Item[] = [
 
 function SelectOption({ icon, label }: Item) {
   return (
-    <Group>
-      <Text fz={20} c="gray.5">{icon}</Text>
+    <Group align='center' gap='xs'>
+      <Text fz={20} c="gray.5" style={{ marginTop: 2 }}>{icon}</Text>
       <div>
         <Text fz="sm" fw={500}>
           {label}
