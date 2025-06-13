@@ -1,11 +1,13 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './features/authSlice';
 import globalReducer from './features/globalSlice';
+import codeEditorReducer from './slices/codeEditorSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     global: globalReducer,
+    codeEditor: codeEditorReducer,
   },
 });
 
