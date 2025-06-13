@@ -4,6 +4,7 @@ import { setSelectedTopic } from '~/store/features/globalSlice';
 import { Course } from '~/types/shared.types';
 import { useState } from 'react';
 import { RiArrowDownSLine } from 'react-icons/ri';
+import { useColorScheme } from '@mantine/hooks';
 
 interface Topic {
   name: string;
@@ -40,6 +41,7 @@ export const NavigationBar = ({ topics }: NavigationBarProps) => {
   }) => {
     const isExpanded = expandedTopics[name];
     const showChevron = hasSubtopics;
+    const scheme = useColorScheme();
 
     const handleChevronClick = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -49,8 +51,9 @@ export const NavigationBar = ({ topics }: NavigationBarProps) => {
     return (
       <Group gap={0}>
         <Button
-          variant="subtle"
-          color={isSelected(name) ? 'blue' : 'gray'}
+          variant={isSelected(name) ? 'gradient' : 'subtle'}
+          color='light'
+          // c={scheme === 'dark' ? 'gray.8' : 'gray.2'}
           justify="flex-start"
           flex={1}
           size="compact-lg"
@@ -82,7 +85,6 @@ export const NavigationBar = ({ topics }: NavigationBarProps) => {
         {showChevron && (
           <Button
             variant="subtle"
-            size="xs"
             color="gray"
             onClick={handleChevronClick}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
