@@ -17,7 +17,8 @@ import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { useMantineColorScheme } from '@mantine/core';
-import { RiMoonFill, RiSunFill, RiComputerLine } from 'react-icons/ri';
+import { RiMoonFill, RiSunFill, RiComputerLine, RiArrowLeftLine } from 'react-icons/ri';
+import { useNavigate } from 'react-router-dom';
 
 interface ChangePasswordForm {
   currentPassword: string;
@@ -30,6 +31,7 @@ export const ProfilePage = () => {
   const user = useCurrentUser();
   const { t, i18n } = useTranslation();
   const { setColorScheme, colorScheme } = useMantineColorScheme();
+  const navigate = useNavigate();
 
   const form = useForm<ChangePasswordForm>({
     initialValues: {
@@ -74,6 +76,14 @@ export const ProfilePage = () => {
 
   return (
     <Container size={420} my={40}>
+      <Button
+        variant="subtle"
+        leftSection={<RiArrowLeftLine size="1rem" />}
+        onClick={() => navigate(-1)}
+        mb="md"
+      >
+        {t('common.back')}
+      </Button>
       <Title ta="center">{t('profile.title')}</Title>
       <Paper withBorder shadow="md" p={30} mt={30} radius="md">
         <Text size="lg" mb="md">

@@ -11,8 +11,6 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const userStatus = useAppSelector((store) => store.auth.status);
   const location = useLocation();
 
-  console.log('user', user, userStatus);
-
   if ((!user && userStatus === 'finished') || userStatus === 'error') {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }

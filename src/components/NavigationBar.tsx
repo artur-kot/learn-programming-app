@@ -1,10 +1,8 @@
-import { AppShell, Stack, Collapse, UnstyledButton, Group, Text, rem, Button } from '@mantine/core';
+import { AppShell, Stack, NavLink, Text } from '@mantine/core';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { setSelectedTopic } from '~/store/features/globalSlice';
 import { Course } from '~/types/shared.types';
 import { useState } from 'react';
-import { RiArrowDownSLine } from 'react-icons/ri';
-import { useColorScheme } from '@mantine/hooks';
 
 interface Topic {
   name: string;
@@ -27,96 +25,39 @@ export const NavigationBar = ({ topics }: NavigationBarProps) => {
     }));
   };
 
-  const isSelected = (name: string) => selectedTopic === name;
-
-  const NavItem = ({
-    name,
-    index,
-    hasSubtopics = false,
-  }: {
-    name: string;
-    index: number;
-    isSubtopic?: boolean;
-    hasSubtopics?: boolean;
-  }) => {
-    const isExpanded = expandedTopics[name];
-    const showChevron = hasSubtopics;
-    const scheme = useColorScheme();
-
-    const handleChevronClick = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      toggleTopic(name);
-    };
-
-    return (
-      <Group gap={0}>
-        <Button
-          variant={isSelected(name) ? 'gradient' : 'subtle'}
-          color='light'
-          // c={scheme === 'dark' ? 'gray.8' : 'gray.2'}
-          justify="flex-start"
-          flex={1}
-          size="compact-lg"
-          styles={{
-            label: {
-              width: '100%',
-            },
-          }}
-          leftSection={
-            <Text size="sm" fw={500}>
-              {index}.
-            </Text>
-          }
-          onClick={() => {
-            if (hasSubtopics && !isExpanded) {
-              toggleTopic(name);
-            }
-            dispatch(setSelectedTopic(name));
-          }}
-        >
-          <Group justify="space-between" wrap="nowrap" w="100%" flex={1}>
-            <Group gap="xs" wrap="nowrap">
-              <Text size="sm" fw={500}>
-                {name}
-              </Text>
-            </Group>
-          </Group>
-        </Button>
-        {showChevron && (
-          <Button
-            variant="subtle"
-            color="gray"
-            onClick={handleChevronClick}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <RiArrowDownSLine
-              size={20}
-              style={{
-                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 200ms ease',
-              }}
-            />
-          </Button>
-        )}
-      </Group>
-    );
-  };
-
   return (
     <AppShell.Navbar p="xs" style={{ width: 300 }}>
       <Stack gap={0}>
         {topics[course].map((topic, index) => (
           <div key={topic.name}>
-            <NavItem name={topic.name} index={index + 1} hasSubtopics={!!topic.subtopics?.length} />
-            {topic.subtopics && (
-              <Collapse in={expandedTopics[topic.name]}>
-                <Stack gap={0} pl="md" my="xs">
-                  {topic.subtopics.map((subtopic, subIndex) => (
-                    <NavItem key={subtopic} name={subtopic} index={subIndex + 1} isSubtopic />
-                  ))}
-                </Stack>
-              </Collapse>
-            )}
+            <NavLink
+              label={
+                <Text size="sm" fw={500}>
+                  {index + 1}. {topic.name}
+                </Text>
+              }
+              active={selectedTopic === topic.name}
+              onClick={() => {
+                if (topic.subtopics?.length) {
+                  toggleTopic(topic.name);
+                }
+                dispatch(setSelectedTopic(topic.name));
+              }}
+              opened={expandedTopics[topic.name]}
+            >
+              {topic.subtopics?.map((subtopic, subIndex) => (
+                <NavLink
+                  key={subtopic}
+                  label={
+                    <Text size="sm">
+                      {index + 1}.{subIndex + 1} {subtopic}
+                    </Text>
+                  }
+                  active={selectedTopic === subtopic}
+                  onClick={() => dispatch(setSelectedTopic(subtopic))}
+                />
+              ))}
+            </NavLink>
           </div>
         ))}
       </Stack>
