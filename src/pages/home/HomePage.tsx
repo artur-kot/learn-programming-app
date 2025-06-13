@@ -1,23 +1,24 @@
-import Editor from '@monaco-editor/react';
-import { useMantineColorScheme } from '@mantine/core';
+import { CodeFiles } from '../../components/CodeFiles';
 
 export const HomePage = () => {
-  const { colorScheme } = useMantineColorScheme();
+  const initialFiles = [
+    {
+      id: '1',
+      name: 'index.js',
+      language: 'javascript',
+      content: '// Start coding here...',
+    },
+    {
+      id: '2',
+      name: 'styles.css',
+      language: 'css',
+      content: '/* Add your styles here */',
+    },
+  ];
 
   return (
     <div style={{ height: 'calc(100vh - 70px)' }}>
-      <Editor
-          height="100%"
-          defaultLanguage="javascript"
-          theme={colorScheme === 'dark' ? 'vs-dark' : 'light'}
-          defaultValue="// Start coding here..."
-          options={{
-            minimap: { enabled: false },
-            fontSize: 14,
-            wordWrap: 'on',
-            automaticLayout: true,
-          }}
-        />
+      <CodeFiles initialFiles={initialFiles} />
     </div>
   );
 };
