@@ -4,10 +4,8 @@ import { useCurrentUser } from '~/services/auth';
 import { links } from '~/pages/links';
 import { RiUserLine, RiLogoutBoxLine, RiArrowDownSLine } from 'react-icons/ri';
 import { account } from '~/services/appwrite';
-import logo from '~/public/learnfrontend-logo.svg';
 import { setUser } from '~/store/features/authSlice';
 import { useDispatch } from 'react-redux';
-import { CoursePicker } from './CoursePicker';
 
 export const TopBar = () => {
   const user = useCurrentUser();
@@ -26,58 +24,37 @@ export const TopBar = () => {
 
   return (
     <AppShell.Header>
-      <Group h="100%" px="md" align='center' justify="space-between">
-        {/* <Group align='center' h='100%'>
-          <Text
-            component={Link}
-            to={links.home}
-            c="inherit"
-            style={{ textDecoration: 'none' }}
-          >
-            <img src={logo} alt="logo" style={{ height: '60px' }} />
-          </Text>
-        </Group> */}
-
-        <Group>
-          <CoursePicker />
-        </Group>
-
-        <Group>
-          {user && (
-            <Menu
-              width={200}
-              position="bottom-end"
-              transitionProps={{ transition: 'pop-top-right' }}
-            >
-              <Menu.Target>
-                <UnstyledButton>
-                  <Group gap={7}>
-                    <Avatar size={30} radius="xl" />
-                    <Text size="sm" fw={500}>
-                      {user.email}
-                    </Text>
-                    <RiArrowDownSLine style={{ width: rem(12), height: rem(12) }} />
-                  </Group>
-                </UnstyledButton>
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Item
-                  leftSection={<RiUserLine style={{ width: rem(16), height: rem(16) }} />}
-                  component={Link}
-                  to={links.profile}
-                >
-                  Profile
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<RiLogoutBoxLine style={{ width: rem(16), height: rem(16) }} />}
-                  onClick={handleLogout}
-                >
-                  Logout
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
-          )}
-        </Group>
+      <Group h="100%" px="md" align="center" justify="flex-end">
+        {user && (
+          <Menu width={200} position="bottom-end" transitionProps={{ transition: 'pop-top-right' }}>
+            <Menu.Target>
+              <UnstyledButton>
+                <Group gap={7}>
+                  <Avatar size={30} radius="xl" />
+                  <Text size="sm" fw={500}>
+                    {user.email}
+                  </Text>
+                  <RiArrowDownSLine style={{ width: rem(12), height: rem(12) }} />
+                </Group>
+              </UnstyledButton>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item
+                leftSection={<RiUserLine style={{ width: rem(16), height: rem(16) }} />}
+                component={Link}
+                to={links.profile}
+              >
+                Profile
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<RiLogoutBoxLine style={{ width: rem(16), height: rem(16) }} />}
+                onClick={handleLogout}
+              >
+                Logout
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        )}
       </Group>
     </AppShell.Header>
   );
