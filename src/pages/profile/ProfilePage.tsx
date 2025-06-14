@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { useMantineColorScheme } from '@mantine/core';
 import { RiMoonFill, RiSunFill, RiComputerLine, RiArrowLeftLine } from 'react-icons/ri';
 import { useNavigate } from 'react-router-dom';
+import { BackButton } from '~/components/BackButton';
 
 interface ChangePasswordForm {
   currentPassword: string;
@@ -76,14 +77,7 @@ export const ProfilePage = () => {
 
   return (
     <Container size={420} my={40}>
-      <Button
-        variant="subtle"
-        leftSection={<RiArrowLeftLine size="1rem" />}
-        onClick={() => navigate(-1)}
-        mb="md"
-      >
-        {t('common.back')}
-      </Button>
+      <BackButton />
       <Title ta="center">{t('profile.title')}</Title>
       <Paper withBorder shadow="md" p={30} mt={30} radius="md">
         <Text size="lg" mb="md">

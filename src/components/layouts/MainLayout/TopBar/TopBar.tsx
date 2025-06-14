@@ -6,6 +6,7 @@ import { RiUserLine, RiLogoutBoxLine, RiArrowDownSLine } from 'react-icons/ri';
 import { account } from '~/services/appwrite';
 import { setUser } from '~/store/features/authSlice';
 import { useDispatch } from 'react-redux';
+import logo from '~/public/learnfrontend-logo.svg';
 
 export const TopBar = () => {
   const user = useCurrentUser();
@@ -24,7 +25,8 @@ export const TopBar = () => {
 
   return (
     <AppShell.Header>
-      <Group h="100%" px="md" align="center" justify="flex-end">
+      <Group h="100%" px="md" align="center" justify="space-between">
+        <img src={logo} alt="logo" style={{ height: '100%' }} />
         {user && (
           <Menu width={200} position="bottom-end" transitionProps={{ transition: 'pop-top-right' }}>
             <Menu.Target>

@@ -2,6 +2,7 @@ import { Container, Title, Stack, Card, Text, Group } from '@mantine/core';
 import { useParams } from 'react-router-dom';
 import { Course } from '~/types/shared.types';
 import { useAppSelector } from '~/store/hooks';
+import { BackButton } from '~/components/BackButton';
 
 // Topics with support for subtopics
 const topics: Record<Course, { name: string; subtopics?: string[] }[]> = {
@@ -53,6 +54,7 @@ export const CoursePage = () => {
   if (!course || !topics[course]) {
     return (
       <Container>
+        <BackButton />
         <Title>Course not found</Title>
       </Container>
     );
@@ -60,6 +62,7 @@ export const CoursePage = () => {
 
   return (
     <Container size="lg" py="xl">
+      <BackButton />
       <Title order={1} mb="xl">
         {course.toUpperCase()} Course
       </Title>

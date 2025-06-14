@@ -1,4 +1,13 @@
-import { TextInput, PasswordInput, Button, Paper, Title, Container, Text, FocusTrap } from '@mantine/core';
+import {
+  TextInput,
+  PasswordInput,
+  Button,
+  Paper,
+  Title,
+  Container,
+  Text,
+  FocusTrap,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
@@ -9,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
 import logo from '~/public/learnfrontend-logo.svg';
+import { BackButton } from '~/components/BackButton';
 
 interface LoginForm {
   email: string;
@@ -60,41 +70,44 @@ export const LoginPage = () => {
     dispatch(setStatus('finished'));
   };
 
-  return <FocusTrap>
-    <Container size={420} py={40}>
-      {/* <Title ta="center">{t('auth.login')}</Title> */}
-      <img src={logo} alt="logo" style={{ width: '100%' }} />
-      <Paper withBorder shadow="md" p={30} mt={30} radius="md">
-        <form onSubmit={form.onSubmit(handleSubmit)}>
-          <TextInput
-            label={t('auth.email')}
-            placeholder="you@example.com"
-            required
-            {...form.getInputProps('email')}
-          />
-          <PasswordInput
-            label={t('auth.password')}
-            placeholder={t('auth.password')}
-            required
-            mt="md"
-            {...form.getInputProps('password')}
-          />
-          <Button fullWidth mt="xl" type="submit" loading={loading}>
-            {t('auth.login')}
-          </Button>
-          <Text ta="center" mt="md">
-            {t('auth.noAccount')}{' '}
-            <Link to={links.register} style={{ textDecoration: 'none' }}>
-              {t('auth.register')}
-            </Link>
-          </Text>
-          <Text ta="center" mt="xs">
-            <Link to={links.forgotPassword} style={{ textDecoration: 'none' }}>
-              {t('auth.forgotPassword')}
-            </Link>
-          </Text>
+  return (
+    <FocusTrap>
+      <Container size={420} py={40}>
+        <BackButton label="Home" />
+        <Title ta="center">{t('auth.login')}</Title>
+        <img src={logo} alt="logo" style={{ width: '100%' }} />
+        <Paper withBorder shadow="md" p={30} mt={30} radius="md">
+          <form onSubmit={form.onSubmit(handleSubmit)}>
+            <TextInput
+              label={t('auth.email')}
+              placeholder="you@example.com"
+              required
+              {...form.getInputProps('email')}
+            />
+            <PasswordInput
+              label={t('auth.password')}
+              placeholder={t('auth.password')}
+              required
+              mt="md"
+              {...form.getInputProps('password')}
+            />
+            <Button fullWidth mt="xl" type="submit" loading={loading}>
+              {t('auth.login')}
+            </Button>
+            <Text ta="center" mt="md">
+              {t('auth.noAccount')}{' '}
+              <Link to={links.register} style={{ textDecoration: 'none' }}>
+                {t('auth.register')}
+              </Link>
+            </Text>
+            <Text ta="center" mt="xs">
+              <Link to={links.forgotPassword} style={{ textDecoration: 'none' }}>
+                {t('auth.forgotPassword')}
+              </Link>
+            </Text>
           </form>
         </Paper>
       </Container>
     </FocusTrap>
+  );
 };

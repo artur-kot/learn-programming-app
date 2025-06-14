@@ -5,7 +5,7 @@ import { withProtected } from '../../auth/ProtectedRoute';
 
 export const MainLayout = withProtected(() => {
   return (
-    <AppShell header={{ height: 70 }}>
+    <AppShell header={{ height: 70 }} padding="md">
       <TopBar />
       <AppShell.Main>
         <Outlet />
