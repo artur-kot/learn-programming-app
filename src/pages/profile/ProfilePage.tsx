@@ -17,7 +17,7 @@ import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { useMantineColorScheme } from '@mantine/core';
-import { RiMoonFill, RiSunFill, RiComputerLine, RiArrowLeftLine } from 'react-icons/ri';
+import { RiMoonFill, RiSunFill, RiComputerLine } from 'react-icons/ri';
 import { useNavigate } from 'react-router-dom';
 import { BackButton } from '~/components/BackButton';
 
