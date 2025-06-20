@@ -17,16 +17,9 @@ import {
   ActionIcon,
   Tooltip,
 } from '@mantine/core';
-import { nprogress } from '@mantine/nprogress';
-import {
-  RiArrowLeftLine,
-  RiArrowRightLine,
-  RiCheckLine,
-  RiRobotLine,
-  RiCloseLine,
-  RiSparklingFill,
-} from 'react-icons/ri';
+import { RiArrowLeftLine, RiArrowRightLine, RiCheckLine, RiSparklingFill } from 'react-icons/ri';
 import { CodeFiles } from '~/components/CodeFiles';
+import { TopicAIAssistant } from '~/components/TopicAIAssistant';
 
 // Hardcoded exercises for now
 const EXERCISES = [
@@ -267,7 +260,7 @@ export const TopicPage = () => {
       transitionDuration={0}
       header={{ height: 0 }}
       navbar={{
-        width: "22.5%",
+        width: '22.5%',
         breakpoint: 'sm',
         collapsed: { mobile: true },
       }}
@@ -400,7 +393,7 @@ export const TopicPage = () => {
       {/* Main Content - Code Editor */}
       <AppShell.Main p="0">
         <Box h="100%" pos="relative">
-          <CodeFiles initialFiles={currentExercise.initialFiles}  />
+          <CodeFiles initialFiles={currentExercise.initialFiles} />
 
           {/* Floating AI Panel Toggle */}
           {!showAiPanel && (
@@ -424,72 +417,12 @@ export const TopicPage = () => {
       {/* Right Sidebar - AI Agent */}
       {showAiPanel && (
         <AppShell.Aside p="md">
-          <Stack gap="md" h="100%">
-            {/* AI Header */}
-            <Group justify="space-between">
-              <Group gap="xs">
-                <RiRobotLine size={20} />
-                <Title order={4}>AI Assistant</Title>
-              </Group>
-              <Tooltip label="Hide AI Panel">
-                <ActionIcon variant="subtle" onClick={() => setShowAiPanel(false)}>
-                  <RiCloseLine size={16} />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
-
-            <Divider />
-
-            {/* AI Content */}
-            <ScrollArea flex={1}>
-              <Stack gap="md">
-                <Paper p="md" bg="blue.0" withBorder>
-                  <Text size="sm" fw={500} mb="xs">
-                    💡 Tip
-                  </Text>
-                  <Text size="sm">
-                    I can help you with this exercise! Ask me questions about HTML, CSS, or
-                    JavaScript, and I'll provide guidance and explanations.
-                  </Text>
-                </Paper>
-
-                <Paper p="md" bg="gray.0" withBorder>
-                  <Text size="sm" fw={500} mb="xs">
-                    🎯 Current Exercise
-                  </Text>
-                  <Text size="sm" mb="xs">
-                    {currentExercise.title}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {currentExercise.task}
-                  </Text>
-                </Paper>
-
-                <Paper p="md" bg="green.0" withBorder>
-                  <Text size="sm" fw={500} mb="xs">
-                    ✅ Progress
-                  </Text>
-                  <Text size="sm">
-                    You've completed {completedExercises.length} out of {EXERCISES.length}{' '}
-                    exercises.
-                    {completedExercises.length === EXERCISES.length && ' Great job!'}
-                  </Text>
-                </Paper>
-
-                {/* Placeholder for AI chat */}
-                <Box>
-                  <Text size="sm" fw={500} mb="sm">
-                    Chat with AI
-                  </Text>
-                  <Paper p="md" bg="gray.1" withBorder>
-                    <Text size="sm" c="dimmed" ta="center">
-                      AI chat functionality will be implemented here
-                    </Text>
-                  </Paper>
-                </Box>
-              </Stack>
-            </ScrollArea>
-          </Stack>
+          <TopicAIAssistant
+            currentExercise={currentExercise}
+            completedExercises={completedExercises.length}
+            totalExercises={EXERCISES.length}
+            onClose={() => setShowAiPanel(false)}
+          />
         </AppShell.Aside>
       )}
     </AppShell>

@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, screen, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
-import fetch from 'node-fetch';
+import http from 'node:http';
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -94,51 +94,100 @@ app.on('open-url', (event, url) => {
 
 // Ollama API handlers
 ipcMain.handle('stream-ollama-response', async (event, { prompt, model = 'qwen2.5-coder:14b' }) => {
-  try {
-    const response = await fetch('http://localhost:11434/api/generate', {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      model,
+      prompt,
+      stream: true,
+    });
+
+    const options = {
+      hostname: 'localhost',
+      port: 11434,
+      path: '/api/generate',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
       },
-      body: JSON.stringify({
-        model,
-        prompt,
-        stream: true,
-      }),
-    });
+    };
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    // For node-fetch v3, we need to handle the response differently
-    const responseText = await response.text();
-    const lines = responseText.split('\n').filter((line) => line.trim());
-
-    for (const line of lines) {
-      try {
-        const data = JSON.parse(line);
-        if (data.response) {
-          event.sender.send('ollama-stream-chunk', {
-            chunk: data.response,
-            done: false,
-          });
-        }
-        if (data.done) {
-          event.sender.send('ollama-stream-chunk', { chunk: '', done: true });
-          break;
-        }
-      } catch (parseError) {
-        console.error('Error parsing Ollama response:', parseError);
+    const req = http.request(options, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP error! status: ${res.statusCode}`));
+        return;
       }
-    }
-  } catch (error) {
-    console.error('Error calling Ollama API:', error);
-    event.sender.send('ollama-stream-chunk', {
-      chunk: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      done: true,
+
+      let buffer = '';
+
+      res.on('data', (chunk) => {
+        buffer += chunk.toString();
+
+        // Process complete lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const data = JSON.parse(line);
+              if (data.response) {
+                event.sender.send('ollama-stream-chunk', {
+                  chunk: data.response,
+                  done: false,
+                });
+              }
+            } catch (parseError) {
+              console.error('Error parsing Ollama response:', parseError);
+            }
+          }
+        }
+      });
+
+      res.on('end', () => {
+        // Process any remaining buffer
+        if (buffer.trim()) {
+          const lines = buffer.split('\n').filter((line) => line.trim());
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line);
+              if (data.response) {
+                event.sender.send('ollama-stream-chunk', {
+                  chunk: data.response,
+                  done: false,
+                });
+              }
+            } catch (parseError) {
+              console.error('Error parsing final buffer:', parseError);
+            }
+          }
+        }
+        event.sender.send('ollama-stream-chunk', { chunk: '', done: true });
+        resolve(undefined);
+      });
+
+      res.on('error', (error) => {
+        console.error('Response error:', error);
+        event.sender.send('ollama-stream-chunk', {
+          chunk: `Error: ${error.message}`,
+          done: true,
+        });
+        reject(error);
+      });
     });
-  }
+
+    req.on('error', (error) => {
+      console.error('Request error:', error);
+      event.sender.send('ollama-stream-chunk', {
+        chunk: `Error: ${error.message}`,
+        done: true,
+      });
+      reject(error);
+    });
+
+    req.write(postData);
+    req.end();
+  });
 });
 
 // Test Ollama connection
