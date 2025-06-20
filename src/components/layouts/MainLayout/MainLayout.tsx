@@ -1,12 +1,15 @@
 import { AppShell } from '@mantine/core';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { TopBar } from './TopBar/TopBar';
 import { withProtected } from '../../auth/ProtectedRoute';
 
 export const MainLayout = withProtected(() => {
+  const location = useLocation();
+  const isTopicPage = location.pathname.includes('/topic/');
+
   return (
-    <AppShell header={{ height: 70 }} padding="md">
-      <TopBar />
+    <AppShell header={isTopicPage ? undefined : { height: 70 }} padding="md">
+      {!isTopicPage && <TopBar />}
       <AppShell.Main>
         <Outlet />
       </AppShell.Main>

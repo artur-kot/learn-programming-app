@@ -1,6 +1,7 @@
 import { HashRouter, Route, Routes } from 'react-router';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
+import { NavigationProgress } from '@mantine/nprogress';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import { HomePage } from './pages/home/HomePage';
@@ -40,6 +41,7 @@ export const App = () => {
   return (
     <Provider store={store}>
       <MantineProvider defaultColorScheme={colorScheme}>
+        <NavigationProgress />
         <Notifications />
         <HashRouter>
           <AppContent />

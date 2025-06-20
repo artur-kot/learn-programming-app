@@ -57,7 +57,7 @@ export const CodeFiles = ({ initialFiles = [] }: CodeFilesProps) => {
   const activeFile = files.find((file) => file.id === activeFileId);
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Tabs value={activeFileId} onChange={setActiveFileId}>
         <Tabs.List>
           {files.map((file) => (
@@ -89,10 +89,10 @@ export const CodeFiles = ({ initialFiles = [] }: CodeFilesProps) => {
         </Tabs.List>
       </Tabs>
 
-      <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
         {activeFile && (
           <>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, height: '100%' }}>
               <CodeEditor
                 language={activeFile.language}
                 value={activeFile.content}

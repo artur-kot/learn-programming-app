@@ -16,7 +16,6 @@ export const CodeEditor = ({
   onChange,
   theme = 'vs-dark',
 }: CodeEditorProps) => {
-  const { colorScheme } = useMantineColorScheme();
   const editorRef = useRef<any>(null);
 
   const handleEditorDidMount = (editor: any, monaco: Monaco) => {
@@ -30,7 +29,7 @@ export const CodeEditor = ({
 
   return (
     <Editor
-      height="100%"
+      height="calc(100vh - 103px)"
       language={language}
       theme={theme}
       value={value}

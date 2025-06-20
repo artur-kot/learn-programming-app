@@ -15,10 +15,12 @@ export const EditorBottomBar = ({ language }: EditorBottomBarProps) => {
   return (
     <Box
       style={{
+        height: '65px',
         padding: '6px 10px',
+        borderTop: '1px solid #e0e0e0',
       }}
     >
-      <Group justify="flex-end">
+      <Group justify="flex-end" align='center' h='100%'>
         <Group gap="xs">
           <Text size="xs" c="dimmed">
             {language}
