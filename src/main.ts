@@ -190,6 +190,12 @@ ipcMain.handle('stream-ollama-response', async (event, { prompt, model = 'qwen2.
   });
 });
 
+// Stop streaming handler
+ipcMain.handle('stop-ollama-stream', async () => {
+  // This will be handled by the client-side by setting streaming state to false
+  return { success: true };
+});
+
 // Test Ollama connection
 ipcMain.handle('test-ollama-connection', async () => {
   try {

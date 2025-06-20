@@ -14,8 +14,16 @@ import {
   Stack,
   Tooltip,
   Badge,
+  Code,
 } from '@mantine/core';
-import { RiSendPlaneFill, RiRobotFill, RiDownloadLine, RiCloseLine } from 'react-icons/ri';
+import {
+  RiSendPlaneFill,
+  RiRobotFill,
+  RiDownloadLine,
+  RiCloseLine,
+  RiStopLine,
+} from 'react-icons/ri';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -59,6 +67,7 @@ export const TopicAIAssistant: React.FC<TopicAIAssistantProps> = ({
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const testConnection = async () => {
@@ -102,6 +111,7 @@ export const TopicAIAssistant: React.FC<TopicAIAssistantProps> = ({
           setCurrentStreamingMessage('');
         }
         setIsLoading(false);
+        setIsStreaming(false);
       } else {
         setCurrentStreamingMessage((prev) => prev + data.chunk);
       }
@@ -121,6 +131,30 @@ export const TopicAIAssistant: React.FC<TopicAIAssistantProps> = ({
     }
   }, [messages, currentStreamingMessage]);
 
+  const getContextualPrompt = () => {
+    const recentMessages = messages.slice(-10); // Get last 10 messages
+    const contextMessages = recentMessages
+      .map((msg) => `${msg.isUser ? 'User' : 'Assistant'}: ${msg.content}`)
+      .join('\n');
+
+    return `I'm working on a coding exercise: "${currentExercise.title}". 
+
+Exercise details:
+- Task: ${currentExercise.task}
+- Difficulty: ${currentExercise.difficulty}
+- Theory: ${currentExercise.content}
+
+${contextMessages ? `Recent conversation context:\n${contextMessages}\n` : ''}
+
+Please help me with this exercise. You can:
+- Explain concepts I don't understand
+- Provide hints and guidance
+- Review my code and suggest improvements
+- Answer questions about HTML, CSS, or JavaScript
+
+What would you like to ask me about this exercise?`;
+  };
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
 
@@ -134,15 +168,36 @@ export const TopicAIAssistant: React.FC<TopicAIAssistantProps> = ({
     setMessages((prev) => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
+    setIsStreaming(true);
     setError(null);
     setCurrentStreamingMessage('');
 
     try {
-      await window.electronAPI.streamOllamaResponse(inputValue, selectedModel);
+      // Create a contextual prompt with recent conversation history
+      const contextualPrompt = `${getContextualPrompt()}\n\nUser: ${inputValue}\n\nAssistant:`;
+      await window.electronAPI.streamOllamaResponse(contextualPrompt, selectedModel);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get response from AI');
       setIsLoading(false);
+      setIsStreaming(false);
     }
+  };
+
+  const handleStopStreaming = () => {
+    if (currentStreamingMessage) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          content: currentStreamingMessage,
+          isUser: false,
+          timestamp: new Date(),
+        },
+      ]);
+      setCurrentStreamingMessage('');
+    }
+    setIsLoading(false);
+    setIsStreaming(false);
   };
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -166,23 +221,6 @@ export const TopicAIAssistant: React.FC<TopicAIAssistantProps> = ({
     if (!size) return '';
     const gb = size / (1024 * 1024 * 1024);
     return `(${gb.toFixed(1)}GB)`;
-  };
-
-  const getContextualPrompt = () => {
-    return `I'm working on a coding exercise: "${currentExercise.title}". 
-    
-Exercise details:
-- Task: ${currentExercise.task}
-- Difficulty: ${currentExercise.difficulty}
-- Theory: ${currentExercise.content}
-
-Please help me with this exercise. You can:
-- Explain concepts I don't understand
-- Provide hints and guidance
-- Review my code and suggest improvements
-- Answer questions about HTML, CSS, or JavaScript
-
-What would you like to ask me about this exercise?`;
   };
 
   return (
@@ -287,9 +325,75 @@ What would you like to ask me about this exercise?`;
                   color: message.isUser ? 'white' : 'inherit',
                 }}
               >
-                <Text size="xs" style={{ whiteSpace: 'pre-wrap' }}>
-                  {message.content}
-                </Text>
+                {message.isUser ? (
+                  <Text size="xs" style={{ whiteSpace: 'pre-wrap' }}>
+                    {message.content}
+                  </Text>
+                ) : (
+                  <Box style={{ color: 'inherit' }}>
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }: any) => (
+                          <Text size="xs" mb="xs">
+                            {children}
+                          </Text>
+                        ),
+                        h1: ({ children }: any) => (
+                          <Text size="xs" fw={700} mb="xs">
+                            {children}
+                          </Text>
+                        ),
+                        h2: ({ children }: any) => (
+                          <Text size="xs" fw={600} mb="xs">
+                            {children}
+                          </Text>
+                        ),
+                        h3: ({ children }: any) => (
+                          <Text size="xs" fw={600} mb="xs">
+                            {children}
+                          </Text>
+                        ),
+                        code: ({ children, className }: any) => (
+                          <Code style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>{children}</Code>
+                        ),
+                        pre: ({ children }: any) => (
+                          <Box mb="xs">
+                            <Code block style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                              {children}
+                            </Code>
+                          </Box>
+                        ),
+                        ul: ({ children }: any) => (
+                          <Box component="ul" mb="xs" style={{ paddingLeft: '1rem' }}>
+                            {children}
+                          </Box>
+                        ),
+                        ol: ({ children }: any) => (
+                          <Box component="ol" mb="xs" style={{ paddingLeft: '1rem' }}>
+                            {children}
+                          </Box>
+                        ),
+                        li: ({ children }: any) => (
+                          <Text size="xs" component="li" mb="xs">
+                            {children}
+                          </Text>
+                        ),
+                        strong: ({ children }: any) => (
+                          <Text size="xs" fw={600} component="span">
+                            {children}
+                          </Text>
+                        ),
+                        em: ({ children }: any) => (
+                          <Text size="xs" fs="italic" component="span">
+                            {children}
+                          </Text>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </Box>
+                )}
                 <Text size="xs" c="dimmed" mt={2}>
                   {formatTime(message.timestamp)}
                 </Text>
@@ -303,8 +407,68 @@ What would you like to ask me about this exercise?`;
                 p="xs"
                 style={{ maxWidth: '85%', backgroundColor: 'var(--mantine-color-gray-1)' }}
               >
-                <Text size="xs" style={{ whiteSpace: 'pre-wrap' }}>
-                  {currentStreamingMessage}
+                <Box>
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }: any) => (
+                        <Text size="xs" mb="xs">
+                          {children}
+                        </Text>
+                      ),
+                      h1: ({ children }: any) => (
+                        <Text size="xs" fw={700} mb="xs">
+                          {children}
+                        </Text>
+                      ),
+                      h2: ({ children }: any) => (
+                        <Text size="xs" fw={600} mb="xs">
+                          {children}
+                        </Text>
+                      ),
+                      h3: ({ children }: any) => (
+                        <Text size="xs" fw={600} mb="xs">
+                          {children}
+                        </Text>
+                      ),
+                      code: ({ children, className }: any) => (
+                        <Code style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>{children}</Code>
+                      ),
+                      pre: ({ children }: any) => (
+                        <Box mb="xs">
+                          <Code block style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                            {children}
+                          </Code>
+                        </Box>
+                      ),
+                      ul: ({ children }: any) => (
+                        <Box component="ul" mb="xs" style={{ paddingLeft: '1rem' }}>
+                          {children}
+                        </Box>
+                      ),
+                      ol: ({ children }: any) => (
+                        <Box component="ol" mb="xs" style={{ paddingLeft: '1rem' }}>
+                          {children}
+                        </Box>
+                      ),
+                      li: ({ children }: any) => (
+                        <Text size="xs" component="li" mb="xs">
+                          {children}
+                        </Text>
+                      ),
+                      strong: ({ children }: any) => (
+                        <Text size="xs" fw={600} component="span">
+                          {children}
+                        </Text>
+                      ),
+                      em: ({ children }: any) => (
+                        <Text size="xs" fs="italic" component="span">
+                          {children}
+                        </Text>
+                      ),
+                    }}
+                  >
+                    {currentStreamingMessage}
+                  </ReactMarkdown>
                   <span
                     style={{
                       animation: 'blink 1s infinite',
@@ -313,7 +477,7 @@ What would you like to ask me about this exercise?`;
                   >
                     ▋
                   </span>
-                </Text>
+                </Box>
               </Paper>
             </Box>
           )}
@@ -336,14 +500,25 @@ What would you like to ask me about this exercise?`;
             disabled={isLoading || !isConnected}
             size="xs"
           />
-          <Button
-            onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isLoading || !isConnected}
-            leftSection={<RiSendPlaneFill size={12} />}
-            size="xs"
-          >
-            Send
-          </Button>
+          {isStreaming ? (
+            <Button
+              onClick={handleStopStreaming}
+              leftSection={<RiStopLine size={12} />}
+              size="xs"
+              color="red"
+            >
+              Stop
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSendMessage}
+              disabled={!inputValue.trim() || isLoading || !isConnected}
+              leftSection={<RiSendPlaneFill size={12} />}
+              size="xs"
+            >
+              Send
+            </Button>
+          )}
         </Group>
       </Box>
     </Stack>

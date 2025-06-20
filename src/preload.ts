@@ -7,8 +7,11 @@ import { contextBridge, ipcRenderer } from 'electron';
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   // Ollama API methods
-  streamOllamaResponse: (prompt: string, model: string = 'qwen2.5-code:14b') =>
+  streamOllamaResponse: (prompt: string, model: string = 'qwen2.5-coder:14b') =>
     ipcRenderer.invoke('stream-ollama-response', { prompt, model }),
+
+  // Stop streaming
+  stopOllamaStream: () => ipcRenderer.invoke('stop-ollama-stream'),
 
   // Test Ollama connection
   testOllamaConnection: () => ipcRenderer.invoke('test-ollama-connection'),
@@ -29,6 +32,7 @@ declare global {
   interface Window {
     electronAPI: {
       streamOllamaResponse: (prompt: string, model?: string) => Promise<void>;
+      stopOllamaStream: () => Promise<{ success: boolean }>;
       testOllamaConnection: () => Promise<{
         success: boolean;
         models?: Array<{ value: string; label: string; size?: number; modified_at?: string }>;

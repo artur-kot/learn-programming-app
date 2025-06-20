@@ -13,8 +13,16 @@ import {
   Select,
   Stack,
   Tooltip,
+  Code,
 } from '@mantine/core';
-import { RiSendPlaneFill, RiRobotFill, RiRefreshLine, RiDownloadLine } from 'react-icons/ri';
+import {
+  RiSendPlaneFill,
+  RiRobotFill,
+  RiRefreshLine,
+  RiDownloadLine,
+  RiStopLine,
+} from 'react-icons/ri';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -40,6 +48,7 @@ export const AIAssistant: React.FC = () => {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const testConnection = async () => {
@@ -49,7 +58,6 @@ export const AIAssistant: React.FC = () => {
       setIsConnected(result.success);
       if (result.success && result.models) {
         setAvailableModels(result.models);
-        // Set the first available model as default if current one is not available
         if (result.models.length > 0 && !result.models.find((m) => m.value === selectedModel)) {
           setSelectedModel(result.models[0].value);
         }
@@ -65,15 +73,12 @@ export const AIAssistant: React.FC = () => {
   };
 
   useEffect(() => {
-    // Test Ollama connection on mount
     testConnection();
   }, []);
 
   useEffect(() => {
-    // Set up stream listener
     window.electronAPI.onOllamaStream((data) => {
       if (data.done) {
-        // Finalize the message
         if (currentStreamingMessage) {
           setMessages((prev) => [
             ...prev,
@@ -87,20 +92,18 @@ export const AIAssistant: React.FC = () => {
           setCurrentStreamingMessage('');
         }
         setIsLoading(false);
+        setIsStreaming(false);
       } else {
-        // Append chunk to current streaming message
         setCurrentStreamingMessage((prev) => prev + data.chunk);
       }
     });
 
-    // Cleanup listener on unmount
     return () => {
       window.electronAPI.removeOllamaStreamListener();
     };
   }, [currentStreamingMessage]);
 
   useEffect(() => {
-    // Auto-scroll to bottom when new messages arrive
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
@@ -108,6 +111,23 @@ export const AIAssistant: React.FC = () => {
       });
     }
   }, [messages, currentStreamingMessage]);
+
+  const getContextualPrompt = () => {
+    const recentMessages = messages.slice(-10); // Get last 10 messages
+    const contextMessages = recentMessages
+      .map((msg) => `${msg.isUser ? 'User' : 'Assistant'}: ${msg.content}`)
+      .join('\n');
+
+    return `You are a helpful AI coding assistant. You can help with:
+- Programming questions and explanations
+- Code review and debugging
+- Best practices and design patterns
+- Learning resources and tutorials
+
+${contextMessages ? `Recent conversation context:\n${contextMessages}\n` : ''}
+
+Please provide helpful, accurate, and well-formatted responses.`;
+  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -122,15 +142,35 @@ export const AIAssistant: React.FC = () => {
     setMessages((prev) => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
+    setIsStreaming(true);
     setError(null);
     setCurrentStreamingMessage('');
 
     try {
-      await window.electronAPI.streamOllamaResponse(inputValue, selectedModel);
+      const contextualPrompt = `${getContextualPrompt()}\n\nUser: ${inputValue}\n\nAssistant:`;
+      await window.electronAPI.streamOllamaResponse(contextualPrompt, selectedModel);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get response from AI');
       setIsLoading(false);
+      setIsStreaming(false);
     }
+  };
+
+  const handleStopStreaming = () => {
+    if (currentStreamingMessage) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          content: currentStreamingMessage,
+          isUser: false,
+          timestamp: new Date(),
+        },
+      ]);
+      setCurrentStreamingMessage('');
+    }
+    setIsLoading(false);
+    setIsStreaming(false);
   };
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -236,9 +276,75 @@ export const AIAssistant: React.FC = () => {
                   color: message.isUser ? 'white' : 'inherit',
                 }}
               >
-                <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                  {message.content}
-                </Text>
+                {message.isUser ? (
+                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                    {message.content}
+                  </Text>
+                ) : (
+                  <Box style={{ color: 'inherit' }}>
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }: any) => (
+                          <Text size="sm" mb="sm">
+                            {children}
+                          </Text>
+                        ),
+                        h1: ({ children }: any) => (
+                          <Text size="sm" fw={700} mb="sm">
+                            {children}
+                          </Text>
+                        ),
+                        h2: ({ children }: any) => (
+                          <Text size="sm" fw={600} mb="sm">
+                            {children}
+                          </Text>
+                        ),
+                        h3: ({ children }: any) => (
+                          <Text size="sm" fw={600} mb="sm">
+                            {children}
+                          </Text>
+                        ),
+                        code: ({ children, className }: any) => (
+                          <Code style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>{children}</Code>
+                        ),
+                        pre: ({ children }: any) => (
+                          <Box mb="sm">
+                            <Code block style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                              {children}
+                            </Code>
+                          </Box>
+                        ),
+                        ul: ({ children }: any) => (
+                          <Box component="ul" mb="sm" style={{ paddingLeft: '1rem' }}>
+                            {children}
+                          </Box>
+                        ),
+                        ol: ({ children }: any) => (
+                          <Box component="ol" mb="sm" style={{ paddingLeft: '1rem' }}>
+                            {children}
+                          </Box>
+                        ),
+                        li: ({ children }: any) => (
+                          <Text size="sm" component="li" mb="xs">
+                            {children}
+                          </Text>
+                        ),
+                        strong: ({ children }: any) => (
+                          <Text size="sm" fw={600} component="span">
+                            {children}
+                          </Text>
+                        ),
+                        em: ({ children }: any) => (
+                          <Text size="sm" fs="italic" component="span">
+                            {children}
+                          </Text>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </Box>
+                )}
                 <Text size="xs" c="dimmed" mt={4}>
                   {formatTime(message.timestamp)}
                 </Text>
@@ -252,8 +358,68 @@ export const AIAssistant: React.FC = () => {
                 p="sm"
                 style={{ maxWidth: '80%', backgroundColor: 'var(--mantine-color-gray-1)' }}
               >
-                <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                  {currentStreamingMessage}
+                <Box>
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }: any) => (
+                        <Text size="sm" mb="sm">
+                          {children}
+                        </Text>
+                      ),
+                      h1: ({ children }: any) => (
+                        <Text size="sm" fw={700} mb="sm">
+                          {children}
+                        </Text>
+                      ),
+                      h2: ({ children }: any) => (
+                        <Text size="sm" fw={600} mb="sm">
+                          {children}
+                        </Text>
+                      ),
+                      h3: ({ children }: any) => (
+                        <Text size="sm" fw={600} mb="sm">
+                          {children}
+                        </Text>
+                      ),
+                      code: ({ children, className }: any) => (
+                        <Code style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>{children}</Code>
+                      ),
+                      pre: ({ children }: any) => (
+                        <Box mb="sm">
+                          <Code block style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                            {children}
+                          </Code>
+                        </Box>
+                      ),
+                      ul: ({ children }: any) => (
+                        <Box component="ul" mb="sm" style={{ paddingLeft: '1rem' }}>
+                          {children}
+                        </Box>
+                      ),
+                      ol: ({ children }: any) => (
+                        <Box component="ol" mb="sm" style={{ paddingLeft: '1rem' }}>
+                          {children}
+                        </Box>
+                      ),
+                      li: ({ children }: any) => (
+                        <Text size="sm" component="li" mb="xs">
+                          {children}
+                        </Text>
+                      ),
+                      strong: ({ children }: any) => (
+                        <Text size="sm" fw={600} component="span">
+                          {children}
+                        </Text>
+                      ),
+                      em: ({ children }: any) => (
+                        <Text size="sm" fs="italic" component="span">
+                          {children}
+                        </Text>
+                      ),
+                    }}
+                  >
+                    {currentStreamingMessage}
+                  </ReactMarkdown>
                   <span
                     style={{
                       animation: 'blink 1s infinite',
@@ -262,7 +428,7 @@ export const AIAssistant: React.FC = () => {
                   >
                     ▋
                   </span>
-                </Text>
+                </Box>
               </Paper>
             </Box>
           )}
@@ -287,14 +453,25 @@ export const AIAssistant: React.FC = () => {
             flex={1}
             disabled={isLoading || !isConnected}
           />
-          <Button
-            onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isLoading || !isConnected}
-            leftSection={<RiSendPlaneFill size={16} />}
-            size="sm"
-          >
-            Send
-          </Button>
+          {isStreaming ? (
+            <Button
+              onClick={handleStopStreaming}
+              leftSection={<RiStopLine size={16} />}
+              size="sm"
+              color="red"
+            >
+              Stop
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSendMessage}
+              disabled={!inputValue.trim() || isLoading || !isConnected}
+              leftSection={<RiSendPlaneFill size={16} />}
+              size="sm"
+            >
+              Send
+            </Button>
+          )}
         </Group>
       </Box>
     </Paper>
