@@ -8,7 +8,7 @@ export const MainLayout = withProtected(() => {
   const isTopicPage = location.pathname.includes('/topic/');
 
   return (
-    <AppShell header={isTopicPage ? undefined : { height: 70 }} padding="md">
+    <AppShell transitionDuration={0} header={isTopicPage ? undefined : { height: 70 }} padding="md">
       {!isTopicPage && <TopBar />}
       <AppShell.Main>
         <Outlet />

@@ -24,6 +24,7 @@ import {
   RiCheckLine,
   RiRobotLine,
   RiCloseLine,
+  RiSparklingFill,
 } from 'react-icons/ri';
 import { CodeFiles } from '~/components/CodeFiles';
 
@@ -263,9 +264,10 @@ export const TopicPage = () => {
 
   return (
     <AppShell
+      transitionDuration={0}
       header={{ height: 0 }}
       navbar={{
-        width: 300,
+        width: "22.5%",
         breakpoint: 'sm',
         collapsed: { mobile: true },
       }}
@@ -398,23 +400,21 @@ export const TopicPage = () => {
       {/* Main Content - Code Editor */}
       <AppShell.Main p="0">
         <Box h="100%" pos="relative">
-          <CodeFiles initialFiles={currentExercise.initialFiles} />
+          <CodeFiles initialFiles={currentExercise.initialFiles}  />
 
           {/* Floating AI Panel Toggle */}
           {!showAiPanel && (
-            <Tooltip label="Show AI Assistant">
+            <Tooltip label="Show AI Assistant" openDelay={350}>
               <ActionIcon
-                variant="filled"
+                variant="gradient"
                 color="blue"
-                size="lg"
+                size="xl"
                 radius="xl"
-                pos="absolute"
-                top="md"
-                right="md"
+                pos="fixed"
                 onClick={() => setShowAiPanel(true)}
-                style={{ zIndex: 1000 }}
+                style={{ zIndex: 1000, bottom: 100, right: 50 }}
               >
-                <RiRobotLine size={20} />
+                <RiSparklingFill size={20} />
               </ActionIcon>
             </Tooltip>
           )}
