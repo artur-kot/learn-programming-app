@@ -2,7 +2,7 @@ import { AppShell, Group, UnstyledButton, Avatar, Text, Menu, rem } from '@manti
 import { Link, useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '~/services/auth';
 import { links } from '~/pages/links';
-import { RiUserLine, RiLogoutBoxLine, RiArrowDownSLine } from 'react-icons/ri';
+import { RiUserLine, RiLogoutBoxLine, RiArrowDownSLine, RiRobotFill } from 'react-icons/ri';
 import { account } from '~/services/appwrite';
 import { setUser } from '~/store/features/authSlice';
 import { useDispatch } from 'react-redux';
@@ -47,6 +47,13 @@ export const TopBar = () => {
                 to={links.profile}
               >
                 Profile
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<RiRobotFill style={{ width: rem(16), height: rem(16) }} />}
+                component={Link}
+                to={links.aiAssistant}
+              >
+                AI Assistant
               </Menu.Item>
               <Menu.Item
                 leftSection={<RiLogoutBoxLine style={{ width: rem(16), height: rem(16) }} />}

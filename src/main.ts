@@ -1,7 +1,8 @@
-import { app, BrowserWindow, dialog, screen } from 'electron';
+import { app, BrowserWindow, dialog, screen, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
+import fetch from 'node-fetch';
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -89,6 +90,84 @@ app.on('activate', () => {
 
 app.on('open-url', (event, url) => {
   dialog.showErrorBox('Welcome Back', `You arrived from: ${url}`);
+});
+
+// Ollama API handlers
+ipcMain.handle('stream-ollama-response', async (event, { prompt, model = 'qwen2.5-coder:14b' }) => {
+  try {
+    const response = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        prompt,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // For node-fetch v3, we need to handle the response differently
+    const responseText = await response.text();
+    const lines = responseText.split('\n').filter((line) => line.trim());
+
+    for (const line of lines) {
+      try {
+        const data = JSON.parse(line);
+        if (data.response) {
+          event.sender.send('ollama-stream-chunk', {
+            chunk: data.response,
+            done: false,
+          });
+        }
+        if (data.done) {
+          event.sender.send('ollama-stream-chunk', { chunk: '', done: true });
+          break;
+        }
+      } catch (parseError) {
+        console.error('Error parsing Ollama response:', parseError);
+      }
+    }
+  } catch (error) {
+    console.error('Error calling Ollama API:', error);
+    event.sender.send('ollama-stream-chunk', {
+      chunk: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      done: true,
+    });
+  }
+});
+
+// Test Ollama connection
+ipcMain.handle('test-ollama-connection', async () => {
+  try {
+    const response = await fetch('http://localhost:11434/api/tags');
+    if (response.ok) {
+      const data = (await response.json()) as {
+        models?: Array<{ name: string; size?: number; modified_at?: string }>;
+      };
+      const models = data.models || [];
+      return {
+        success: true,
+        models: models.map((model) => ({
+          value: model.name,
+          label: model.name,
+          size: model.size,
+          modified_at: model.modified_at,
+        })),
+      };
+    } else {
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 });
 
 // In this file you can include the rest of your app's specific main process

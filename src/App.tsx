@@ -11,6 +11,7 @@ import { RegisterPage } from './pages/auth/RegisterPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { CoursePage } from './pages/course/CoursePage';
 import { TopicPage } from './pages/course/TopicPage';
+import { AIAssistantPage } from './pages/ai/AIAssistantPage';
 import './i18n/i18n';
 import { useColorScheme } from '@mantine/hooks';
 import { MainLayout } from './components/layouts/MainLayout/MainLayout';
@@ -24,6 +25,7 @@ const AppContent = () => {
         <Route path="/course/:courseId" element={<CoursePage />} />
         <Route path="/course/:courseId/topic/:topicId" element={<TopicPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/ai-assistant" element={<AIAssistantPage />} />
       </Route>
 
       <Route path="/auth" element={<AuthLayout />}>

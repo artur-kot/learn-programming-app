@@ -1,2 +1,41 @@
 // See the Electron documentation for details on how to use preload scripts:
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
+
+import { contextBridge, ipcRenderer } from 'electron';
+
+// Expose protected methods that allow the renderer process to use
+// the ipcRenderer without exposing the entire object
+contextBridge.exposeInMainWorld('electronAPI', {
+  // Ollama API methods
+  streamOllamaResponse: (prompt: string, model: string = 'qwen2.5-code:14b') =>
+    ipcRenderer.invoke('stream-ollama-response', { prompt, model }),
+
+  // Test Ollama connection
+  testOllamaConnection: () => ipcRenderer.invoke('test-ollama-connection'),
+
+  // Listen for streaming responses
+  onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => {
+    ipcRenderer.on('ollama-stream-chunk', (_event, data) => callback(data));
+  },
+
+  // Remove listeners
+  removeOllamaStreamListener: () => {
+    ipcRenderer.removeAllListeners('ollama-stream-chunk');
+  },
+});
+
+// Type definitions for TypeScript
+declare global {
+  interface Window {
+    electronAPI: {
+      streamOllamaResponse: (prompt: string, model?: string) => Promise<void>;
+      testOllamaConnection: () => Promise<{
+        success: boolean;
+        models?: Array<{ value: string; label: string; size?: number; modified_at?: string }>;
+        error?: string;
+      }>;
+      onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => void;
+      removeOllamaStreamListener: () => void;
+    };
+  }
+}

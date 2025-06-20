@@ -6,4 +6,7 @@ export const links = {
   profile: '/profile',
   course: (courseId: string) => `/course/${courseId}`,
   topic: (courseId: string, topicId: string) => `/course/${courseId}/topic/${topicId}`,
+  aiAssistant: '/ai-assistant',
 };
+
+export const AI_ASSISTANT = '/ai-assistant';
