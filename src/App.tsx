@@ -9,6 +9,7 @@ import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { CoursePage } from './pages/course/CoursePage';
+import { TopicPage } from './pages/course/TopicPage';
 import './i18n/i18n';
 import { useColorScheme } from '@mantine/hooks';
 import { MainLayout } from './components/layouts/MainLayout/MainLayout';
@@ -20,6 +21,7 @@ const AppContent = () => {
       <Route path="/" element={<MainLayout />}>
         <Route path="/" index element={<HomePage />} />
         <Route path="/course/:courseId" element={<CoursePage />} />
+        <Route path="/course/:courseId/topic/:topicId" element={<TopicPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
 

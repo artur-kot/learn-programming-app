@@ -4,4 +4,6 @@ export const links = {
   register: '/auth/register',
   forgotPassword: '/auth/forgot-password',
   profile: '/profile',
+  course: (courseId: string) => `/course/${courseId}`,
+  topic: (courseId: string, topicId: string) => `/course/${courseId}/topic/${topicId}`,
 };

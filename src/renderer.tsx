@@ -3,5 +3,6 @@ import { App } from './App';
 
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
+import '@mantine/nprogress/styles.css';
 
 createRoot(document.getElementById('root')!).render(<App />);

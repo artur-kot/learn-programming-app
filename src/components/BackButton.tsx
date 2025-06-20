@@ -15,7 +15,6 @@ export const BackButton = ({ label }: BackButtonProps) => {
 
     const path = location.pathname;
     if (path.startsWith('/course/')) return 'Courses';
-    if (path === '/profile') return 'Home';
     return 'Back';
   };
 

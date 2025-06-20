@@ -1,8 +1,10 @@
-import { Container, Title, Stack, Card, Text, Group } from '@mantine/core';
+import { Container, Title, Stack, Card } from '@mantine/core';
 import { useParams } from 'react-router-dom';
 import { Course } from '~/types/shared.types';
 import { useAppSelector } from '~/store/hooks';
 import { BackButton } from '~/components/BackButton';
+import { TopicItem } from '~/components/TopicItem';
+import { RiPlayFill } from 'react-icons/ri';
 
 // Topics with support for subtopics
 const topics: Record<Course, { name: string; subtopics?: string[] }[]> = {
@@ -75,17 +77,17 @@ export const CoursePage = () => {
             {chapter.subtopics ? (
               <Stack gap="xs">
                 {chapter.subtopics.map((topic, topicIndex) => (
-                  <Card key={topic} withBorder p="md">
-                    <Text>
-                      {index + 1}.{topicIndex + 1} {topic}
-                    </Text>
-                  </Card>
+                  <TopicItem
+                    key={topic}
+                    topicName={topic}
+                    chapterIndex={index}
+                    topicIndex={topicIndex}
+                    courseId={course}
+                  />
                 ))}
               </Stack>
             ) : (
-              <Card withBorder p="md">
-                <Text>This chapter is a topic itself</Text>
-              </Card>
+              <TopicItem topicName={chapter.name} chapterIndex={index} courseId={course} />
             )}
           </Card>
         ))}
