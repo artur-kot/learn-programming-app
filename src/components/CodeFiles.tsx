@@ -1,10 +1,9 @@
-import { Tabs, ActionIcon, Menu } from '@mantine/core';
+import { Tabs, ActionIcon } from '@mantine/core';
 import { VscFileCode, VscAdd, VscClose } from 'react-icons/vsc';
 import { useState } from 'react';
 import { CodeEditor } from './CodeEditor';
 import { EditorBottomBar } from './EditorBottomBar';
-import { useSelector } from 'react-redux';
-import { RootState } from '../store';
+import { useUnifiedTheme } from '../store/hooks';
 
 interface File {
   id: string;
@@ -23,7 +22,7 @@ export const CodeFiles = ({ initialFiles = [] }: CodeFilesProps) => {
   const [activeFileId, setActiveFileId] = useState<string | null>(
     initialFiles.length > 0 ? initialFiles[0].id : null
   );
-  const theme = useSelector((state: RootState) => state.codeEditor.theme);
+  const { getCodeEditorTheme } = useUnifiedTheme();
 
   const handleFileContentChange = (value: string | undefined) => {
     if (!activeFileId || !value) return;
@@ -89,7 +88,15 @@ export const CodeFiles = ({ initialFiles = [] }: CodeFilesProps) => {
         </Tabs.List>
       </Tabs>
 
-      <div style={{ flex: 1, height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          flex: 1,
+          height: '100%',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {activeFile && (
           <>
             <div style={{ flex: 1, height: '100%' }}>
@@ -97,7 +104,7 @@ export const CodeFiles = ({ initialFiles = [] }: CodeFilesProps) => {
                 language={activeFile.language}
                 value={activeFile.content}
                 onChange={handleFileContentChange}
-                theme={theme}
+                theme={getCodeEditorTheme()}
               />
             </div>
             <EditorBottomBar language={activeFile.language} />

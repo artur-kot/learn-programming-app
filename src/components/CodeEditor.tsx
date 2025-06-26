@@ -1,7 +1,7 @@
 import Editor, { Monaco } from '@monaco-editor/react';
-import { useMantineColorScheme } from '@mantine/core';
-import { CodeTheme } from '../store/slices/codeEditorSlice';
 import { useRef } from 'react';
+
+export type CodeTheme = 'vs-dark' | 'light';
 
 interface CodeEditorProps {
   language?: string;

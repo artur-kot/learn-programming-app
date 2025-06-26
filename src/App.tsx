@@ -16,6 +16,7 @@ import './i18n/i18n';
 import { useColorScheme } from '@mantine/hooks';
 import { MainLayout } from './components/layouts/MainLayout/MainLayout';
 import { AuthLayout } from './components/layouts/AuthLayout/AuthLayout';
+import { ThemeInitializer } from './components/ThemeInitializer';
 
 const AppContent = () => {
   return (
@@ -43,6 +44,7 @@ export const App = () => {
   return (
     <Provider store={store}>
       <MantineProvider defaultColorScheme={colorScheme}>
+        <ThemeInitializer />
         <NavigationProgress />
         <Notifications />
         <HashRouter>

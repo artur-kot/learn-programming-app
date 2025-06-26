@@ -16,10 +16,10 @@ import { account } from '../../services/appwrite';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
-import { useMantineColorScheme } from '@mantine/core';
 import { RiMoonFill, RiSunFill, RiComputerLine } from 'react-icons/ri';
 import { useNavigate } from 'react-router-dom';
 import { BackButton } from '~/components/BackButton';
+import { useUnifiedTheme } from '../../store/hooks';
 
 interface ChangePasswordForm {
   currentPassword: string;
@@ -31,7 +31,7 @@ export const ProfilePage = () => {
   const [loading, setLoading] = useState(false);
   const user = useCurrentUser();
   const { t, i18n } = useTranslation();
-  const { setColorScheme, colorScheme } = useMantineColorScheme();
+  const { theme, setTheme } = useUnifiedTheme();
   const navigate = useNavigate();
 
   const form = useForm<ChangePasswordForm>({
@@ -88,8 +88,8 @@ export const ProfilePage = () => {
           {t('profile.theme.title')}
         </Text>
         <SegmentedControl
-          value={colorScheme}
-          onChange={(value) => setColorScheme(value as 'light' | 'dark' | 'auto')}
+          value={theme}
+          onChange={(value) => setTheme(value as 'light' | 'dark' | 'auto')}
           data={[
             {
               value: 'light',

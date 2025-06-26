@@ -11,12 +11,23 @@ const topics: Record<Course, string[]> = {
   [Course.NEXT]: ['Pages', 'API Routes', 'Server Components', 'Deployment'],
 };
 
+export type ThemeMode = 'light' | 'dark' | 'auto';
+
+interface GlobalState {
+  course: Course;
+  selectedTopic: string;
+  theme: ThemeMode;
+}
+
+const initialState: GlobalState = {
+  course: Course.HTML,
+  selectedTopic: topics[Course.HTML][0], // Initialize with first topic
+  theme: 'auto',
+};
+
 export const globalSlice = createSlice({
   name: 'global',
-  initialState: {
-    course: Course.HTML,
-    selectedTopic: topics[Course.HTML][0], // Initialize with first topic
-  },
+  initialState,
   reducers: {
     setCourse: (state, action: PayloadAction<Course>) => {
       state.course = action.payload;
@@ -25,9 +36,21 @@ export const globalSlice = createSlice({
     setSelectedTopic: (state, action: PayloadAction<string>) => {
       state.selectedTopic = action.payload;
     },
+    setTheme: (state, action: PayloadAction<ThemeMode>) => {
+      state.theme = action.payload;
+    },
+    toggleTheme: (state) => {
+      if (state.theme === 'light') {
+        state.theme = 'auto';
+      } else if (state.theme === 'auto') {
+        state.theme = 'dark';
+      } else {
+        state.theme = 'light';
+      }
+    },
   },
 });
 
-export const { setCourse, setSelectedTopic } = globalSlice.actions;
+export const { setCourse, setSelectedTopic, setTheme, toggleTheme } = globalSlice.actions;
 
 export default globalSlice.reducer;
