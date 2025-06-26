@@ -1,4 +1,4 @@
-import { Box, Group, Text, ActionIcon, Tooltip, getThemeColor, useMantineTheme, virtualColor } from '@mantine/core';
+import { Box, Group, Text, ActionIcon, Tooltip } from '@mantine/core';
 import { TbSun, TbMoon, TbDeviceDesktop } from 'react-icons/tb';
 import { useUnifiedTheme } from '../store/hooks';
 
@@ -14,7 +14,6 @@ const themeToIconMap = {
 
 export const EditorBottomBar = ({ language }: EditorBottomBarProps) => {
   const { theme, toggleTheme } = useUnifiedTheme();
-  const mantineTheme = useMantineTheme();
 
   return (
     <Box

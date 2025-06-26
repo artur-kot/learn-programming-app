@@ -10,7 +10,6 @@ import {
   ActionIcon,
   LoadingOverlay,
   Alert,
-  Select,
   Stack,
   Tooltip,
   Badge,
@@ -19,11 +18,12 @@ import {
 import {
   RiSendPlaneFill,
   RiRobotFill,
-  RiDownloadLine,
   RiCloseLine,
   RiStopLine,
+  RiSettings3Line,
 } from 'react-icons/ri';
 import ReactMarkdown from 'react-markdown';
+import { OllamaSettingsModal } from './OllamaSettingsModal';
 
 interface Message {
   id: string;
@@ -71,6 +71,7 @@ export const TopicAIAssistant: React.FC<TopicAIAssistantProps> = ({
   const [isOllamaInstalled, setIsOllamaInstalled] = useState<boolean | null>(null);
   const [isInstallingOllama, setIsInstallingOllama] = useState(false);
   const [isStartingServer, setIsStartingServer] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const checkOllamaInstallation = async () => {
@@ -273,12 +274,6 @@ What would you like to ask me about this exercise?`;
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const formatModelSize = (size?: number) => {
-    if (!size) return '';
-    const gb = size / (1024 * 1024 * 1024);
-    return `(${gb.toFixed(1)}GB)`;
-  };
-
   return (
     <Stack gap="md" h="100%">
       {/* AI Header */}
@@ -305,27 +300,14 @@ What would you like to ask me about this exercise?`;
           )}
         </Group>
         <Group gap="xs">
-          <Select
-            size="xs"
-            value={selectedModel}
-            onChange={(value) => setSelectedModel(value || 'qwen2.5-coder:14b')}
-            data={availableModels.map((model) => ({
-              value: model.value,
-              label: `${model.label} ${formatModelSize(model.size)}`,
-            }))}
-            w={120}
-            disabled={!isConnected || isLoadingModels || isOllamaInstalled === false}
-            placeholder={isLoadingModels ? 'Loading...' : 'Model'}
-          />
-          <Tooltip label="Refresh models">
+          <Tooltip label="Ollama Settings">
             <ActionIcon
               variant="subtle"
               size="xs"
-              onClick={testConnection}
-              loading={isLoadingModels}
+              onClick={() => setIsSettingsModalOpen(true)}
               disabled={isOllamaInstalled === false}
             >
-              <RiDownloadLine size={12} />
+              <RiSettings3Line size={12} />
             </ActionIcon>
           </Tooltip>
           {onClose && (
@@ -612,6 +594,18 @@ What would you like to ask me about this exercise?`;
           )}
         </Group>
       </Box>
+
+      {/* Ollama Settings Modal */}
+      <OllamaSettingsModal
+        opened={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        availableModels={availableModels}
+        isLoadingModels={isLoadingModels}
+        onRefreshModels={testConnection}
+        isConnected={isConnected}
+      />
     </Stack>
   );
 };
