@@ -101,6 +101,9 @@ declare global {
           freeMemoryGB: number;
           isAppleSilicon: boolean;
           hasDedicatedGPU: boolean;
+          gpuModel: string;
+          gpuVendor: string;
+          gpuMemory: number | null;
         };
         error?: string;
       }>;

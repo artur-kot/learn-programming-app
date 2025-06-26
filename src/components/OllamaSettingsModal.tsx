@@ -57,6 +57,9 @@ interface SystemInfo {
   freeMemoryGB: number;
   isAppleSilicon: boolean;
   hasDedicatedGPU: boolean;
+  gpuModel: string;
+  gpuVendor: string;
+  gpuMemory: number | null;
 }
 
 interface OllamaSettingsModalProps {
@@ -187,7 +190,7 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
                 <Text fw={500}>14B models:</Text> 32GB+ RAM, high-end CPU or dedicated GPU
               </List.Item>
               <List.Item>
-                <Text fw={500}>32B models:</Text> 64GB+ RAM, high-end system with dedicated GPU
+                <Text fw={500}>32B+ models:</Text> 64GB+ RAM, high-end system with dedicated GPU
               </List.Item>
             </List>
           </Paper>
@@ -234,8 +237,8 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
                 generation
               </List.Item>
               <List.Item>
-                <Text fw={500}>Research:</Text> 14B or 32B models for advanced AI research and
-                development
+                <Text fw={500}>Research:</Text> 14B or 32B models (or more) for advanced AI research
+                and development
               </List.Item>
             </List>
           </Paper>
@@ -252,8 +255,9 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
                 <strong>Memory:</strong> {systemInfo.totalMemoryGB}GB total,{' '}
                 {systemInfo.freeMemoryGB}GB available
                 <br />
-                <strong>GPU:</strong>{' '}
-                {systemInfo.hasDedicatedGPU ? 'Dedicated GPU detected' : 'Integrated graphics'}
+                <strong>GPU:</strong> {systemInfo.gpuModel}
+                {systemInfo.gpuVendor !== 'Unknown' && ` (${systemInfo.gpuVendor})`}
+                {systemInfo.gpuMemory && ` - ${systemInfo.gpuMemory}GB VRAM`}
                 <br />
                 {systemInfo.isAppleSilicon && (
                   <>
@@ -630,8 +634,8 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
               <Group justify="space-between" mb="md">
                 <Title order={6}>Available Models</Title>
                 <Tooltip label="Show model selection guide">
-                  <ActionIcon variant="light" color="blue" onClick={showInfoDialog}>
-                    <RiInformationLine size={16} />
+                  <ActionIcon variant="filled" color="gray" size="lg" onClick={showInfoDialog}>
+                    <RiInformationLine />
                   </ActionIcon>
                 </Tooltip>
               </Group>

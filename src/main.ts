@@ -543,32 +543,137 @@ ipcMain.handle('get-system-info', async () => {
     // Check if we're on Apple Silicon (M1/M2/M3)
     const isAppleSilicon = platform === 'darwin' && arch === 'arm64';
 
-    // Check if we have a dedicated GPU (basic detection)
-    let hasDedicatedGPU = false;
+    // Get detailed GPU information
+    let gpuInfo = {
+      hasDedicatedGPU: false,
+      gpuModel: 'Integrated Graphics',
+      gpuVendor: 'Unknown',
+      gpuMemory: null as number | null,
+    };
+
     if (platform === 'win32') {
       try {
-        const { stdout } = await promisify(exec)('wmic path win32_VideoController get name');
-        hasDedicatedGPU =
-          stdout.toLowerCase().includes('nvidia') ||
-          stdout.toLowerCase().includes('amd') ||
-          stdout.toLowerCase().includes('radeon');
-      } catch {
-        // If we can't detect GPU, assume false
-        hasDedicatedGPU = false;
+        // Get GPU information using PowerShell
+        const { stdout } = await promisify(exec)(
+          'powershell -Command "Get-WmiObject -Class Win32_VideoController | Select-Object Name, AdapterRAM, VideoProcessor | ConvertTo-Json"'
+        );
+        const gpuData = JSON.parse(stdout);
+
+        if (Array.isArray(gpuData)) {
+          // Find the most powerful GPU (usually the first one or the one with most memory)
+          const dedicatedGPU =
+            gpuData.find(
+              (gpu: any) =>
+                gpu.Name &&
+                (gpu.Name.toLowerCase().includes('nvidia') ||
+                  gpu.Name.toLowerCase().includes('amd') ||
+                  gpu.Name.toLowerCase().includes('radeon') ||
+                  gpu.Name.toLowerCase().includes('rtx') ||
+                  gpu.Name.toLowerCase().includes('gtx') ||
+                  gpu.Name.toLowerCase().includes('rx'))
+            ) || gpuData[0];
+
+          if (dedicatedGPU) {
+            gpuInfo.hasDedicatedGPU =
+              dedicatedGPU.Name.toLowerCase().includes('nvidia') ||
+              dedicatedGPU.Name.toLowerCase().includes('amd') ||
+              dedicatedGPU.Name.toLowerCase().includes('radeon');
+            gpuInfo.gpuModel = dedicatedGPU.Name || 'Unknown GPU';
+            gpuInfo.gpuVendor = dedicatedGPU.Name?.toLowerCase().includes('nvidia')
+              ? 'NVIDIA'
+              : dedicatedGPU.Name?.toLowerCase().includes('amd')
+                ? 'AMD'
+                : dedicatedGPU.Name?.toLowerCase().includes('intel')
+                  ? 'Intel'
+                  : 'Unknown';
+
+            // Convert memory from bytes to GB if available
+            if (dedicatedGPU.AdapterRAM) {
+              gpuInfo.gpuMemory = Math.round(dedicatedGPU.AdapterRAM / (1024 * 1024 * 1024));
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to get GPU info on Windows:', error);
+        // Fallback to basic detection
+        try {
+          const { stdout } = await promisify(exec)('wmic path win32_VideoController get name');
+          const hasDedicated =
+            stdout.toLowerCase().includes('nvidia') ||
+            stdout.toLowerCase().includes('amd') ||
+            stdout.toLowerCase().includes('radeon');
+          gpuInfo.hasDedicatedGPU = hasDedicated;
+          gpuInfo.gpuModel = hasDedicated ? 'Dedicated GPU' : 'Integrated Graphics';
+        } catch {
+          gpuInfo.hasDedicatedGPU = false;
+          gpuInfo.gpuModel = 'Integrated Graphics';
+        }
       }
     } else if (platform === 'darwin') {
-      // On macOS, assume Apple Silicon has good GPU capabilities
-      hasDedicatedGPU = isAppleSilicon;
+      // On macOS, get detailed GPU info
+      try {
+        const { stdout } = await promisify(exec)('system_profiler SPDisplaysDataType -json');
+        const displayData = JSON.parse(stdout);
+
+        if (displayData.SPDisplaysDataType && displayData.SPDisplaysDataType.length > 0) {
+          const gpu = displayData.SPDisplaysDataType[0];
+          gpuInfo.gpuModel = gpu.sppci_model || gpu.sppci_name || 'Unknown GPU';
+
+          if (isAppleSilicon) {
+            gpuInfo.hasDedicatedGPU = true;
+            gpuInfo.gpuVendor = 'Apple';
+            gpuInfo.gpuModel = 'Apple Silicon GPU';
+          } else if (gpu.sppci_model) {
+            gpuInfo.hasDedicatedGPU = !gpu.sppci_model.toLowerCase().includes('intel');
+            gpuInfo.gpuVendor = gpu.sppci_model.toLowerCase().includes('amd')
+              ? 'AMD'
+              : gpu.sppci_model.toLowerCase().includes('nvidia')
+                ? 'NVIDIA'
+                : gpu.sppci_model.toLowerCase().includes('intel')
+                  ? 'Intel'
+                  : 'Unknown';
+          }
+        }
+      } catch (error) {
+        console.error('Failed to get GPU info on macOS:', error);
+        gpuInfo.hasDedicatedGPU = isAppleSilicon;
+        gpuInfo.gpuModel = isAppleSilicon ? 'Apple Silicon GPU' : 'Integrated Graphics';
+        gpuInfo.gpuVendor = isAppleSilicon ? 'Apple' : 'Unknown';
+      }
     } else {
       // On Linux, try to detect GPU
       try {
         const { stdout } = await promisify(exec)('lspci | grep -i vga');
-        hasDedicatedGPU =
-          stdout.toLowerCase().includes('nvidia') ||
-          stdout.toLowerCase().includes('amd') ||
-          stdout.toLowerCase().includes('radeon');
-      } catch {
-        hasDedicatedGPU = false;
+        const lines = stdout.split('\n').filter((line) => line.trim());
+
+        if (lines.length > 0) {
+          const gpuLine = lines[0];
+          gpuInfo.hasDedicatedGPU =
+            gpuLine.toLowerCase().includes('nvidia') ||
+            gpuLine.toLowerCase().includes('amd') ||
+            gpuLine.toLowerCase().includes('radeon');
+
+          // Extract GPU model from lspci output
+          const modelMatch = gpuLine.match(/\[([^\]]+)\]/);
+          if (modelMatch) {
+            gpuInfo.gpuModel = modelMatch[1];
+          } else {
+            gpuInfo.gpuModel = gpuInfo.hasDedicatedGPU ? 'Dedicated GPU' : 'Integrated Graphics';
+          }
+
+          gpuInfo.gpuVendor = gpuLine.toLowerCase().includes('nvidia')
+            ? 'NVIDIA'
+            : gpuLine.toLowerCase().includes('amd')
+              ? 'AMD'
+              : gpuLine.toLowerCase().includes('intel')
+                ? 'Intel'
+                : 'Unknown';
+        }
+      } catch (error) {
+        console.error('Failed to get GPU info on Linux:', error);
+        gpuInfo.hasDedicatedGPU = false;
+        gpuInfo.gpuModel = 'Integrated Graphics';
+        gpuInfo.gpuVendor = 'Unknown';
       }
     }
 
@@ -582,7 +687,10 @@ ipcMain.handle('get-system-info', async () => {
         totalMemoryGB,
         freeMemoryGB,
         isAppleSilicon,
-        hasDedicatedGPU,
+        hasDedicatedGPU: gpuInfo.hasDedicatedGPU,
+        gpuModel: gpuInfo.gpuModel,
+        gpuVendor: gpuInfo.gpuVendor,
+        gpuMemory: gpuInfo.gpuMemory,
       },
     };
   } catch (error) {
