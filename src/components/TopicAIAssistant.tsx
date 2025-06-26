@@ -303,17 +303,17 @@ What would you like to ask me about this exercise?`;
           <Tooltip label="Ollama Settings">
             <ActionIcon
               variant="subtle"
-              size="xs"
+              size="lg"
               onClick={() => setIsSettingsModalOpen(true)}
               disabled={isOllamaInstalled === false}
             >
-              <RiSettings3Line size={12} />
+              <RiSettings3Line />
             </ActionIcon>
           </Tooltip>
           {onClose && (
             <Tooltip label="Hide AI Panel">
-              <ActionIcon variant="subtle" size="xs" onClick={onClose}>
-                <RiCloseLine size={12} />
+              <ActionIcon variant="subtle" size="lg" onClick={onClose}>
+                <RiCloseLine />
               </ActionIcon>
             </Tooltip>
           )}
