@@ -68,7 +68,57 @@ export const TopicAIAssistant: React.FC<TopicAIAssistantProps> = ({
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isOllamaInstalled, setIsOllamaInstalled] = useState<boolean | null>(null);
+  const [isInstallingOllama, setIsInstallingOllama] = useState(false);
+  const [isStartingServer, setIsStartingServer] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const checkOllamaInstallation = async () => {
+    try {
+      const result = await window.electronAPI.checkOllamaInstalled();
+      setIsOllamaInstalled(result.installed);
+    } catch (err) {
+      setIsOllamaInstalled(false);
+      setError('Failed to check Ollama installation');
+    }
+  };
+
+  const installOllama = async () => {
+    setIsInstallingOllama(true);
+    setError(null);
+    try {
+      const result = await window.electronAPI.installOllama();
+      if (result.success) {
+        setIsOllamaInstalled(true);
+        // Try to start the server after installation
+        await startOllamaServer();
+      } else {
+        setError(`Failed to install Ollama: ${result.error}`);
+      }
+    } catch (err) {
+      setError('Failed to install Ollama');
+    } finally {
+      setIsInstallingOllama(false);
+    }
+  };
+
+  const startOllamaServer = async () => {
+    setIsStartingServer(true);
+    setError(null);
+    try {
+      const result = await window.electronAPI.startOllamaServer();
+      if (result.success) {
+        // Test connection after starting server
+        await testConnection();
+      } else {
+        setError(`Failed to start Ollama server: ${result.error}`);
+      }
+    } catch (err) {
+      setError('Failed to start Ollama server');
+    } finally {
+      setIsStartingServer(false);
+    }
+  };
 
   const testConnection = async () => {
     setIsLoadingModels(true);
@@ -92,8 +142,14 @@ export const TopicAIAssistant: React.FC<TopicAIAssistantProps> = ({
   };
 
   useEffect(() => {
-    testConnection();
+    checkOllamaInstallation();
   }, []);
+
+  useEffect(() => {
+    if (isOllamaInstalled) {
+      testConnection();
+    }
+  }, [isOllamaInstalled]);
 
   useEffect(() => {
     window.electronAPI.onOllamaStream((data) => {
@@ -232,9 +288,19 @@ What would you like to ask me about this exercise?`;
           <Text fw={600} size="sm">
             AI Assistant
           </Text>
-          {isConnected !== null && (
-            <Badge size="xs" color={isConnected ? 'green' : 'red'}>
-              {isConnected ? '●' : '●'}
+          {isOllamaInstalled === false && (
+            <Badge size="xs" color="red">
+              ● Not Installed
+            </Badge>
+          )}
+          {isOllamaInstalled === true && isConnected === false && (
+            <Badge size="xs" color="orange">
+              ● Server Off
+            </Badge>
+          )}
+          {isConnected === true && (
+            <Badge size="xs" color="green">
+              ● Connected
             </Badge>
           )}
         </Group>
@@ -248,7 +314,7 @@ What would you like to ask me about this exercise?`;
               label: `${model.label} ${formatModelSize(model.size)}`,
             }))}
             w={120}
-            disabled={!isConnected || isLoadingModels}
+            disabled={!isConnected || isLoadingModels || isOllamaInstalled === false}
             placeholder={isLoadingModels ? 'Loading...' : 'Model'}
           />
           <Tooltip label="Refresh models">
@@ -257,6 +323,7 @@ What would you like to ask me about this exercise?`;
               size="xs"
               onClick={testConnection}
               loading={isLoadingModels}
+              disabled={isOllamaInstalled === false}
             >
               <RiDownloadLine size={12} />
             </ActionIcon>
@@ -277,9 +344,25 @@ What would you like to ask me about this exercise?`;
         </Alert>
       )}
 
-      {!isConnected && isConnected !== null && (
+      {isOllamaInstalled === false && (
         <Alert color="orange">
-          Ollama not connected. Run <code>ollama serve</code>
+          <Text size="xs" mb="xs">
+            Ollama is not installed on your system.
+          </Text>
+          <Button onClick={installOllama} loading={isInstallingOllama} size="xs" color="blue">
+            {isInstallingOllama ? 'Installing...' : 'Install Ollama'}
+          </Button>
+        </Alert>
+      )}
+
+      {isOllamaInstalled === true && !isConnected && isConnected !== null && (
+        <Alert color="orange">
+          <Text size="xs" mb="xs">
+            Ollama is installed but the server is not running.
+          </Text>
+          <Button onClick={startOllamaServer} loading={isStartingServer} size="xs" color="green">
+            {isStartingServer ? 'Starting...' : 'Start Ollama Server'}
+          </Button>
         </Alert>
       )}
 
@@ -489,7 +572,13 @@ What would you like to ask me about this exercise?`;
         <LoadingOverlay visible={isLoading} />
         <Group gap="xs">
           <Textarea
-            placeholder={isConnected ? 'Ask about this exercise...' : 'Ollama not connected...'}
+            placeholder={
+              isOllamaInstalled === false
+                ? 'Install Ollama to use AI Assistant...'
+                : isConnected
+                  ? 'Ask about this exercise...'
+                  : 'Start Ollama server to use AI Assistant...'
+            }
             value={inputValue}
             onChange={(event) => setInputValue(event.currentTarget.value)}
             onKeyPress={handleKeyPress}
@@ -497,7 +586,7 @@ What would you like to ask me about this exercise?`;
             minRows={1}
             maxRows={3}
             flex={1}
-            disabled={isLoading || !isConnected}
+            disabled={isLoading || !isConnected || isOllamaInstalled === false}
             size="xs"
           />
           {isStreaming ? (
@@ -512,7 +601,9 @@ What would you like to ask me about this exercise?`;
           ) : (
             <Button
               onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading || !isConnected}
+              disabled={
+                !inputValue.trim() || isLoading || !isConnected || isOllamaInstalled === false
+              }
               leftSection={<RiSendPlaneFill size={12} />}
               size="xs"
             >

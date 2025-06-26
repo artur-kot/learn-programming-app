@@ -3,6 +3,9 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
 import http from 'node:http';
+import { spawn, exec } from 'node:child_process';
+import { promisify } from 'node:util';
+import fs from 'node:fs';
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -224,6 +227,114 @@ ipcMain.handle('test-ollama-connection', async () => {
     };
   }
 });
+
+// Check if Ollama is installed
+ipcMain.handle('check-ollama-installed', async () => {
+  try {
+    const execAsync = promisify(exec);
+
+    // Check if ollama command exists
+    if (process.platform === 'win32') {
+      // On Windows, check if ollama.exe exists in PATH
+      try {
+        await execAsync('where ollama');
+        return { installed: true };
+      } catch {
+        return { installed: false };
+      }
+    } else {
+      // On Unix-like systems, check if ollama command exists
+      try {
+        await execAsync('which ollama');
+        return { installed: true };
+      } catch {
+        return { installed: false };
+      }
+    }
+  } catch (error) {
+    return { installed: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+});
+
+// Install Ollama
+ipcMain.handle('install-ollama', async () => {
+  try {
+    const execAsync = promisify(exec);
+
+    if (process.platform === 'win32') {
+      // On Windows, download and install Ollama
+      const installScript = `
+        Write-Host "Installing Ollama..."
+        Invoke-WebRequest -Uri "https://ollama.ai/download/ollama-windows-amd64.exe" -OutFile "$env:TEMP\\ollama-installer.exe"
+        Start-Process -FilePath "$env:TEMP\\ollama-installer.exe" -ArgumentList "/S" -Wait
+        Write-Host "Ollama installation completed"
+      `;
+
+      await execAsync(`powershell -Command "${installScript}"`);
+      return { success: true };
+    } else if (process.platform === 'darwin') {
+      // On macOS, use curl to install
+      await execAsync('curl -fsSL https://ollama.ai/install.sh | sh');
+      return { success: true };
+    } else {
+      // On Linux, use curl to install
+      await execAsync('curl -fsSL https://ollama.ai/install.sh | sh');
+      return { success: true };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Start Ollama server
+ipcMain.handle('start-ollama-server', async () => {
+  try {
+    // Check if Ollama is already running
+    const isRunning = await checkOllamaServer();
+    if (isRunning) {
+      return { success: true, alreadyRunning: true };
+    }
+
+    // Start Ollama server
+    const ollamaProcess = spawn('ollama', ['serve'], {
+      detached: true,
+      stdio: 'ignore',
+    });
+
+    // Wait a bit for the server to start
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // Check if server started successfully
+    const serverStarted = await checkOllamaServer();
+
+    if (serverStarted) {
+      return { success: true, alreadyRunning: false };
+    } else {
+      return { success: false, error: 'Failed to start Ollama server' };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Helper function to check if Ollama server is running
+async function checkOllamaServer(): Promise<boolean> {
+  try {
+    const response = await fetch('http://localhost:11434/api/tags', {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000), // 5 second timeout
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.

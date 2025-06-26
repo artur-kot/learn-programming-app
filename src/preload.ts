@@ -16,6 +16,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Test Ollama connection
   testOllamaConnection: () => ipcRenderer.invoke('test-ollama-connection'),
 
+  // Check if Ollama is installed
+  checkOllamaInstalled: () => ipcRenderer.invoke('check-ollama-installed'),
+
+  // Install Ollama
+  installOllama: () => ipcRenderer.invoke('install-ollama'),
+
+  // Start Ollama server
+  startOllamaServer: () => ipcRenderer.invoke('start-ollama-server'),
+
   // Listen for streaming responses
   onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => {
     ipcRenderer.on('ollama-stream-chunk', (_event, data) => callback(data));
@@ -36,6 +45,13 @@ declare global {
       testOllamaConnection: () => Promise<{
         success: boolean;
         models?: Array<{ value: string; label: string; size?: number; modified_at?: string }>;
+        error?: string;
+      }>;
+      checkOllamaInstalled: () => Promise<{ installed: boolean; error?: string }>;
+      installOllama: () => Promise<{ success: boolean; error?: string }>;
+      startOllamaServer: () => Promise<{
+        success: boolean;
+        alreadyRunning?: boolean;
         error?: string;
       }>;
       onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => void;
