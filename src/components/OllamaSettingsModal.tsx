@@ -16,7 +16,15 @@ import {
   ActionIcon,
   Tooltip,
 } from '@mantine/core';
-import { RiRefreshLine, RiCheckLine, RiCloseLine, RiDownloadLine } from 'react-icons/ri';
+import { modals } from '@mantine/modals';
+import {
+  RiRefreshLine,
+  RiCheckLine,
+  RiCloseLine,
+  RiDownloadLine,
+  RiStopLine,
+} from 'react-icons/ri';
+import { OllamaGuard } from './OllamaGuard';
 
 interface Model {
   value: string;
@@ -152,6 +160,42 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
     }
   };
 
+  const handleCancelDownload = async (modelName: string) => {
+    try {
+      await window.electronAPI.cancelOllamaDownload(modelName);
+      setDownloadProgress((prev) => ({
+        ...prev,
+        [modelName]: {
+          status: 'Download cancelled',
+          done: true,
+          error: true,
+        },
+      }));
+      setDownloadingModels((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(modelName);
+        return newSet;
+      });
+    } catch (error) {
+      console.error('Failed to cancel download:', error);
+    }
+  };
+
+  const confirmCancelDownload = (modelName: string) => {
+    modals.openConfirmModal({
+      title: 'Cancel Download',
+      children: (
+        <Text>
+          Are you sure you want to cancel the download of "{modelName}"? This action cannot be
+          undone.
+        </Text>
+      ),
+      labels: { confirm: 'Cancel Download', cancel: 'Keep Downloading' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => handleCancelDownload(modelName),
+    });
+  };
+
   const getProgressPercentage = (modelName: string) => {
     const progress = downloadProgress[modelName];
     if (!progress || !progress.completed || !progress.total) return 0;
@@ -165,6 +209,8 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
   const getDownloadProgress = (modelName: string) => {
     return downloadProgress[modelName];
   };
+
+  const hasActiveDownload = downloadingModels.size > 0;
 
   const rows = QWEN_MODELS.map((model) => {
     const installed = isModelInstalled(model.name);
@@ -222,16 +268,26 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
           )}
         </Table.Td>
         <Table.Td>
-          {!installed && !downloading && (
+          {!installed && !downloading && !hasActiveDownload && (
             <Tooltip label="Download model">
               <ActionIcon
                 variant="light"
                 color="blue"
                 onClick={() => handleDownloadModel(model.name)}
                 disabled={!isConnected}
-                loading={downloading}
               >
                 <RiDownloadLine size={16} />
+              </ActionIcon>
+            </Tooltip>
+          )}
+          {downloading && (
+            <Tooltip label="Cancel download">
+              <ActionIcon
+                variant="light"
+                color="red"
+                onClick={() => confirmCancelDownload(model.name)}
+              >
+                <RiStopLine size={16} />
               </ActionIcon>
             </Tooltip>
           )}
@@ -241,76 +297,70 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
   });
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Ollama Settings" size="lg" centered>
-      <Stack gap="md">
-        {/* Connection Status */}
-        <Alert
-          color={isConnected ? 'green' : 'orange'}
-          title={isConnected ? 'Connected to Ollama' : 'Not Connected'}
-        >
-          {isConnected
-            ? 'Ollama server is running and ready to use.'
-            : 'Ollama server is not running. Please start the server to use AI features.'}
-        </Alert>
+    <>
+      <Modal opened={opened} onClose={onClose} title="Ollama Settings" size="lg" centered>
+        <Stack gap="md">
+          <OllamaGuard isConnected={isConnected} showInstallInstructions>
+            {/* Model Selector */}
+            <Paper p="md" withBorder>
+              <Title order={6} mb="md">
+                Select Model
+              </Title>
+              <Group gap="sm" align="flex-end">
+                <Select
+                  label="Active Model"
+                  placeholder="Choose a model"
+                  value={selectedModel}
+                  onChange={(value) => onModelChange(value || 'qwen2.5-coder:14b')}
+                  data={availableModels.map((model) => ({
+                    value: model.value,
+                    label: `${model.label} ${formatModelSize(model.size)}`,
+                  }))}
+                  style={{ flex: 1 }}
+                  disabled={!isConnected || isLoadingModels}
+                />
+                <Button
+                  onClick={onRefreshModels}
+                  loading={isLoadingModels}
+                  disabled={!isConnected}
+                  leftSection={<RiRefreshLine size={16} />}
+                  variant="light"
+                >
+                  Refresh
+                </Button>
+              </Group>
+            </Paper>
 
-        {/* Model Selector */}
-        <Paper p="md" withBorder>
-          <Title order={6} mb="md">
-            Select Model
-          </Title>
-          <Group gap="sm" align="flex-end">
-            <Select
-              label="Active Model"
-              placeholder="Choose a model"
-              value={selectedModel}
-              onChange={(value) => onModelChange(value || 'qwen2.5-coder:14b')}
-              data={availableModels.map((model) => ({
-                value: model.value,
-                label: `${model.label} ${formatModelSize(model.size)}`,
-              }))}
-              style={{ flex: 1 }}
-              disabled={!isConnected || isLoadingModels}
-            />
-            <Button
-              onClick={onRefreshModels}
-              loading={isLoadingModels}
-              disabled={!isConnected}
-              leftSection={<RiRefreshLine size={16} />}
-              variant="light"
-            >
-              Refresh
+            {/* Models Table */}
+            <Paper p="md" withBorder>
+              <Group justify="space-between" mb="md">
+                <Title order={6}>Available LLM Models</Title>
+              </Group>
+
+              <LoadingOverlay visible={isLoadingModels} />
+
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Model</Table.Th>
+                    <Table.Th>Size</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Actions</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>{rows}</Table.Tbody>
+              </Table>
+            </Paper>
+          </OllamaGuard>
+
+          {/* Actions */}
+          <Group justify="flex-end">
+            <Button onClick={onClose} variant="light">
+              Close
             </Button>
           </Group>
-        </Paper>
-
-        {/* Models Table */}
-        <Paper p="md" withBorder>
-          <Group justify="space-between" mb="md">
-            <Title order={6}>Available LLM Models</Title>
-          </Group>
-
-          <LoadingOverlay visible={isLoadingModels} />
-
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Model</Table.Th>
-                <Table.Th>Size</Table.Th>
-                <Table.Th>Status</Table.Th>
-                <Table.Th>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>{rows}</Table.Tbody>
-          </Table>
-        </Paper>
-
-        {/* Actions */}
-        <Group justify="flex-end">
-          <Button onClick={onClose} variant="light">
-            Close
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
+        </Stack>
+      </Modal>
+    </>
   );
 };

@@ -23,6 +23,7 @@ import {
   RiStopLine,
 } from 'react-icons/ri';
 import ReactMarkdown from 'react-markdown';
+import { OllamaGuard } from './OllamaGuard';
 
 interface Message {
   id: string;
@@ -310,252 +311,113 @@ Please provide helpful, accurate, and well-formatted responses.`;
         </Alert>
       )}
 
-      {isOllamaInstalled === false && (
-        <Alert color="orange" mb="md">
-          <Text mb="sm">Ollama is not installed on your system.</Text>
-          <Button onClick={installOllama} loading={isInstallingOllama} size="sm" color="blue">
-            {isInstallingOllama ? 'Installing...' : 'Install Ollama'}
-          </Button>
-        </Alert>
-      )}
+      <OllamaGuard
+        isConnected={isConnected}
+        fallback={
+          <>
+            {isOllamaInstalled === false && (
+              <Alert color="orange" mb="md">
+                <Text mb="sm">Ollama is not installed on your system.</Text>
+                <Button onClick={installOllama} loading={isInstallingOllama} size="sm" color="blue">
+                  {isInstallingOllama ? 'Installing...' : 'Install Ollama'}
+                </Button>
+              </Alert>
+            )}
 
-      {isOllamaInstalled === true && !isConnected && isConnected !== null && (
-        <Alert color="orange" mb="md">
-          <Text mb="sm">Ollama is installed but the server is not running.</Text>
-          <Button onClick={startOllamaServer} loading={isStartingServer} size="sm" color="green">
-            {isStartingServer ? 'Starting...' : 'Start Ollama Server'}
-          </Button>
-        </Alert>
-      )}
+            {isOllamaInstalled === true && !isConnected && isConnected !== null && (
+              <Alert color="orange" mb="md">
+                <Text mb="sm">Ollama is installed but the server is not running.</Text>
+                <Button
+                  onClick={startOllamaServer}
+                  loading={isStartingServer}
+                  size="sm"
+                  color="green"
+                >
+                  {isStartingServer ? 'Starting...' : 'Start Ollama Server'}
+                </Button>
+              </Alert>
+            )}
 
-      {isConnected && availableModels.length === 0 && (
-        <Alert color="yellow" mb="md">
-          No models found. Pull a model using: <code>ollama pull qwen2.5-coder:14b</code>
-        </Alert>
-      )}
-
-      <ScrollArea flex={1} ref={scrollAreaRef} mb="md">
-        <Stack gap="md">
-          {messages.map((message) => (
-            <Box
-              key={message.id}
-              style={{
-                display: 'flex',
-                justifyContent: message.isUser ? 'flex-end' : 'flex-start',
-              }}
-            >
-              <Paper
-                p="sm"
+            {isConnected && availableModels.length === 0 && (
+              <Alert color="yellow" mb="md">
+                No models found. Pull a model using: <code>ollama pull qwen2.5-coder:14b</code>
+              </Alert>
+            )}
+          </>
+        }
+      >
+        <ScrollArea flex={1} ref={scrollAreaRef} mb="md">
+          <Stack gap="md">
+            {messages.map((message) => (
+              <Box
+                key={message.id}
                 style={{
+                  alignSelf: message.isUser ? 'flex-end' : 'flex-start',
                   maxWidth: '80%',
-                  backgroundColor: message.isUser
-                    ? 'var(--mantine-color-blue-6)'
-                    : 'var(--mantine-color-gray-1)',
-                  color: message.isUser ? 'white' : 'inherit',
                 }}
               >
-                {message.isUser ? (
-                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                    {message.content}
+                <Paper
+                  p="sm"
+                  bg={message.isUser ? 'blue.6' : 'gray.1'}
+                  c={message.isUser ? 'white' : 'inherit'}
+                  style={{ borderRadius: '12px' }}
+                >
+                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                  <Text size="xs" c={message.isUser ? 'blue.2' : 'dimmed'} mt="xs">
+                    {formatTime(message.timestamp)}
                   </Text>
-                ) : (
-                  <Box style={{ color: 'inherit' }}>
-                    <ReactMarkdown
-                      components={{
-                        p: ({ children }: any) => (
-                          <Text size="sm" mb="sm">
-                            {children}
-                          </Text>
-                        ),
-                        h1: ({ children }: any) => (
-                          <Text size="sm" fw={700} mb="sm">
-                            {children}
-                          </Text>
-                        ),
-                        h2: ({ children }: any) => (
-                          <Text size="sm" fw={600} mb="sm">
-                            {children}
-                          </Text>
-                        ),
-                        h3: ({ children }: any) => (
-                          <Text size="sm" fw={600} mb="sm">
-                            {children}
-                          </Text>
-                        ),
-                        code: ({ children, className }: any) => (
-                          <Code style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>{children}</Code>
-                        ),
-                        pre: ({ children }: any) => (
-                          <Box mb="sm">
-                            <Code block style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
-                              {children}
-                            </Code>
-                          </Box>
-                        ),
-                        ul: ({ children }: any) => (
-                          <Box component="ul" mb="sm" style={{ paddingLeft: '1rem' }}>
-                            {children}
-                          </Box>
-                        ),
-                        ol: ({ children }: any) => (
-                          <Box component="ol" mb="sm" style={{ paddingLeft: '1rem' }}>
-                            {children}
-                          </Box>
-                        ),
-                        li: ({ children }: any) => (
-                          <Text size="sm" component="li" mb="xs">
-                            {children}
-                          </Text>
-                        ),
-                        strong: ({ children }: any) => (
-                          <Text size="sm" fw={600} component="span">
-                            {children}
-                          </Text>
-                        ),
-                        em: ({ children }: any) => (
-                          <Text size="sm" fs="italic" component="span">
-                            {children}
-                          </Text>
-                        ),
-                      }}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
-                  </Box>
-                )}
-                <Text size="xs" c="dimmed" mt={4}>
-                  {formatTime(message.timestamp)}
-                </Text>
-              </Paper>
-            </Box>
-          ))}
+                </Paper>
+              </Box>
+            ))}
+            {currentStreamingMessage && (
+              <Box style={{ alignSelf: 'flex-start', maxWidth: '80%' }}>
+                <Paper p="sm" bg="gray.1" style={{ borderRadius: '12px' }}>
+                  <ReactMarkdown>{currentStreamingMessage}</ReactMarkdown>
+                  <Text size="xs" c="dimmed" mt="xs">
+                    {formatTime(new Date())} (typing...)
+                  </Text>
+                </Paper>
+              </Box>
+            )}
+          </Stack>
+        </ScrollArea>
 
-          {currentStreamingMessage && (
-            <Box style={{ display: 'flex', justifyContent: 'flex-start' }}>
-              <Paper
-                p="sm"
-                style={{ maxWidth: '80%', backgroundColor: 'var(--mantine-color-gray-1)' }}
+        <Box style={{ position: 'relative' }}>
+          <LoadingOverlay visible={isLoading} />
+          <Group gap="xs">
+            <Textarea
+              placeholder="Ask me anything about coding, debugging, or development..."
+              value={inputValue}
+              onChange={(event) => setInputValue(event.currentTarget.value)}
+              onKeyPress={handleKeyPress}
+              autosize
+              minRows={1}
+              maxRows={4}
+              flex={1}
+              disabled={isLoading}
+            />
+            {isStreaming ? (
+              <Button
+                onClick={handleStopStreaming}
+                leftSection={<RiStopLine size={16} />}
+                size="sm"
+                color="red"
               >
-                <Box>
-                  <ReactMarkdown
-                    components={{
-                      p: ({ children }: any) => (
-                        <Text size="sm" mb="sm">
-                          {children}
-                        </Text>
-                      ),
-                      h1: ({ children }: any) => (
-                        <Text size="sm" fw={700} mb="sm">
-                          {children}
-                        </Text>
-                      ),
-                      h2: ({ children }: any) => (
-                        <Text size="sm" fw={600} mb="sm">
-                          {children}
-                        </Text>
-                      ),
-                      h3: ({ children }: any) => (
-                        <Text size="sm" fw={600} mb="sm">
-                          {children}
-                        </Text>
-                      ),
-                      code: ({ children, className }: any) => (
-                        <Code style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>{children}</Code>
-                      ),
-                      pre: ({ children }: any) => (
-                        <Box mb="sm">
-                          <Code block style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
-                            {children}
-                          </Code>
-                        </Box>
-                      ),
-                      ul: ({ children }: any) => (
-                        <Box component="ul" mb="sm" style={{ paddingLeft: '1rem' }}>
-                          {children}
-                        </Box>
-                      ),
-                      ol: ({ children }: any) => (
-                        <Box component="ol" mb="sm" style={{ paddingLeft: '1rem' }}>
-                          {children}
-                        </Box>
-                      ),
-                      li: ({ children }: any) => (
-                        <Text size="sm" component="li" mb="xs">
-                          {children}
-                        </Text>
-                      ),
-                      strong: ({ children }: any) => (
-                        <Text size="sm" fw={600} component="span">
-                          {children}
-                        </Text>
-                      ),
-                      em: ({ children }: any) => (
-                        <Text size="sm" fs="italic" component="span">
-                          {children}
-                        </Text>
-                      ),
-                    }}
-                  >
-                    {currentStreamingMessage}
-                  </ReactMarkdown>
-                  <span
-                    style={{
-                      animation: 'blink 1s infinite',
-                      opacity: 1,
-                    }}
-                  >
-                    ▋
-                  </span>
-                </Box>
-              </Paper>
-            </Box>
-          )}
-        </Stack>
-      </ScrollArea>
-
-      <Box style={{ position: 'relative' }}>
-        <LoadingOverlay visible={isLoading} />
-        <Group gap="xs">
-          <Textarea
-            placeholder={
-              isOllamaInstalled === false
-                ? 'Install Ollama to use AI Assistant...'
-                : isConnected
-                  ? 'Ask me anything about coding, debugging, or development...'
-                  : 'Start Ollama server to use AI Assistant...'
-            }
-            value={inputValue}
-            onChange={(event) => setInputValue(event.currentTarget.value)}
-            onKeyPress={handleKeyPress}
-            autosize
-            minRows={1}
-            maxRows={4}
-            flex={1}
-            disabled={isLoading || !isConnected || isOllamaInstalled === false}
-          />
-          {isStreaming ? (
-            <Button
-              onClick={handleStopStreaming}
-              leftSection={<RiStopLine size={16} />}
-              size="sm"
-              color="red"
-            >
-              Stop
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSendMessage}
-              disabled={
-                !inputValue.trim() || isLoading || !isConnected || isOllamaInstalled === false
-              }
-              leftSection={<RiSendPlaneFill size={16} />}
-              size="sm"
-            >
-              Send
-            </Button>
-          )}
-        </Group>
-      </Box>
+                Stop
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSendMessage}
+                disabled={!inputValue.trim() || isLoading}
+                leftSection={<RiSendPlaneFill size={16} />}
+                size="sm"
+              >
+                Send
+              </Button>
+            )}
+          </Group>
+        </Box>
+      </OllamaGuard>
     </Paper>
   );
 };

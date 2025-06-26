@@ -95,6 +95,12 @@ app.on('open-url', (event, url) => {
   dialog.showErrorBox('Welcome Back', `You arrived from: ${url}`);
 });
 
+// Track active downloads for cancellation
+const activeDownloads = new Map<
+  string,
+  { req: http.ClientRequest; abortController: AbortController }
+>();
+
 // Ollama API handlers
 ipcMain.handle('stream-ollama-response', async (event, { prompt, model = 'qwen2.5-coder:14b' }) => {
   return new Promise((resolve, reject) => {
@@ -339,6 +345,8 @@ async function checkOllamaServer(): Promise<boolean> {
 // Download/Pull Ollama model
 ipcMain.handle('download-ollama-model', async (event, { modelName }) => {
   return new Promise((resolve, reject) => {
+    const abortController = new AbortController();
+
     const postData = JSON.stringify({
       name: modelName,
     });
@@ -352,10 +360,12 @@ ipcMain.handle('download-ollama-model', async (event, { modelName }) => {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(postData),
       },
+      signal: abortController.signal,
     };
 
     const req = http.request(options, (res) => {
       if (res.statusCode !== 200) {
+        activeDownloads.delete(modelName);
         reject(new Error(`HTTP error! status: ${res.statusCode}`));
         return;
       }
@@ -415,6 +425,7 @@ ipcMain.handle('download-ollama-model', async (event, { modelName }) => {
           done: true,
         });
 
+        activeDownloads.delete(modelName);
         resolve({ success: true });
       });
 
@@ -426,13 +437,46 @@ ipcMain.handle('download-ollama-model', async (event, { modelName }) => {
           done: true,
           error: true,
         });
+        activeDownloads.delete(modelName);
         reject(error);
       });
     });
 
+    // Store the request for potential cancellation
+    activeDownloads.set(modelName, { req, abortController });
+
     req.write(postData);
     req.end();
   });
+});
+
+// Cancel Ollama model download
+ipcMain.handle('cancel-ollama-download', async (event, { modelName }) => {
+  try {
+    const download = activeDownloads.get(modelName);
+    if (download) {
+      download.abortController.abort();
+      download.req.destroy();
+      activeDownloads.delete(modelName);
+
+      // Send cancellation signal to renderer
+      event.sender.send('ollama-download-progress', {
+        modelName,
+        status: 'Download cancelled',
+        done: true,
+        error: true,
+      });
+
+      return { success: true };
+    } else {
+      return { success: false, error: 'Download not found' };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 });
 
 // In this file you can include the rest of your app's specific main process
