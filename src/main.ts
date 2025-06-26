@@ -479,5 +479,48 @@ ipcMain.handle('cancel-ollama-download', async (event, { modelName }) => {
   }
 });
 
+// Delete Ollama model
+ipcMain.handle('delete-ollama-model', async (event, { modelName }) => {
+  try {
+    const postData = JSON.stringify({
+      name: modelName,
+    });
+
+    const options = {
+      hostname: 'localhost',
+      port: 11434,
+      path: '/api/delete',
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+    };
+
+    return new Promise((resolve, reject) => {
+      const req = http.request(options, (res) => {
+        if (res.statusCode === 200) {
+          resolve({ success: true });
+        } else {
+          reject(new Error(`HTTP error! status: ${res.statusCode}`));
+        }
+      });
+
+      req.on('error', (error) => {
+        console.error('Delete request error:', error);
+        reject(error);
+      });
+
+      req.write(postData);
+      req.end();
+    });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.

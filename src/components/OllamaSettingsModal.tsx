@@ -23,6 +23,7 @@ import {
   RiCloseLine,
   RiDownloadLine,
   RiStopLine,
+  RiDeleteBinLine,
 } from 'react-icons/ri';
 import { OllamaGuard } from './OllamaGuard';
 
@@ -181,6 +182,22 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
     }
   };
 
+  const handleDeleteModel = async (modelName: string) => {
+    try {
+      const result = await window.electronAPI.deleteOllamaModel(modelName);
+      if (result.success) {
+        // Refresh models list after deletion
+        setTimeout(() => {
+          onRefreshModels();
+        }, 1000);
+      } else {
+        console.error('Failed to delete model:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to delete model:', error);
+    }
+  };
+
   const confirmCancelDownload = (modelName: string) => {
     modals.openConfirmModal({
       title: 'Cancel Download',
@@ -193,6 +210,21 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
       labels: { confirm: 'Cancel Download', cancel: 'Keep Downloading' },
       confirmProps: { color: 'red' },
       onConfirm: () => handleCancelDownload(modelName),
+    });
+  };
+
+  const confirmDeleteModel = (modelName: string) => {
+    modals.openConfirmModal({
+      title: 'Delete Model',
+      children: (
+        <Text>
+          Are you sure you want to delete "{modelName}"? This will permanently remove the model from
+          your system and cannot be undone.
+        </Text>
+      ),
+      labels: { confirm: 'Delete Model', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => handleDeleteModel(modelName),
     });
   };
 
@@ -288,6 +320,18 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
                 onClick={() => confirmCancelDownload(model.name)}
               >
                 <RiStopLine size={16} />
+              </ActionIcon>
+            </Tooltip>
+          )}
+          {installed && !downloading && (
+            <Tooltip label="Delete model">
+              <ActionIcon
+                variant="light"
+                color="red"
+                onClick={() => confirmDeleteModel(model.name)}
+                disabled={!isConnected}
+              >
+                <RiDeleteBinLine size={16} />
               </ActionIcon>
             </Tooltip>
           )}

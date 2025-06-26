@@ -33,6 +33,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cancelOllamaDownload: (modelName: string) =>
     ipcRenderer.invoke('cancel-ollama-download', { modelName }),
 
+  // Delete Ollama model
+  deleteOllamaModel: (modelName: string) =>
+    ipcRenderer.invoke('delete-ollama-model', { modelName }),
+
   // Listen for streaming responses
   onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => {
     ipcRenderer.on('ollama-stream-chunk', (_event, data) => callback(data));
@@ -82,6 +86,7 @@ declare global {
       }>;
       downloadOllamaModel: (modelName: string) => Promise<void>;
       cancelOllamaDownload: (modelName: string) => Promise<{ success: boolean; error?: string }>;
+      deleteOllamaModel: (modelName: string) => Promise<{ success: boolean; error?: string }>;
       onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => void;
       onOllamaDownloadProgress: (
         callback: (data: {
