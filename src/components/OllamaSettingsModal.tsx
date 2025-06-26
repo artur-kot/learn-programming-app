@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   Select,
@@ -12,14 +12,27 @@ import {
   LoadingOverlay,
   Paper,
   Title,
+  Progress,
+  ActionIcon,
+  Tooltip,
 } from '@mantine/core';
-import { RiRefreshLine, RiCheckLine, RiCloseLine } from 'react-icons/ri';
+import { RiRefreshLine, RiCheckLine, RiCloseLine, RiDownloadLine } from 'react-icons/ri';
 
 interface Model {
   value: string;
   label: string;
   size?: number;
   modified_at?: string;
+}
+
+interface DownloadProgress {
+  [modelName: string]: {
+    status: string;
+    completed?: number;
+    total?: number;
+    done: boolean;
+    error?: boolean;
+  };
 }
 
 interface OllamaSettingsModalProps {
@@ -53,6 +66,46 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
   onRefreshModels,
   isConnected,
 }) => {
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress>({});
+  const [downloadingModels, setDownloadingModels] = useState<Set<string>>(new Set());
+
+  // Set up download progress listener
+  useEffect(() => {
+    if (opened) {
+      window.electronAPI.onOllamaDownloadProgress((data) => {
+        setDownloadProgress((prev) => ({
+          ...prev,
+          [data.modelName]: {
+            status: data.status,
+            completed: data.completed,
+            total: data.total,
+            done: data.done,
+            error: data.error,
+          },
+        }));
+
+        if (data.done) {
+          setDownloadingModels((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(data.modelName);
+            return newSet;
+          });
+
+          // Refresh models list when download completes
+          if (!data.error) {
+            setTimeout(() => {
+              onRefreshModels();
+            }, 1000);
+          }
+        }
+      });
+
+      return () => {
+        window.electronAPI.removeOllamaDownloadListener();
+      };
+    }
+  }, [opened, onRefreshModels]);
+
   const formatModelSize = (size?: number) => {
     if (!size) return '';
     const gb = size / (1024 * 1024 * 1024);
@@ -68,9 +121,57 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
     return model?.size ? formatModelSize(model.size) : '';
   };
 
+  const handleDownloadModel = async (modelName: string) => {
+    if (!isConnected || downloadingModels.has(modelName)) return;
+
+    setDownloadingModels((prev) => new Set(prev).add(modelName));
+    setDownloadProgress((prev) => ({
+      ...prev,
+      [modelName]: {
+        status: 'Starting download...',
+        done: false,
+      },
+    }));
+
+    try {
+      await window.electronAPI.downloadOllamaModel(modelName);
+    } catch (error) {
+      setDownloadProgress((prev) => ({
+        ...prev,
+        [modelName]: {
+          status: `Error: ${error instanceof Error ? error.message : 'Download failed'}`,
+          done: true,
+          error: true,
+        },
+      }));
+      setDownloadingModels((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(modelName);
+        return newSet;
+      });
+    }
+  };
+
+  const getProgressPercentage = (modelName: string) => {
+    const progress = downloadProgress[modelName];
+    if (!progress || !progress.completed || !progress.total) return 0;
+    return Math.round((progress.completed / progress.total) * 100);
+  };
+
+  const isDownloading = (modelName: string) => {
+    return downloadingModels.has(modelName);
+  };
+
+  const getDownloadProgress = (modelName: string) => {
+    return downloadProgress[modelName];
+  };
+
   const rows = QWEN_MODELS.map((model) => {
     const installed = isModelInstalled(model.name);
     const size = getModelSize(model.name);
+    const downloading = isDownloading(model.name);
+    const progress = getDownloadProgress(model.name);
+    const progressPercentage = getProgressPercentage(model.name);
 
     return (
       <Table.Tr key={model.name}>
@@ -93,6 +194,24 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
                 Installed
               </Group>
             </Badge>
+          ) : downloading ? (
+            <Stack gap="xs">
+              <Badge color="blue" variant="light" size="sm">
+                Downloading...
+              </Badge>
+              {progress && (
+                <Stack gap={4}>
+                  <Progress
+                    value={progressPercentage}
+                    size="xs"
+                    color={progress.error ? 'red' : 'blue'}
+                  />
+                  <Text size="xs" c="dimmed">
+                    {progress.status}
+                  </Text>
+                </Stack>
+              )}
+            </Stack>
           ) : (
             <Badge color="gray" variant="light" size="sm">
               <Group gap={4}>
@@ -100,6 +219,21 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
                 Not Installed
               </Group>
             </Badge>
+          )}
+        </Table.Td>
+        <Table.Td>
+          {!installed && !downloading && (
+            <Tooltip label="Download model">
+              <ActionIcon
+                variant="light"
+                color="blue"
+                onClick={() => handleDownloadModel(model.name)}
+                disabled={!isConnected}
+                loading={downloading}
+              >
+                <RiDownloadLine size={16} />
+              </ActionIcon>
+            </Tooltip>
           )}
         </Table.Td>
       </Table.Tr>
@@ -163,6 +297,7 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
                 <Table.Th>Model</Table.Th>
                 <Table.Th>Size</Table.Th>
                 <Table.Th>Status</Table.Th>
+                <Table.Th>Actions</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>{rows}</Table.Tbody>

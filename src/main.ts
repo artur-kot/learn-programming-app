@@ -336,5 +336,104 @@ async function checkOllamaServer(): Promise<boolean> {
   }
 }
 
+// Download/Pull Ollama model
+ipcMain.handle('download-ollama-model', async (event, { modelName }) => {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      name: modelName,
+    });
+
+    const options = {
+      hostname: 'localhost',
+      port: 11434,
+      path: '/api/pull',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP error! status: ${res.statusCode}`));
+        return;
+      }
+
+      let buffer = '';
+
+      res.on('data', (chunk) => {
+        buffer += chunk.toString();
+
+        // Process complete lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const data = JSON.parse(line);
+              // Send progress updates to renderer
+              event.sender.send('ollama-download-progress', {
+                modelName,
+                status: data.status,
+                completed: data.completed,
+                total: data.total,
+                done: false,
+              });
+            } catch (parseError) {
+              console.error('Error parsing Ollama download response:', parseError);
+            }
+          }
+        }
+      });
+
+      res.on('end', () => {
+        // Process any remaining buffer
+        if (buffer.trim()) {
+          const lines = buffer.split('\n').filter((line) => line.trim());
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line);
+              event.sender.send('ollama-download-progress', {
+                modelName,
+                status: data.status,
+                completed: data.completed,
+                total: data.total,
+                done: false,
+              });
+            } catch (parseError) {
+              console.error('Error parsing final download buffer:', parseError);
+            }
+          }
+        }
+
+        // Send completion signal
+        event.sender.send('ollama-download-progress', {
+          modelName,
+          status: 'Download completed',
+          done: true,
+        });
+
+        resolve({ success: true });
+      });
+
+      req.on('error', (error) => {
+        console.error('Download request error:', error);
+        event.sender.send('ollama-download-progress', {
+          modelName,
+          status: `Error: ${error.message}`,
+          done: true,
+          error: true,
+        });
+        reject(error);
+      });
+    });
+
+    req.write(postData);
+    req.end();
+  });
+});
+
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.

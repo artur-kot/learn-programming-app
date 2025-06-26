@@ -25,14 +25,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Start Ollama server
   startOllamaServer: () => ipcRenderer.invoke('start-ollama-server'),
 
+  // Download/Pull Ollama model
+  downloadOllamaModel: (modelName: string) =>
+    ipcRenderer.invoke('download-ollama-model', { modelName }),
+
   // Listen for streaming responses
   onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => {
     ipcRenderer.on('ollama-stream-chunk', (_event, data) => callback(data));
   },
 
+  // Listen for download progress
+  onOllamaDownloadProgress: (
+    callback: (data: {
+      modelName: string;
+      status: string;
+      completed?: number;
+      total?: number;
+      done: boolean;
+      error?: boolean;
+    }) => void
+  ) => {
+    ipcRenderer.on('ollama-download-progress', (_event, data) => callback(data));
+  },
+
   // Remove listeners
   removeOllamaStreamListener: () => {
     ipcRenderer.removeAllListeners('ollama-stream-chunk');
+  },
+
+  removeOllamaDownloadListener: () => {
+    ipcRenderer.removeAllListeners('ollama-download-progress');
   },
 });
 
@@ -54,8 +76,20 @@ declare global {
         alreadyRunning?: boolean;
         error?: string;
       }>;
+      downloadOllamaModel: (modelName: string) => Promise<void>;
       onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => void;
+      onOllamaDownloadProgress: (
+        callback: (data: {
+          modelName: string;
+          status: string;
+          completed?: number;
+          total?: number;
+          done: boolean;
+          error?: boolean;
+        }) => void
+      ) => void;
       removeOllamaStreamListener: () => void;
+      removeOllamaDownloadListener: () => void;
     };
   }
 }
