@@ -17,6 +17,7 @@ import {
   Tooltip,
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
+import { notifications } from '@mantine/notifications';
 import {
   RiRefreshLine,
   RiCheckLine,
@@ -77,6 +78,7 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
 }) => {
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress>({});
   const [downloadingModels, setDownloadingModels] = useState<Set<string>>(new Set());
+  const [deletingModels, setDeletingModels] = useState<Set<string>>(new Set());
 
   // Set up download progress listener
   useEffect(() => {
@@ -183,18 +185,57 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
   };
 
   const handleDeleteModel = async (modelName: string) => {
+    setDeletingModels((prev) => new Set(prev).add(modelName));
+
     try {
       const result = await window.electronAPI.deleteOllamaModel(modelName);
       if (result.success) {
+        // Show success notification
+        notifications.show({
+          title: 'Model Deleted',
+          message: `Successfully deleted "${modelName}"`,
+          color: 'green',
+        });
+
+        // Check if the deleted model was the currently selected one
+        if (modelName === selectedModel) {
+          // Find the first available model to switch to
+          const remainingModels = availableModels.filter((model) => model.value !== modelName);
+          if (remainingModels.length > 0) {
+            onModelChange(remainingModels[0].value);
+            notifications.show({
+              title: 'Model Switched',
+              message: `Switched to "${remainingModels[0].value}"`,
+              color: 'blue',
+            });
+          }
+        }
+
         // Refresh models list after deletion
         setTimeout(() => {
           onRefreshModels();
         }, 1000);
       } else {
+        notifications.show({
+          title: 'Delete Failed',
+          message: `Failed to delete "${modelName}": ${result.error}`,
+          color: 'red',
+        });
         console.error('Failed to delete model:', result.error);
       }
     } catch (error) {
+      notifications.show({
+        title: 'Delete Failed',
+        message: `Failed to delete "${modelName}": ${error instanceof Error ? error.message : 'Unknown error'}`,
+        color: 'red',
+      });
       console.error('Failed to delete model:', error);
+    } finally {
+      setDeletingModels((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(modelName);
+        return newSet;
+      });
     }
   };
 
@@ -238,6 +279,10 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
     return downloadingModels.has(modelName);
   };
 
+  const isDeleting = (modelName: string) => {
+    return deletingModels.has(modelName);
+  };
+
   const getDownloadProgress = (modelName: string) => {
     return downloadProgress[modelName];
   };
@@ -248,6 +293,7 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
     const installed = isModelInstalled(model.name);
     const size = getModelSize(model.name);
     const downloading = isDownloading(model.name);
+    const deleting = isDeleting(model.name);
     const progress = getDownloadProgress(model.name);
     const progressPercentage = getProgressPercentage(model.name);
 
@@ -266,12 +312,20 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
         </Table.Td>
         <Table.Td>
           {installed ? (
-            <Badge color="green" variant="light" size="sm">
-              <Group gap={4}>
-                <RiCheckLine size={12} />
-                Installed
-              </Group>
-            </Badge>
+            deleting ? (
+              <Stack gap="xs">
+                <Badge color="orange" variant="light" size="sm">
+                  Deleting...
+                </Badge>
+              </Stack>
+            ) : (
+              <Badge color="green" variant="light" size="sm">
+                <Group gap={4}>
+                  <RiCheckLine size={12} />
+                  Installed
+                </Group>
+              </Badge>
+            )
           ) : downloading ? (
             <Stack gap="xs">
               <Badge color="blue" variant="light" size="sm">
@@ -323,7 +377,7 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
               </ActionIcon>
             </Tooltip>
           )}
-          {installed && !downloading && (
+          {installed && !downloading && !deleting && (
             <Tooltip label="Delete model">
               <ActionIcon
                 variant="light"
@@ -378,7 +432,7 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
             {/* Models Table */}
             <Paper p="md" withBorder>
               <Group justify="space-between" mb="md">
-                <Title order={6}>Available LLM Models</Title>
+                <Title order={6}>Available Models</Title>
               </Group>
 
               <LoadingOverlay visible={isLoadingModels} />
