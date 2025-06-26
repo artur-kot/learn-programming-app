@@ -37,6 +37,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteOllamaModel: (modelName: string) =>
     ipcRenderer.invoke('delete-ollama-model', { modelName }),
 
+  // Get system information for model recommendations
+  getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
+
   // Listen for streaming responses
   onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => {
     ipcRenderer.on('ollama-stream-chunk', (_event, data) => callback(data));
@@ -87,6 +90,20 @@ declare global {
       downloadOllamaModel: (modelName: string) => Promise<void>;
       cancelOllamaDownload: (modelName: string) => Promise<{ success: boolean; error?: string }>;
       deleteOllamaModel: (modelName: string) => Promise<{ success: boolean; error?: string }>;
+      getSystemInfo: () => Promise<{
+        success: boolean;
+        systemInfo?: {
+          platform: string;
+          arch: string;
+          cpuCount: number;
+          cpuModel: string;
+          totalMemoryGB: number;
+          freeMemoryGB: number;
+          isAppleSilicon: boolean;
+          hasDedicatedGPU: boolean;
+        };
+        error?: string;
+      }>;
       onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => void;
       onOllamaDownloadProgress: (
         callback: (data: {

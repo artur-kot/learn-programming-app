@@ -6,6 +6,7 @@ import http from 'node:http';
 import { spawn, exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
+import os from 'node:os';
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -514,6 +515,76 @@ ipcMain.handle('delete-ollama-model', async (event, { modelName }) => {
       req.write(postData);
       req.end();
     });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// Get system information for model recommendations
+ipcMain.handle('get-system-info', async () => {
+  try {
+    const cpus = os.cpus();
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const platform = os.platform();
+    const arch = os.arch();
+
+    // Calculate memory in GB
+    const totalMemoryGB = Math.round(totalMemory / (1024 * 1024 * 1024));
+    const freeMemoryGB = Math.round(freeMemory / (1024 * 1024 * 1024));
+
+    // Get CPU info
+    const cpuCount = cpus.length;
+    const cpuModel = cpus[0]?.model || 'Unknown';
+
+    // Check if we're on Apple Silicon (M1/M2/M3)
+    const isAppleSilicon = platform === 'darwin' && arch === 'arm64';
+
+    // Check if we have a dedicated GPU (basic detection)
+    let hasDedicatedGPU = false;
+    if (platform === 'win32') {
+      try {
+        const { stdout } = await promisify(exec)('wmic path win32_VideoController get name');
+        hasDedicatedGPU =
+          stdout.toLowerCase().includes('nvidia') ||
+          stdout.toLowerCase().includes('amd') ||
+          stdout.toLowerCase().includes('radeon');
+      } catch {
+        // If we can't detect GPU, assume false
+        hasDedicatedGPU = false;
+      }
+    } else if (platform === 'darwin') {
+      // On macOS, assume Apple Silicon has good GPU capabilities
+      hasDedicatedGPU = isAppleSilicon;
+    } else {
+      // On Linux, try to detect GPU
+      try {
+        const { stdout } = await promisify(exec)('lspci | grep -i vga');
+        hasDedicatedGPU =
+          stdout.toLowerCase().includes('nvidia') ||
+          stdout.toLowerCase().includes('amd') ||
+          stdout.toLowerCase().includes('radeon');
+      } catch {
+        hasDedicatedGPU = false;
+      }
+    }
+
+    return {
+      success: true,
+      systemInfo: {
+        platform,
+        arch,
+        cpuCount,
+        cpuModel,
+        totalMemoryGB,
+        freeMemoryGB,
+        isAppleSilicon,
+        hasDedicatedGPU,
+      },
+    };
   } catch (error) {
     return {
       success: false,

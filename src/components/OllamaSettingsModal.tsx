@@ -15,6 +15,7 @@ import {
   Progress,
   ActionIcon,
   Tooltip,
+  List,
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
@@ -25,6 +26,8 @@ import {
   RiDownloadLine,
   RiStopLine,
   RiDeleteBinLine,
+  RiInformationLine,
+  RiThumbUpLine,
 } from 'react-icons/ri';
 import { OllamaGuard } from './OllamaGuard';
 
@@ -43,6 +46,17 @@ interface DownloadProgress {
     done: boolean;
     error?: boolean;
   };
+}
+
+interface SystemInfo {
+  platform: string;
+  arch: string;
+  cpuCount: number;
+  cpuModel: string;
+  totalMemoryGB: number;
+  freeMemoryGB: number;
+  isAppleSilicon: boolean;
+  hasDedicatedGPU: boolean;
 }
 
 interface OllamaSettingsModalProps {
@@ -79,6 +93,180 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress>({});
   const [downloadingModels, setDownloadingModels] = useState<Set<string>>(new Set());
   const [deletingModels, setDeletingModels] = useState<Set<string>>(new Set());
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [recommendedModels, setRecommendedModels] = useState<Set<string>>(new Set());
+
+  // Get system information and calculate recommendations
+  useEffect(() => {
+    const getSystemInfo = async () => {
+      try {
+        const result = await window.electronAPI.getSystemInfo();
+        if (result.success && result.systemInfo) {
+          setSystemInfo(result.systemInfo);
+          calculateRecommendations(result.systemInfo);
+        }
+      } catch (error) {
+        console.error('Failed to get system info:', error);
+      }
+    };
+
+    if (opened) {
+      getSystemInfo();
+    }
+  }, [opened]);
+
+  const calculateRecommendations = (info: SystemInfo) => {
+    const recommendations = new Set<string>();
+
+    // Base recommendations on system capabilities
+    if (info.isAppleSilicon) {
+      // Apple Silicon can handle larger models well
+      if (info.totalMemoryGB >= 16) {
+        recommendations.add('qwen2.5-coder:14b');
+        recommendations.add('qwen2.5-coder:32b');
+      } else if (info.totalMemoryGB >= 8) {
+        recommendations.add('qwen2.5-coder:7b');
+        recommendations.add('qwen2.5-coder:14b');
+      } else {
+        recommendations.add('qwen2.5-coder:3b');
+        recommendations.add('qwen2.5-coder:7b');
+      }
+    } else if (info.hasDedicatedGPU) {
+      // Dedicated GPU can handle larger models
+      if (info.totalMemoryGB >= 16) {
+        recommendations.add('qwen2.5-coder:14b');
+        recommendations.add('qwen2.5-coder:32b');
+      } else if (info.totalMemoryGB >= 8) {
+        recommendations.add('qwen2.5-coder:7b');
+        recommendations.add('qwen2.5-coder:14b');
+      } else {
+        recommendations.add('qwen2.5-coder:3b');
+        recommendations.add('qwen2.5-coder:7b');
+      }
+    } else {
+      // CPU-only systems
+      if (info.cpuCount >= 8 && info.totalMemoryGB >= 16) {
+        recommendations.add('qwen2.5-coder:7b');
+        recommendations.add('qwen2.5-coder:14b');
+      } else if (info.cpuCount >= 4 && info.totalMemoryGB >= 8) {
+        recommendations.add('qwen2.5-coder:3b');
+        recommendations.add('qwen2.5-coder:7b');
+      } else {
+        recommendations.add('qwen2.5-coder:0.5b');
+        recommendations.add('qwen2.5-coder:1.5b');
+        recommendations.add('qwen2.5-coder:3b');
+      }
+    }
+
+    setRecommendedModels(recommendations);
+  };
+
+  const showInfoDialog = () => {
+    modals.open({
+      title: 'Model Selection Guide',
+      size: 'lg',
+      children: (
+        <Stack gap="md">
+          <Text size="sm">Choose the right model based on your system capabilities and needs:</Text>
+
+          <Paper p="md" withBorder>
+            <Title order={6} mb="sm">
+              System Requirements
+            </Title>
+            <List size="sm" spacing="xs">
+              <List.Item>
+                <Text fw={500}>0.5B - 1.5B models:</Text> Basic systems, 4GB+ RAM, any CPU
+              </List.Item>
+              <List.Item>
+                <Text fw={500}>3B models:</Text> 8GB+ RAM, 4+ CPU cores, good for most tasks
+              </List.Item>
+              <List.Item>
+                <Text fw={500}>7B models:</Text> 16GB+ RAM, 8+ CPU cores or dedicated GPU
+              </List.Item>
+              <List.Item>
+                <Text fw={500}>14B models:</Text> 32GB+ RAM, high-end CPU or dedicated GPU
+              </List.Item>
+              <List.Item>
+                <Text fw={500}>32B models:</Text> 64GB+ RAM, high-end system with dedicated GPU
+              </List.Item>
+            </List>
+          </Paper>
+
+          <Paper p="md" withBorder>
+            <Title order={6} mb="sm">
+              Performance Benefits
+            </Title>
+            <List size="sm" spacing="xs">
+              <List.Item>
+                <Text fw={500}>Larger models (7B+):</Text> Better code understanding, more accurate
+                suggestions, better reasoning capabilities
+              </List.Item>
+              <List.Item>
+                <Text fw={500}>Smaller models (0.5B-3B):</Text> Faster responses, lower resource
+                usage, suitable for basic coding tasks
+              </List.Item>
+              <List.Item>
+                <Text fw={500}>GPU acceleration:</Text> Significantly faster inference, especially
+                for larger models
+              </List.Item>
+              <List.Item>
+                <Text fw={500}>Apple Silicon:</Text> Excellent performance with larger models due to
+                unified memory
+              </List.Item>
+            </List>
+          </Paper>
+
+          <Paper p="md" withBorder>
+            <Title order={6} mb="sm">
+              Recommendations
+            </Title>
+            <List size="sm" spacing="xs">
+              <List.Item>
+                <Text fw={500}>Development:</Text> Start with 3B or 7B models for good balance of
+                speed and quality
+              </List.Item>
+              <List.Item>
+                <Text fw={500}>Learning:</Text> 1.5B or 3B models are sufficient for most coding
+                tutorials
+              </List.Item>
+              <List.Item>
+                <Text fw={500}>Professional:</Text> 7B or 14B models for complex code analysis and
+                generation
+              </List.Item>
+              <List.Item>
+                <Text fw={500}>Research:</Text> 14B or 32B models for advanced AI research and
+                development
+              </List.Item>
+            </List>
+          </Paper>
+
+          {systemInfo && (
+            <Paper p="md" withBorder>
+              <Title order={6} mb="sm">
+                Your System
+              </Title>
+              <Text size="sm">
+                <strong>Platform:</strong> {systemInfo.platform} ({systemInfo.arch})<br />
+                <strong>CPU:</strong> {systemInfo.cpuCount} cores - {systemInfo.cpuModel}
+                <br />
+                <strong>Memory:</strong> {systemInfo.totalMemoryGB}GB total,{' '}
+                {systemInfo.freeMemoryGB}GB available
+                <br />
+                <strong>GPU:</strong>{' '}
+                {systemInfo.hasDedicatedGPU ? 'Dedicated GPU detected' : 'Integrated graphics'}
+                <br />
+                {systemInfo.isAppleSilicon && (
+                  <>
+                    <strong>Apple Silicon:</strong> Optimized for AI workloads
+                  </>
+                )}
+              </Text>
+            </Paper>
+          )}
+        </Stack>
+      ),
+    });
+  };
 
   // Set up download progress listener
   useEffect(() => {
@@ -296,13 +484,21 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
     const deleting = isDeleting(model.name);
     const progress = getDownloadProgress(model.name);
     const progressPercentage = getProgressPercentage(model.name);
+    const isRecommended = recommendedModels.has(model.name);
 
     return (
       <Table.Tr key={model.name}>
         <Table.Td>
-          <Text size="sm" fw={500}>
-            {model.name}
-          </Text>
+          <Group gap="xs" align="center">
+            <Text size="sm" fw={500}>
+              {model.name}
+            </Text>
+            {isRecommended && (
+              <Tooltip label="Recommended for your system">
+                <RiThumbUpLine size={14} color="green" />
+              </Tooltip>
+            )}
+          </Group>
           <Text size="xs" c="dimmed">
             {model.description}
           </Text>
@@ -433,6 +629,11 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
             <Paper p="md" withBorder>
               <Group justify="space-between" mb="md">
                 <Title order={6}>Available Models</Title>
+                <Tooltip label="Show model selection guide">
+                  <ActionIcon variant="light" color="blue" onClick={showInfoDialog}>
+                    <RiInformationLine size={16} />
+                  </ActionIcon>
+                </Tooltip>
               </Group>
 
               <LoadingOverlay visible={isLoadingModels} />
