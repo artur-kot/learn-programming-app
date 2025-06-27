@@ -73,15 +73,41 @@ interface OllamaSettingsModalProps {
   isConnected: boolean | null;
 }
 
-// Predefined Qwen models for reference
+// Predefined Qwen models for reference with fallback sizes
 const QWEN_MODELS = [
-  { name: 'qwen2.5-coder:0.5b', size: '0.5B', description: 'Smallest coding model' },
-  { name: 'qwen2.5-coder:1.5b', size: '1.5B', description: 'Small coding model' },
-  { name: 'qwen2.5-coder:3b', size: '3B', description: 'Medium coding model' },
-  { name: 'qwen2.5-coder:7b', size: '7B', description: 'Large coding model' },
-  { name: 'qwen2.5-coder:14b', size: '14B', description: 'Extra large coding model' },
-  { name: 'qwen2.5-coder:32b', size: '32B', description: 'Largest coding model' },
+  {
+    name: 'qwen2.5-coder:0.5b',
+    size: '0.5B',
+    fallbackSizeGB: 0.3,
+    description: 'Smallest coding model',
+  },
+  {
+    name: 'qwen2.5-coder:1.5b',
+    size: '1.5B',
+    fallbackSizeGB: 0.9,
+    description: 'Small coding model',
+  },
+  { name: 'qwen2.5-coder:3b', size: '3B', fallbackSizeGB: 1.8, description: 'Medium coding model' },
+  { name: 'qwen2.5-coder:7b', size: '7B', fallbackSizeGB: 4.1, description: 'Large coding model' },
+  {
+    name: 'qwen2.5-coder:14b',
+    size: '14B',
+    fallbackSizeGB: 8.2,
+    description: 'Extra large coding model',
+  },
+  {
+    name: 'qwen2.5-coder:32b',
+    size: '32B',
+    fallbackSizeGB: 19.0,
+    description: 'Largest coding model',
+  },
 ];
+
+interface ModelInfo {
+  name: string;
+  size: number;
+  modified_at: string;
+}
 
 export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
   opened,
@@ -98,6 +124,7 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
   const [deletingModels, setDeletingModels] = useState<Set<string>>(new Set());
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [recommendedModels, setRecommendedModels] = useState<Set<string>>(new Set());
+  const [modelsInfo, setModelsInfo] = useState<ModelInfo[]>([]);
 
   // Get system information and calculate recommendations
   useEffect(() => {
@@ -113,10 +140,24 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
       }
     };
 
+    const getModelsInfo = async () => {
+      try {
+        const result = await window.electronAPI.getOllamaModelsInfo();
+        if (result.success && result.models) {
+          setModelsInfo(result.models);
+        }
+      } catch (error) {
+        console.error('Failed to get models info:', error);
+      }
+    };
+
     if (opened) {
       getSystemInfo();
+      if (isConnected) {
+        getModelsInfo();
+      }
     }
-  }, [opened]);
+  }, [opened, isConnected]);
 
   const calculateRecommendations = (info: SystemInfo) => {
     const recommendations = new Set<string>();
@@ -324,6 +365,16 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
     return model?.size ? formatModelSize(model.size) : '';
   };
 
+  const getModelSizeFromLibrary = (modelName: string) => {
+    const modelInfo = modelsInfo.find((info) => info.name === modelName);
+    return modelInfo ? formatModelSize(modelInfo.size) : '';
+  };
+
+  const getFallbackSize = (modelName: string) => {
+    const model = QWEN_MODELS.find((m) => m.name === modelName);
+    return model ? `${model.fallbackSizeGB}GB` : '';
+  };
+
   const handleDownloadModel = async (modelName: string) => {
     if (!isConnected || downloadingModels.has(modelName)) return;
 
@@ -484,11 +535,17 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
   const rows = QWEN_MODELS.map((model) => {
     const installed = isModelInstalled(model.name);
     const size = getModelSize(model.name);
+    const librarySize = getModelSizeFromLibrary(model.name);
+    const fallbackSize = getFallbackSize(model.name);
     const downloading = isDownloading(model.name);
     const deleting = isDeleting(model.name);
     const progress = getDownloadProgress(model.name);
     const progressPercentage = getProgressPercentage(model.name);
     const isRecommended = recommendedModels.has(model.name);
+
+    // Hybrid approach: use actual size from availableModels if installed,
+    // otherwise use size from library if available, fallback to hardcoded size
+    const displaySize = installed ? size : librarySize || fallbackSize;
 
     return (
       <Table.Tr key={model.name}>
@@ -508,7 +565,7 @@ export const OllamaSettingsModal: React.FC<OllamaSettingsModalProps> = ({
           </Text>
         </Table.Td>
         <Table.Td>
-          <Text size="sm">{size}</Text>
+          <Text size="sm">{displaySize}</Text>
         </Table.Td>
         <Table.Td>
           {installed ? (

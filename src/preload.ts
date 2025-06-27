@@ -40,6 +40,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Get system information for model recommendations
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
 
+  // Get model information from Ollama library
+  getOllamaModelsInfo: () => ipcRenderer.invoke('get-ollama-models-info'),
+
   // Listen for streaming responses
   onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => {
     ipcRenderer.on('ollama-stream-chunk', (_event, data) => callback(data));
@@ -105,6 +108,15 @@ declare global {
           gpuVendor: string;
           gpuMemory: number | null;
         };
+        error?: string;
+      }>;
+      getOllamaModelsInfo: () => Promise<{
+        success: boolean;
+        models?: Array<{
+          name: string;
+          size: number;
+          modified_at: string;
+        }>;
         error?: string;
       }>;
       onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => void;

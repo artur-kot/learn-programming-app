@@ -701,5 +701,26 @@ ipcMain.handle('get-system-info', async () => {
   }
 });
 
+// Get model information from Ollama library
+ipcMain.handle('get-ollama-models-info', async () => {
+  try {
+    const response = await fetch('http://localhost:11434/api/library');
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        success: true,
+        models: data.models || [],
+      };
+    } else {
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
