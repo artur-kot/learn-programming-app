@@ -6,7 +6,7 @@ import { RiUserLine, RiLogoutBoxLine, RiArrowDownSLine, RiRobotFill } from 'reac
 import { account } from '~/services/appwrite';
 import { setUser } from '~/store/features/authSlice';
 import { useDispatch } from 'react-redux';
-import logo from '~/public/learnfrontend-logo.svg';
+import logo from '~/assets/learnfrontend-logo.svg';
 
 export const TopBar = () => {
   const user = useCurrentUser();
@@ -17,7 +17,7 @@ export const TopBar = () => {
     try {
       await account.deleteSession('current');
       dispatch(setUser(null));
-      navigate(links.login);
+      navigate(links.login());
     } catch (error) {
       console.error('Error logging out:', error);
     }
@@ -26,7 +26,9 @@ export const TopBar = () => {
   return (
     <AppShell.Header>
       <Group h="100%" px="md" align="center" justify="space-between">
-        <img src={logo} alt="logo" style={{ height: '100%' }} />
+        <Link to={links.home()} style={{ height: '100%' }}>
+          <img src={logo} alt="logo" style={{ height: '100%' }} />
+        </Link>
         {user && (
           <Menu width={200} position="bottom-end" transitionProps={{ transition: 'pop-top-right' }}>
             <Menu.Target>
@@ -44,7 +46,7 @@ export const TopBar = () => {
               <Menu.Item
                 leftSection={<RiUserLine style={{ width: rem(16), height: rem(16) }} />}
                 component={Link}
-                to={links.profile}
+                to={links.profile()}
               >
                 Profile
               </Menu.Item>

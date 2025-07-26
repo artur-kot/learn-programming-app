@@ -5,6 +5,7 @@ import { useAppSelector } from '~/store/hooks';
 import { BackButton } from '~/components/BackButton';
 import { TopicItem } from '~/components/TopicItem';
 import { RiPlayFill } from 'react-icons/ri';
+import { links } from '../links';
 
 // Topics with support for subtopics
 const topics: Record<Course, { name: string; subtopics?: string[] }[]> = {
@@ -56,7 +57,7 @@ export const CoursePage = () => {
   if (!course || !topics[course]) {
     return (
       <Container>
-        <BackButton />
+        <BackButton to={links.home()} label="Courses" />
         <Title>Course not found</Title>
       </Container>
     );
@@ -64,7 +65,7 @@ export const CoursePage = () => {
 
   return (
     <Container size="lg" py="xl">
-      <BackButton />
+      <BackButton to={links.home()} label="Courses" />
       <Title order={1} mb="xl">
         {course.toUpperCase()} Course
       </Title>

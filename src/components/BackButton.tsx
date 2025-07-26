@@ -4,9 +4,10 @@ import { RiArrowLeftLine } from 'react-icons/ri';
 
 interface BackButtonProps {
   label?: string;
+  to?: string;
 }
 
-export const BackButton = ({ label }: BackButtonProps) => {
+export const BackButton = ({ label, to }: BackButtonProps) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -22,7 +23,8 @@ export const BackButton = ({ label }: BackButtonProps) => {
     <Button
       variant="subtle"
       leftSection={<RiArrowLeftLine size="1rem" />}
-      onClick={() => navigate(-1)}
+      // @ts-ignore
+      onClick={() => navigate(to ? to : -1)}
       mb="md"
     >
       {getPreviousScreenName()}

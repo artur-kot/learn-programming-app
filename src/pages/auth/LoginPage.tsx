@@ -17,7 +17,7 @@ import { links } from '../links';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
-import logo from '~/public/learnfrontend-logo.svg';
+import logo from '~/assets/learnfrontend-logo.svg';
 import { BackButton } from '~/components/BackButton';
 
 interface LoginForm {
@@ -96,12 +96,12 @@ export const LoginPage = () => {
             </Button>
             <Text ta="center" mt="md">
               {t('auth.noAccount')}{' '}
-              <Link to={links.register} style={{ textDecoration: 'none' }}>
+              <Link to={links.register()} style={{ textDecoration: 'none' }}>
                 {t('auth.register')}
               </Link>
             </Text>
             <Text ta="center" mt="xs">
-              <Link to={links.forgotPassword} style={{ textDecoration: 'none' }}>
+              <Link to={links.forgotPassword()} style={{ textDecoration: 'none' }}>
                 {t('auth.forgotPassword')}
               </Link>
             </Text>

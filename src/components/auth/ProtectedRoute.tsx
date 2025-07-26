@@ -1,12 +1,13 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useCurrentUser } from '~/services/auth';
+import { isAdmin, useCurrentUser } from '~/services/auth';
 import { useAppSelector } from '~/store/hooks';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  admin?: boolean;
 }
 
-export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, admin }: ProtectedRouteProps) => {
   const user = useCurrentUser();
   const userStatus = useAppSelector((store) => store.auth.status);
   const location = useLocation();
@@ -15,12 +16,16 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 
+  if (admin && !isAdmin(user!)) {
+    return <Navigate to="/" />;
+  }
+
   return <>{children}</>;
 };
 
-export const withProtected = (Component: React.ComponentType<any>) => {
+export const withProtected = (Component: React.ComponentType<any>, admin?: boolean) => {
   return (props: any) => (
-    <ProtectedRoute>
+    <ProtectedRoute admin={admin}>
       <Component {...props} />
     </ProtectedRoute>
   );

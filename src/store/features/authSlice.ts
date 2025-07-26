@@ -2,7 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Models } from 'appwrite';
 
 interface AuthState {
-  user: Models.Preferences | null;
+  user: Models.User<Models.Preferences> | null;
   status: 'idle' | 'loading' | 'finished' | 'error';
 }
 
@@ -15,7 +15,7 @@ export const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setUser: (state, action: PayloadAction<Models.Preferences | null>) => {
+    setUser: (state, action: PayloadAction<Models.User<Models.Preferences> | null>) => {
       state.user = action.payload;
     },
     setStatus: (state, action: PayloadAction<AuthState['status']>) => {

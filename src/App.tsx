@@ -18,8 +18,22 @@ import { useColorScheme } from '@mantine/hooks';
 import { MainLayout } from './components/layouts/MainLayout/MainLayout';
 import { AuthLayout } from './components/layouts/AuthLayout/AuthLayout';
 import { ThemeInitializer } from './components/ThemeInitializer';
+import { AdminLayout } from './components/layouts/AdminLayout/AdminLayout';
+import { CodeHighlightAdapterProvider, createShikiAdapter } from '@mantine/code-highlight';
 
-const AppContent = () => {
+async function loadShiki() {
+  const { createHighlighter } = await import('shiki');
+  const shiki = await createHighlighter({
+    langs: ['tsx', 'scss', 'html', 'bash', 'json', 'css', 'javascript', 'typescript'],
+    themes: [],
+  });
+
+  return shiki;
+}
+
+const shikiAdapter = createShikiAdapter(loadShiki);
+
+const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<MainLayout />}>
@@ -35,6 +49,12 @@ const AppContent = () => {
         <Route path="/auth/register" element={<RegisterPage />} />
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
       </Route>
+
+      {import.meta.env.DEV && (
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route path="/admin/users" element={<h1>Users</h1>} />
+        </Route>
+      )}
     </Routes>
   );
 };
@@ -49,9 +69,11 @@ export const App = () => {
           <ThemeInitializer />
           <NavigationProgress />
           <Notifications />
-          <HashRouter>
-            <AppContent />
-          </HashRouter>
+          <CodeHighlightAdapterProvider adapter={shikiAdapter}>
+            <HashRouter>
+              <AppRoutes />
+            </HashRouter>
+          </CodeHighlightAdapterProvider>
         </ModalsProvider>
       </MantineProvider>
     </Provider>

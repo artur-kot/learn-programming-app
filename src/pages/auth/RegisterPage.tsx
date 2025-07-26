@@ -17,7 +17,7 @@ import { links } from '../links';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useState } from 'react';
-import logo from '~/public/learnfrontend-logo.svg';
+import logo from '~/assets/learnfrontend-logo.svg';
 import { BackButton } from '~/components/BackButton';
 
 interface RegisterForm {
@@ -95,7 +95,7 @@ export const RegisterPage = () => {
           </Button>
           <Text ta="center" mt="md">
             {t('auth.haveAccount')}{' '}
-            <Link to={links.login} style={{ textDecoration: 'none' }}>
+            <Link to={links.login()} style={{ textDecoration: 'none' }}>
               {t('auth.login')}
             </Link>
           </Text>

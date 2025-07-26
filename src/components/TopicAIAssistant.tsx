@@ -13,17 +13,16 @@ import {
   Stack,
   Tooltip,
   Badge,
-  Code,
 } from '@mantine/core';
 import {
   RiSendPlaneFill,
   RiRobotFill,
-  RiCloseLine,
+  RiExpandRightFill,
   RiStopLine,
   RiSettings3Line,
 } from 'react-icons/ri';
-import ReactMarkdown from 'react-markdown';
 import { OllamaSettingsModal } from './OllamaSettingsModal';
+import { AIResponse } from './AIResponse';
 
 interface Message {
   id: string;
@@ -270,10 +269,6 @@ What would you like to ask me about this exercise?`;
     setError(null);
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
   return (
     <Stack gap="md" h="100%">
       {/* AI Header */}
@@ -313,7 +308,7 @@ What would you like to ask me about this exercise?`;
           {onClose && (
             <Tooltip label="Hide AI Panel">
               <ActionIcon variant="subtle" size="lg" onClick={onClose}>
-                <RiCloseLine />
+                <RiExpandRightFill />
               </ActionIcon>
             </Tooltip>
           )}
@@ -395,73 +390,8 @@ What would you like to ask me about this exercise?`;
                     {message.content}
                   </Text>
                 ) : (
-                  <Box style={{ color: 'inherit' }}>
-                    <ReactMarkdown
-                      components={{
-                        p: ({ children }: any) => (
-                          <Text size="xs" mb="xs">
-                            {children}
-                          </Text>
-                        ),
-                        h1: ({ children }: any) => (
-                          <Text size="xs" fw={700} mb="xs">
-                            {children}
-                          </Text>
-                        ),
-                        h2: ({ children }: any) => (
-                          <Text size="xs" fw={600} mb="xs">
-                            {children}
-                          </Text>
-                        ),
-                        h3: ({ children }: any) => (
-                          <Text size="xs" fw={600} mb="xs">
-                            {children}
-                          </Text>
-                        ),
-                        code: ({ children, className }: any) => (
-                          <Code style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>{children}</Code>
-                        ),
-                        pre: ({ children }: any) => (
-                          <Box mb="xs">
-                            <Code block style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
-                              {children}
-                            </Code>
-                          </Box>
-                        ),
-                        ul: ({ children }: any) => (
-                          <Box component="ul" mb="xs" style={{ paddingLeft: '1rem' }}>
-                            {children}
-                          </Box>
-                        ),
-                        ol: ({ children }: any) => (
-                          <Box component="ol" mb="xs" style={{ paddingLeft: '1rem' }}>
-                            {children}
-                          </Box>
-                        ),
-                        li: ({ children }: any) => (
-                          <Text size="xs" component="li" mb="xs">
-                            {children}
-                          </Text>
-                        ),
-                        strong: ({ children }: any) => (
-                          <Text size="xs" fw={600} component="span">
-                            {children}
-                          </Text>
-                        ),
-                        em: ({ children }: any) => (
-                          <Text size="xs" fs="italic" component="span">
-                            {children}
-                          </Text>
-                        ),
-                      }}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
-                  </Box>
+                  <AIResponse content={message.content} timestamp={message.timestamp} />
                 )}
-                <Text size="xs" c="dimmed" mt={2}>
-                  {formatTime(message.timestamp)}
-                </Text>
               </Paper>
             </Box>
           ))}
@@ -472,77 +402,11 @@ What would you like to ask me about this exercise?`;
                 p="xs"
                 style={{ maxWidth: '85%', backgroundColor: 'var(--mantine-color-gray-1)' }}
               >
-                <Box>
-                  <ReactMarkdown
-                    components={{
-                      p: ({ children }: any) => (
-                        <Text size="xs" mb="xs">
-                          {children}
-                        </Text>
-                      ),
-                      h1: ({ children }: any) => (
-                        <Text size="xs" fw={700} mb="xs">
-                          {children}
-                        </Text>
-                      ),
-                      h2: ({ children }: any) => (
-                        <Text size="xs" fw={600} mb="xs">
-                          {children}
-                        </Text>
-                      ),
-                      h3: ({ children }: any) => (
-                        <Text size="xs" fw={600} mb="xs">
-                          {children}
-                        </Text>
-                      ),
-                      code: ({ children, className }: any) => (
-                        <Code style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>{children}</Code>
-                      ),
-                      pre: ({ children }: any) => (
-                        <Box mb="xs">
-                          <Code block style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
-                            {children}
-                          </Code>
-                        </Box>
-                      ),
-                      ul: ({ children }: any) => (
-                        <Box component="ul" mb="xs" style={{ paddingLeft: '1rem' }}>
-                          {children}
-                        </Box>
-                      ),
-                      ol: ({ children }: any) => (
-                        <Box component="ol" mb="xs" style={{ paddingLeft: '1rem' }}>
-                          {children}
-                        </Box>
-                      ),
-                      li: ({ children }: any) => (
-                        <Text size="xs" component="li" mb="xs">
-                          {children}
-                        </Text>
-                      ),
-                      strong: ({ children }: any) => (
-                        <Text size="xs" fw={600} component="span">
-                          {children}
-                        </Text>
-                      ),
-                      em: ({ children }: any) => (
-                        <Text size="xs" fs="italic" component="span">
-                          {children}
-                        </Text>
-                      ),
-                    }}
-                  >
-                    {currentStreamingMessage}
-                  </ReactMarkdown>
-                  <span
-                    style={{
-                      animation: 'blink 1s infinite',
-                      opacity: 1,
-                    }}
-                  >
-                    ▋
-                  </span>
-                </Box>
+                <AIResponse
+                  content={currentStreamingMessage}
+                  timestamp={new Date()}
+                  isStreaming={true}
+                />
               </Paper>
             </Box>
           )}

@@ -1,8 +1,12 @@
-import { ID } from 'appwrite';
+import { ID, Models } from 'appwrite';
 import { account } from './appwrite';
 import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '~/store/hooks';
 import { setStatus, setUser } from '~/store/features/authSlice';
+
+export const isAdmin = (user: Models.User<Models.Preferences>) => {
+  return user.labels?.includes('admin');
+};
 
 export const getCurrentUser = async () => {
   try {
