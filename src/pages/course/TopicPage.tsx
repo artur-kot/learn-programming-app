@@ -12,7 +12,6 @@ import {
   Box,
   Divider,
   Badge,
-  AppShell,
   ScrollArea,
   ActionIcon,
   Tooltip,
