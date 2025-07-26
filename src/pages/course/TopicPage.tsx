@@ -230,8 +230,78 @@ export const TopicPage = () => {
   const [completedExercises, setCompletedExercises] = useState<number[]>([]);
   const [showAiPanel, setShowAiPanel] = useState(true);
 
+  // Resizable sidebar states
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(360);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(350);
+  const [isResizingLeft, setIsResizingLeft] = useState(false);
+  const [isResizingRight, setIsResizingRight] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
   const currentExercise = EXERCISES[currentExerciseIndex];
   const progress = (completedExercises.length / EXERCISES.length) * 100;
+
+  // Update window width on resize
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Calculate available width for middle area
+  const availableWidth = windowWidth - leftSidebarWidth - (showAiPanel ? rightSidebarWidth : 0);
+  const minMiddleWidth = 600;
+
+  // Adjust sidebar widths if middle area is too small
+  useEffect(() => {
+    if (availableWidth < minMiddleWidth) {
+      const deficit = minMiddleWidth - availableWidth;
+      if (showAiPanel) {
+        // Reduce both sidebars proportionally
+        const leftRatio = leftSidebarWidth / (leftSidebarWidth + rightSidebarWidth);
+        const rightRatio = rightSidebarWidth / (leftSidebarWidth + rightSidebarWidth);
+        setLeftSidebarWidth(Math.max(200, leftSidebarWidth - deficit * leftRatio));
+        setRightSidebarWidth(Math.max(250, rightSidebarWidth - deficit * rightRatio));
+      } else {
+        // Only reduce left sidebar
+        setLeftSidebarWidth(Math.max(200, leftSidebarWidth - deficit));
+      }
+    }
+  }, [windowWidth, showAiPanel, leftSidebarWidth, rightSidebarWidth, availableWidth]);
+
+  // Mouse event handlers for resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizingLeft) {
+        const newWidth = Math.max(200, Math.min(500, e.clientX));
+        setLeftSidebarWidth(newWidth);
+      }
+      if (isResizingRight) {
+        // Calculate width from right edge of window
+        const rightEdge = windowWidth - e.clientX;
+        const newWidth = Math.max(250, Math.min(500, rightEdge));
+        setRightSidebarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingLeft(false);
+      setIsResizingRight(false);
+    };
+
+    if (isResizingLeft || isResizingRight) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingLeft, isResizingRight, windowWidth]);
 
   const handleNextExercise = () => {
     if (currentExerciseIndex < EXERCISES.length - 1) {
@@ -256,24 +326,20 @@ export const TopicPage = () => {
   };
 
   return (
-    <AppShell
-      transitionDuration={0}
-      header={{ height: 0 }}
-      navbar={{
-        width: '22.5%',
-        breakpoint: 'sm',
-        collapsed: { mobile: true },
-      }}
-      aside={{
-        width: showAiPanel ? 350 : 0,
-        breakpoint: 'md',
-        collapsed: { mobile: true },
-      }}
-      style={{ height: '100vh' }}
-    >
+    <Box style={{ height: '100vh', display: 'flex' }}>
       {/* Left Sidebar - Exercise Description */}
-      <AppShell.Navbar p="md">
-        <Stack gap="md" h="100%">
+      <Box
+        style={{
+          width: leftSidebarWidth,
+          minWidth: 200,
+          maxWidth: 500,
+          borderRight: '1px solid var(--mantine-color-gray-3)',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <Stack gap="md" h="100%" p="md">
           {/* Header */}
           <Box>
             <Button
@@ -388,43 +454,89 @@ export const TopicPage = () => {
             </Group>
           </Box>
         </Stack>
-      </AppShell.Navbar>
+
+        {/* Left sidebar resize handle */}
+        <Box
+          pos="absolute"
+          right={-4}
+          top={0}
+          bottom={0}
+          w={8}
+          style={{
+            cursor: 'col-resize',
+            background: 'transparent',
+            zIndex: 10,
+          }}
+          onMouseDown={() => setIsResizingLeft(true)}
+        />
+      </Box>
 
       {/* Main Content - Code Editor */}
-      <AppShell.Main p="0">
-        <Box h="100%" pos="relative">
-          <CodeFiles initialFiles={currentExercise.initialFiles} />
+      <Box
+        style={{
+          flex: 1,
+          minWidth: minMiddleWidth,
+          position: 'relative',
+        }}
+      >
+        <CodeFiles initialFiles={currentExercise.initialFiles} />
 
-          {/* Floating AI Panel Toggle */}
-          {!showAiPanel && (
-            <Tooltip label="Show AI Assistant" openDelay={350}>
-              <ActionIcon
-                variant="gradient"
-                color="blue"
-                size="xl"
-                radius="xl"
-                pos="fixed"
-                onClick={() => setShowAiPanel(true)}
-                style={{ zIndex: 1000, bottom: 100, right: 50 }}
-              >
-                <RiSparklingFill size={20} />
-              </ActionIcon>
-            </Tooltip>
-          )}
-        </Box>
-      </AppShell.Main>
+        {/* Floating AI Panel Toggle */}
+        {!showAiPanel && (
+          <Tooltip label="Show AI Assistant" openDelay={350}>
+            <ActionIcon
+              variant="gradient"
+              color="blue"
+              size="xl"
+              radius="xl"
+              pos="fixed"
+              onClick={() => setShowAiPanel(true)}
+              style={{ zIndex: 1000, bottom: 100, right: 50 }}
+            >
+              <RiSparklingFill size={20} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Box>
 
       {/* Right Sidebar - AI Agent */}
       {showAiPanel && (
-        <AppShell.Aside p="md">
-          <TopicAIAssistant
-            currentExercise={currentExercise}
-            completedExercises={completedExercises.length}
-            totalExercises={EXERCISES.length}
-            onClose={() => setShowAiPanel(false)}
+        <Box
+          style={{
+            width: rightSidebarWidth,
+            minWidth: 250,
+            maxWidth: 500,
+            borderLeft: '1px solid var(--mantine-color-gray-3)',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <Box p="md" style={{ flex: 1 }}>
+            <TopicAIAssistant
+              currentExercise={currentExercise}
+              completedExercises={completedExercises.length}
+              totalExercises={EXERCISES.length}
+              onClose={() => setShowAiPanel(false)}
+            />
+          </Box>
+
+          {/* Right sidebar resize handle */}
+          <Box
+            pos="absolute"
+            left={-4}
+            top={0}
+            bottom={0}
+            w={8}
+            style={{
+              cursor: 'col-resize',
+              background: 'transparent',
+              zIndex: 10,
+            }}
+            onMouseDown={() => setIsResizingRight(true)}
           />
-        </AppShell.Aside>
+        </Box>
       )}
-    </AppShell>
+    </Box>
   );
 };
