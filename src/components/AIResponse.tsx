@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text } from '@mantine/core';
+import { Box, Card, Text } from '@mantine/core';
 import ReactMarkdown from 'react-markdown';
 import { AIMarkdownComponents } from './AIMarkdownComponents';
 
@@ -19,7 +19,7 @@ export const AIResponse: React.FC<AIResponseProps> = ({
   };
 
   return (
-    <Box style={{ color: 'inherit' }}>
+    <Card>
       <ReactMarkdown components={AIMarkdownComponents}>{content}</ReactMarkdown>
       {isStreaming && (
         <span
@@ -34,6 +34,6 @@ export const AIResponse: React.FC<AIResponseProps> = ({
       <Text size="xs" c="dimmed" mt={2}>
         {formatTime(timestamp)}
       </Text>
-    </Box>
+    </Card>
   );
 };

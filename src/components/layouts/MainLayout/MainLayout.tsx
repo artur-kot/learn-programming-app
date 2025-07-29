@@ -10,7 +10,7 @@ export const MainLayout = withProtected(() => {
   return (
     <AppShell transitionDuration={0} header={isTopicPage ? undefined : { height: 70 }} padding="md">
       {!isTopicPage && <TopBar />}
-      <AppShell.Main py="0">
+      <AppShell.Main p="0">
         <Outlet />
       </AppShell.Main>
     </AppShell>

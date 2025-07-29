@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from '@mantine/core';
-import { CodeHighlight } from '@mantine/code-highlight';
+import { CodeHighlight, InlineCodeHighlight } from '@mantine/code-highlight';
 
 export const AIMarkdownComponents = {
   p: ({ children }: any) => (
@@ -27,27 +27,10 @@ export const AIMarkdownComponents = {
     // Check if it's a code block with language
     if (className && className.startsWith('language-')) {
       const language = className.replace('language-', '');
-      return (
-        <Box mb="xs">
-          <CodeHighlight code={String(children)} language={language} />
-        </Box>
-      );
+      return <CodeHighlight code={String(children)} language={language} />;
     }
-    // Inline code
-    return (
-      <Text
-        size="xs"
-        component="code"
-        style={{
-          backgroundColor: 'rgba(0,0,0,0.1)',
-          padding: '2px 4px',
-          borderRadius: '4px',
-          fontFamily: 'monospace',
-        }}
-      >
-        {children}
-      </Text>
-    );
+
+    return <InlineCodeHighlight code={String(children)} withBorder />;
   },
   pre: ({ children }: any) => {
     // Handle pre blocks that might contain code
@@ -67,7 +50,6 @@ export const AIMarkdownComponents = {
         size="xs"
         component="pre"
         style={{
-          backgroundColor: 'rgba(0,0,0,0.1)',
           padding: '8px',
           borderRadius: '4px',
           fontFamily: 'monospace',

@@ -20,6 +20,7 @@ import {
   RiExpandRightFill,
   RiStopLine,
   RiSettings3Line,
+  RiSparklingFill,
 } from 'react-icons/ri';
 import { OllamaSettingsModal } from './OllamaSettingsModal';
 import { AIResponse } from './AIResponse';
@@ -274,7 +275,8 @@ What would you like to ask me about this exercise?`;
       {/* AI Header */}
       <Group justify="space-between">
         <Group gap="xs">
-          <RiRobotFill size={20} />
+          <RiSparklingFill size={20} />
+
           <Text fw={600} size="sm">
             AI Assistant
           </Text>
@@ -289,9 +291,11 @@ What would you like to ask me about this exercise?`;
             </Badge>
           )}
           {isConnected === true && (
-            <Badge size="xs" color="green">
-              ● Connected
-            </Badge>
+            <Tooltip label="Connected to Ollama server" openDelay={500}>
+              <Badge size="xs" color="green">
+                ● Connected
+              </Badge>
+            </Tooltip>
           )}
         </Group>
         <Group gap="xs">
@@ -344,7 +348,7 @@ What would you like to ask me about this exercise?`;
       )}
 
       {/* Context Information */}
-      <Paper p="xs" bg="blue.0" withBorder>
+      {/* <Paper p="xs" bg="blue.0" withBorder>
         <Text size="xs" fw={500} mb="xs">
           💡 Current Exercise
         </Text>
@@ -354,21 +358,23 @@ What would you like to ask me about this exercise?`;
         <Text size="xs" c="dimmed">
           {currentExercise.task}
         </Text>
-      </Paper>
+      </Paper> */}
 
       {/* Chat Messages */}
       <ScrollArea flex={1} ref={scrollAreaRef}>
         <Stack gap="xs">
           {messages.length === 0 && (
-            <Paper p="xs" bg="gray.0" withBorder>
+            <Paper p="xs" withBorder>
               <Text size="xs" c="dimmed" ta="center">
-                Ask me about this exercise or coding concepts!
+                Ask me about this exercise or coding concepts.
               </Text>
             </Paper>
           )}
 
           {messages.map((message) => (
             <Box
+              p="0"
+              bdrs='xs'
               key={message.id}
               style={{
                 display: 'flex',
@@ -377,12 +383,11 @@ What would you like to ask me about this exercise?`;
             >
               <Paper
                 p="xs"
+                bdrs='xs'
+                bg={message.isUser ? 'var(--mantine-color-blue-6)' : 'transparent'}
                 style={{
-                  maxWidth: '85%',
-                  backgroundColor: message.isUser
-                    ? 'var(--mantine-color-blue-6)'
-                    : 'var(--mantine-color-gray-1)',
                   color: message.isUser ? 'white' : 'inherit',
+                  maxWidth: '100%',
                 }}
               >
                 {message.isUser ? (
@@ -397,25 +402,18 @@ What would you like to ask me about this exercise?`;
           ))}
 
           {currentStreamingMessage && (
-            <Box style={{ display: 'flex', justifyContent: 'flex-start' }}>
-              <Paper
-                p="xs"
-                style={{ maxWidth: '85%', backgroundColor: 'var(--mantine-color-gray-1)' }}
-              >
-                <AIResponse
-                  content={currentStreamingMessage}
-                  timestamp={new Date()}
-                  isStreaming={true}
-                />
-              </Paper>
-            </Box>
+            <AIResponse
+              content={currentStreamingMessage}
+              timestamp={new Date()}
+              isStreaming={true}
+            />
           )}
         </Stack>
       </ScrollArea>
 
       {/* Input Area */}
       <Box style={{ position: 'relative' }}>
-        <LoadingOverlay visible={isLoading} />
+        {/* <LoadingOverlay visible={isLoading} variant="dots" /> */}
         <Group gap="xs">
           <Textarea
             placeholder={
