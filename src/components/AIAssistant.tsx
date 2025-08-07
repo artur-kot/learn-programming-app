@@ -150,6 +150,11 @@ export const AIAssistant: React.FC = () => {
         }
         setIsLoading(false);
         setIsStreaming(false);
+
+        // Handle cancellation
+        if (data.cancelled) {
+          console.log('Stream was cancelled');
+        }
       } else {
         setCurrentStreamingMessage((prev) => prev + data.chunk);
       }
@@ -213,7 +218,21 @@ Please provide helpful, accurate, and well-formatted responses.`;
     }
   };
 
-  const handleStopStreaming = () => {
+  const handleStopStreaming = async () => {
+    try {
+      // Call the API to stop the stream
+      const result = await window.electronAPI.stopOllamaStream();
+
+      if (result.success) {
+        console.log(result.message);
+      } else {
+        console.error('Failed to stop stream:', result.error);
+      }
+    } catch (error) {
+      console.error('Error stopping stream:', error);
+    }
+
+    // Update UI state
     if (currentStreamingMessage) {
       setMessages((prev) => [
         ...prev,

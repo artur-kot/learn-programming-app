@@ -77,7 +77,12 @@ declare global {
   interface Window {
     electronAPI: {
       streamOllamaResponse: (prompt: string, model?: string) => Promise<void>;
-      stopOllamaStream: () => Promise<{ success: boolean }>;
+      stopOllamaStream: () => Promise<{
+        success: boolean;
+        cancelledCount?: number;
+        message?: string;
+        error?: string;
+      }>;
       testOllamaConnection: () => Promise<{
         success: boolean;
         models?: Array<{ value: string; label: string; size?: number; modified_at?: string }>;
@@ -119,7 +124,9 @@ declare global {
         }>;
         error?: string;
       }>;
-      onOllamaStream: (callback: (data: { chunk: string; done: boolean }) => void) => void;
+      onOllamaStream: (
+        callback: (data: { chunk: string; done: boolean; cancelled?: boolean }) => void
+      ) => void;
       onOllamaDownloadProgress: (
         callback: (data: {
           modelName: string;

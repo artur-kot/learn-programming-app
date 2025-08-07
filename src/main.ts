@@ -102,9 +102,18 @@ const activeDownloads = new Map<
   { req: http.ClientRequest; abortController: AbortController }
 >();
 
+// Track active streaming requests for cancellation
+const activeStreams = new Map<
+  string,
+  { req: http.ClientRequest; abortController: AbortController }
+>();
+
 // Ollama API handlers
 ipcMain.handle('stream-ollama-response', async (event, { prompt, model = 'qwen2.5-coder:14b' }) => {
   return new Promise((resolve, reject) => {
+    const abortController = new AbortController();
+    const streamId = `${model}-${Date.now()}`; // Create unique stream ID
+
     const postData = JSON.stringify({
       model,
       prompt,
@@ -120,10 +129,12 @@ ipcMain.handle('stream-ollama-response', async (event, { prompt, model = 'qwen2.
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(postData),
       },
+      signal: abortController.signal,
     };
 
     const req = http.request(options, (res) => {
       if (res.statusCode !== 200) {
+        activeStreams.delete(streamId);
         reject(new Error(`HTTP error! status: ${res.statusCode}`));
         return;
       }
@@ -173,6 +184,7 @@ ipcMain.handle('stream-ollama-response', async (event, { prompt, model = 'qwen2.
           }
         }
         event.sender.send('ollama-stream-chunk', { chunk: '', done: true });
+        activeStreams.delete(streamId);
         resolve(undefined);
       });
 
@@ -182,6 +194,7 @@ ipcMain.handle('stream-ollama-response', async (event, { prompt, model = 'qwen2.
           chunk: `Error: ${error.message}`,
           done: true,
         });
+        activeStreams.delete(streamId);
         reject(error);
       });
     });
@@ -192,8 +205,12 @@ ipcMain.handle('stream-ollama-response', async (event, { prompt, model = 'qwen2.
         chunk: `Error: ${error.message}`,
         done: true,
       });
+      activeStreams.delete(streamId);
       reject(error);
     });
+
+    // Store the request for potential cancellation
+    activeStreams.set(streamId, { req, abortController });
 
     req.write(postData);
     req.end();
@@ -201,9 +218,45 @@ ipcMain.handle('stream-ollama-response', async (event, { prompt, model = 'qwen2.
 });
 
 // Stop streaming handler
-ipcMain.handle('stop-ollama-stream', async () => {
-  // This will be handled by the client-side by setting streaming state to false
-  return { success: true };
+ipcMain.handle('stop-ollama-stream', async (event) => {
+  try {
+    // Cancel all active streams
+    let cancelledCount = 0;
+
+    for (const [streamId, stream] of activeStreams.entries()) {
+      try {
+        stream.abortController.abort();
+        stream.req.destroy();
+        cancelledCount++;
+
+        // Send cancellation signal to renderer
+        event.sender.send('ollama-stream-chunk', {
+          chunk: '',
+          done: true,
+          cancelled: true,
+        });
+      } catch (error) {
+        console.error(`Error cancelling stream ${streamId}:`, error);
+      }
+    }
+
+    // Clear all streams from the map
+    activeStreams.clear();
+
+    return {
+      success: true,
+      cancelledCount,
+      message:
+        cancelledCount > 0
+          ? `Cancelled ${cancelledCount} active stream(s)`
+          : 'No active streams to cancel',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 });
 
 // Test Ollama connection
