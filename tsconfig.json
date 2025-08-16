@@ -13,7 +13,7 @@
     "strict": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
-    "types": ["vite/client"],
+    "types": ["vite/client", "./src/types/electron-api", "./src/types/env"],
     "paths": {
       "~/*": ["./src/*"],
       "~/public/*": ["./public/*"]

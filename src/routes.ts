@@ -1,10 +1,11 @@
 import { createMemoryHistory, createRouter } from 'vue-router';
 
-import HomeView from './views/HomeView.vue';
 import AboutView from './views/AboutView.vue';
+import MainLayout from './layouts/MainLayout.vue';
+import CoursesView from './views/CoursesView.vue';
 
 const routes = [
-  { path: '/', component: HomeView },
+  { path: '/', component: MainLayout, children: [{ path: '', component: CoursesView }] },
   { path: '/about', component: AboutView },
 ];
 
