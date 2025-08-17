@@ -131,31 +131,7 @@
   </div>
 </template>
 <script setup>
-import IconField from 'primevue/iconfield';
 import { ref } from 'vue';
-const navs = ref([
-  {
-    label: 'Dashboard',
-    icon: 'pi pi-th-large',
-    to: ''
-  },
-  {
-    label: 'Bookmarks',
-    icon: 'pi pi-bookmark',
-    to: ''
-  },
-  {
-    label: 'Team',
-    icon: 'pi pi-users',
-    to: ''
-  },
-  {
-    label: 'Messages',
-    icon: 'pi pi-comments',
-    badge: '2',
-    to: ''
-  }
-]);
 
 const items = ref([
   {
