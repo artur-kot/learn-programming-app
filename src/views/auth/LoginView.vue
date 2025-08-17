@@ -25,8 +25,8 @@
         </div>
         <div class="flex flex-col gap-6">
           <div class="flex gap-4">
-            <div class="flex items-center justify-center rounded-lg h-9 w-9 bg-surface-900 dark:bg-surface-50">
-              <i class="pi pi-inbox text-base! leading-none! text-white dark:text-surface-900" />
+            <div class="flex items-center justify-center rounded-lg h-9 w-9 bg-surface-50 dark:bg-surface-900">
+              <i class="pi pi-inbox text-base! leading-none! text-surface-900 dark:text-surface-50" />
             </div>
             <div class="flex flex-col flex-1 gap-2">
               <div class="font-medium text-surface-900 dark:text-surface-0">Unlimited Inbox</div>
@@ -35,8 +35,8 @@
             </div>
           </div>
           <div class="flex gap-4">
-            <div class="flex items-center justify-center rounded-lg h-9 w-9 bg-surface-900 dark:bg-surface-50">
-              <i class="pi pi-shield text-base! leading-none! text-white dark:text-surface-900" />
+            <div class="flex items-center justify-center rounded-lg h-9 w-9 bg-surface-50 dark:bg-surface-900">
+              <i class="pi pi-shield text-base! leading-none! text-surface-900 dark:text-surface-50" />
             </div>
             <div class="flex flex-col flex-1 gap-2">
               <div class="font-medium text-surface-900 dark:text-surface-0">Enterprise Grade Data Security</div>
@@ -45,8 +45,8 @@
             </div>
           </div>
           <div class="flex gap-4">
-            <div class="flex items-center justify-center rounded-lg h-9 w-9 bg-surface-900 dark:bg-surface-50">
-              <i class="pi pi-globe text-base! leading-none! text-white dark:text-surface-900" />
+            <div class="flex items-center justify-center rounded-lg h-9 w-9 bg-surface-50 dark:bg-surface-900">
+              <i class="pi pi-globe text-base! leading-none! text-surface-900 dark:text-surface-50" />
             </div>
             <div class="flex flex-col flex-1 gap-2">
               <div class="font-medium text-surface-900 dark:text-surface-0">Cloud Backups</div>
@@ -62,11 +62,13 @@
         <div class="flex flex-col gap-6">
           <div class="flex flex-col gap-2">
             <label for="email3" class="font-medium text-surface-900 dark:text-surface-0">Email Address</label>
-            <InputText id="email3" v-model="email" type="text" class="w-full rounded-md shadow-sm" autocomplete="email" />
+            <InputText id="email3" v-model="email" type="text" class="w-full rounded-md shadow-sm"
+              autocomplete="email" />
           </div>
           <div class="flex flex-col gap-2">
             <label for="password3" class="font-medium text-surface-900 dark:text-surface-0">Password</label>
-            <InputText id="password3" v-model="password" type="password" class="w-full rounded-md shadow-sm" autocomplete="current-password" @keyup.enter="onSubmit" />
+            <InputText id="password3" v-model="password" type="password" class="w-full rounded-md shadow-sm"
+              autocomplete="current-password" @keyup.enter="onSubmit" />
           </div>
           <div
             class="flex flex-col items-start justify-between w-full gap-2 sm:flex-row md:flex-col lg:flex-row sm:items-center md:items-start lg:items-center">

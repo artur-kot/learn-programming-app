@@ -8,6 +8,7 @@ import ToastService from 'primevue/toastservice';
 import i18n from './i18n.js';
 import './lib/supabaseClient.ts'; // initialize supabase client (optional side-effect import)
 import pinia from './stores/index.js';
+import { useAppearanceStore } from './stores/appearance.js';
 
 const app = createApp(App);
 app.use(router);
@@ -20,6 +21,7 @@ app.use(PrimeVue, {
     preset: Aura,
     options: {
       primary: 'emerald',
+      darkModeSelector: '.app-dark',
     },
   },
 });
@@ -28,3 +30,7 @@ app.use(PrimeVue, {
 app.use(ToastService);
 
 app.mount('#app');
+
+// Load appearance preferences after mount so DOM is available
+const appearance = useAppearanceStore();
+appearance.load();

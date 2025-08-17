@@ -1,4 +1,6 @@
-import { app, BrowserWindow, dialog, screen } from 'electron';
+import { app, BrowserWindow, dialog, screen, ipcMain } from 'electron';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
@@ -21,6 +23,39 @@ if (started) {
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
 let mainWindow: BrowserWindow | null = null;
+
+// ---------------- Appearance Config Persistence ----------------
+type AppConfig = {
+  themePreference?: 'system' | 'light' | 'dark';
+};
+
+const getConfigPath = () => {
+  return path.join(app.getPath('userData'), 'config.json');
+};
+
+async function readConfig(): Promise<AppConfig> {
+  const file = getConfigPath();
+  try {
+    if (!fs.existsSync(file)) {
+      return {};
+    }
+    const raw = await fsp.readFile(file, 'utf-8');
+    return JSON.parse(raw) as AppConfig;
+  } catch {
+    return {};
+  }
+}
+
+async function writeConfig(patch: Partial<AppConfig>) {
+  const current = await readConfig();
+  const next = { ...current, ...patch } as AppConfig;
+  try {
+    await fsp.mkdir(path.dirname(getConfigPath()), { recursive: true });
+    await fsp.writeFile(getConfigPath(), JSON.stringify(next, null, 2), 'utf-8');
+  } catch (e) {
+    // Silently ignore for now; could add logging.
+  }
+}
 
 const createWindow = () => {
   const screenSize = screen.getPrimaryDisplay().workAreaSize;
@@ -68,6 +103,17 @@ if (!gotTheLock) {
 
   // Create mainWindow, load the rest of the app, etc...
   app.whenReady().then(createWindow);
+  // Register IPC once app is ready
+  app.whenReady().then(() => {
+    ipcMain.handle('theme:get', async () => {
+      const cfg = await readConfig();
+      return cfg.themePreference || 'system';
+    });
+    ipcMain.handle('theme:set', async (_e, theme: 'system' | 'light' | 'dark') => {
+      await writeConfig({ themePreference: theme });
+      return theme;
+    });
+  });
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common

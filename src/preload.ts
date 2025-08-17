@@ -3,10 +3,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
-	// existing placeholders (extend carefully to avoid breaking changes)
-	onNavigate: (callback: (path: string) => void) => {
-		// Future navigation events could be wired here
-	},
-	getThemePreference: (): Promise<'light' | 'dark' | 'system'> => ipcRenderer.invoke('theme:get'),
-	setThemePreference: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('theme:set', theme),
+  getThemePreference: (): Promise<'system' | 'light' | 'dark'> => ipcRenderer.invoke('theme:get'),
+  setThemePreference: (theme: 'system' | 'light' | 'dark'): Promise<'system' | 'light' | 'dark'> => ipcRenderer.invoke('theme:set', theme),
 });

@@ -48,8 +48,7 @@
               }"
                 class="flex items-center gap-4 p-3 transition-colors duration-150 border border-transparent rounded-md cursor-pointer text-surface-900 dark:text-surface-0 hover:bg-surface-100 dark:hover:bg-surface-800 hover:border hover:border-surface-200 dark:hover:border-surface-700">
                 <span class="text-base font-semibold leading-tight">Courses</span>
-                <i
-                  class="pi pi-chevron-down text-sm! leading-none! text-surfachelle-500 dark:text-surface-400 ml-auto" />
+                <i class="pi pi-chevron-down text-sm! leading-none! text-surface-500 dark:text-surface-400 ml-auto" />
               </div>
               <ul class="flex flex-col gap-1 p-0 m-0 overflow-hidden list-none">
                 <li>
