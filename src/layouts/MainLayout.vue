@@ -28,17 +28,17 @@
                     class="flex items-center gap-2 p-3 transition-colors duration-150 border border-transparent rounded-lg cursor-pointer text-surface-700 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-50 hover:border hover:border-surface-200 dark:hover:border-surface-700 group">
                     <i
                       class="pi pi-home text-base! leading-none! text-surface-500 dark:text-surface-400 group-hover:text-surface-900 dark:group-hover:text-surface-50" />
-                    <span class="text-base font-medium leading-tight">Dashboard</span>
+                    <span class="text-base font-medium leading-tight">My Learning</span>
                   </a>
                 </li>
                 <li>
                   <a
                     class="flex items-center gap-2 p-3 transition-colors duration-150 border border-transparent rounded-lg cursor-pointer text-surface-700 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-50 hover:border hover:border-surface-200 dark:hover:border-surface-700 group">
                     <i
-                      class="pi pi-bookmark text-base! leading-none! text-surface-500 dark:text-surface-400 group-hover:text-surface-900 dark:group-hover:text-surface-50" />
-                    <span class="text-base font-medium leading-tight">Bookmarks</span>
-                    <Badge value="8" severity="contrast"
-                      class="ml-auto h-5! min-w-5! text-xs! font-bold! leading-tight! rounded-xl!" />
+                      class="pi pi-book text-base! leading-none! text-surface-500 dark:text-surface-400 group-hover:text-surface-900 dark:group-hover:text-surface-50" />
+                    <span class="text-base font-medium leading-tight">Courses</span>
+                    <!-- <Badge value="8" severity="contrast"
+                      class="ml-auto h-5! min-w-5! text-xs! font-bold! leading-tight! rounded-xl!" /> -->
                   </a>
                 </li>
                 <li>
@@ -133,22 +133,22 @@
               </a>
             </li>
             <li>
-              <a
+              <RouterLink to="/settings"
                 class="flex items-center gap-2 p-3 transition-colors duration-150 border border-transparent rounded-lg cursor-pointer text-surface-700 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-50 hover:border hover:border-surface-200 dark:hover:border-surface-700 group">
                 <i
                   class="pi pi-cog text-base! leading-none! text-surface-500 dark:text-surface-400 group-hover:text-surface-900 dark:group-hover:text-surface-50" />
                 <span class="text-base font-medium leading-tight">Settings</span>
-              </a>
+              </RouterLink>
             </li>
           </ul>
         </div>
       </div>
     </div>
 
-    <div class="flex flex-col flex-auto min-h-screen bg-surface-50 dark:bg-surface-950 p-7 md:p-8">
+    <div class="flex flex-col flex-auto h-screen bg-surface-50 dark:bg-surface-950 p-7 md:p-8">
       <div
-        class="flex flex-col flex-auto p-8 border shadow-md bg-surface-0 dark:bg-surface-900 rounded-xl border-surface-200 dark:border-surface-700">
-        <div class="flex items-center justify-between w-full gap-2 mb-8 md:gap-8">
+        class="flex flex-col flex-auto p-8 border shadow-md 2xl:p-12 p-overflow-auto bg-surface-0 dark:bg-surface-900 rounded-xl border-surface-200 dark:border-surface-700">
+        <div class="flex items-center justify-between w-full gap-2">
           <div class="flex items-center gap-4 md:gap-8">
             <a v-styleclass="{
               selector: '#app-sidebar-13',
