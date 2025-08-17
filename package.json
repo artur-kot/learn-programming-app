@@ -52,6 +52,7 @@
     "@primeuix/themes": "^1.2.3",
     "@primevue/auto-import-resolver": "^4.3.7",
     "@primevue/forms": "^4.3.7",
+    "@supabase/supabase-js": "^2.45.3",
     "@tailwindcss/vite": "^4.1.12",
     "dayjs": "^1.11.13",
     "dotenv": "^17.2.1",
@@ -59,6 +60,7 @@
     "i18next": "^25.3.6",
     "i18next-browser-languagedetector": "^8.2.0",
     "node-fetch": "^3.3.2",
+    "pinia": "^2.3.1",
     "primeicons": "^7.0.0",
     "primevue": "^4.3.7",
     "recharts": "^3.1.2",
@@ -68,7 +70,6 @@
     "unplugin-vue-components": "^29.0.0",
     "vue": "^3.5.18",
     "vue-i18n": "^11.1.11",
-    "vue-router": "^4.5.1",
-    "@supabase/supabase-js": "^2.45.3"
+    "vue-router": "^4.5.1"
   }
 }

@@ -62,11 +62,11 @@
         <div class="flex flex-col gap-6">
           <div class="flex flex-col gap-2">
             <label for="email3" class="font-medium text-surface-900 dark:text-surface-0">Email Address</label>
-            <InputText id="email3" type="text" class="w-full rounded-md shadow-sm" />
+            <InputText id="email3" v-model="email" type="text" class="w-full rounded-md shadow-sm" autocomplete="email" />
           </div>
           <div class="flex flex-col gap-2">
             <label for="password3" class="font-medium text-surface-900 dark:text-surface-0">Password</label>
-            <InputText id="password3" type="password" class="w-full rounded-md shadow-sm" />
+            <InputText id="password3" v-model="password" type="password" class="w-full rounded-md shadow-sm" autocomplete="current-password" @keyup.enter="onSubmit" />
           </div>
           <div
             class="flex flex-col items-start justify-between w-full gap-2 sm:flex-row md:flex-col lg:flex-row sm:items-center md:items-start lg:items-center">
@@ -78,9 +78,10 @@
               class="font-medium cursor-pointer text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300">Forgot
               your password?</a>
           </div>
+          <div v-if="errorMessage" class="text-sm text-red-500">{{ errorMessage }}</div>
         </div>
         <div class="flex flex-col gap-6">
-          <Button label="Login" class="w-full" />
+          <Button label="Login" class="w-full" :disabled="auth.loading" @click="onSubmit" />
           <Divider align="center">
             <span class="text-surface-500 dark:text-surface-400">or</span>
           </Divider>
@@ -101,6 +102,29 @@ import Checkbox from 'primevue/checkbox';
 import Divider from 'primevue/divider';
 import InputText from 'primevue/inputtext';
 import { ref } from 'vue';
+import { useAuthStore } from '../../stores/auth.js';
+import { useRouter, useRoute } from 'vue-router';
 
 const checked2 = ref(true);
+const email = ref('');
+const password = ref('');
+const errorMessage = ref('');
+const auth = useAuthStore();
+const router = useRouter();
+const route = useRoute();
+
+const onSubmit = async () => {
+  errorMessage.value = '';
+  if (!email.value || !password.value) {
+    errorMessage.value = 'Please enter email and password';
+    return;
+  }
+  try {
+    await auth.signInWithPassword(email.value, password.value);
+    const redirect = (route.query.redirect) ? String(route.query.redirect) : '/';
+    router.replace(redirect);
+  } catch (e) {
+    errorMessage.value = auth.error || 'Login failed';
+  }
+};
 </script>
