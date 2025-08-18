@@ -24,12 +24,12 @@
               </div> -->
               <ul class="flex flex-col gap-1 p-0 m-0 overflow-hidden list-none">
                 <li>
-                  <a
-                    class="flex items-center gap-2 p-3 transition-colors duration-150 border border-transparent rounded-lg cursor-pointer text-surface-700 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-50 hover:border hover:border-surface-200 dark:hover:border-surface-700 group">
-                    <i
-                      class="pi pi-home text-base! leading-none! text-surface-500 dark:text-surface-400 group-hover:text-surface-900 dark:group-hover:text-surface-50" />
+                  <RouterLink to="/" :aria-current="isActive('/') ? 'page' : undefined"
+                    :class="[baseLinkClasses, isActive('/') ? activeClasses : inactiveClasses]">
+                    <i class="pi pi-home text-base! leading-none! group-hover:text-surface-900 dark:group-hover:text-surface-50"
+                      :class="isActive('/') ? activeIconClasses : inactiveIconClasses" />
                     <span class="text-base font-medium leading-tight">My Learning</span>
-                  </a>
+                  </RouterLink>
                 </li>
               </ul>
             </li>
@@ -97,10 +97,10 @@
               </a>
             </li>
             <li>
-              <RouterLink to="/settings"
-                class="flex items-center gap-2 p-3 transition-colors duration-150 border border-transparent rounded-lg cursor-pointer text-surface-700 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-50 hover:border hover:border-surface-200 dark:hover:border-surface-700 group">
-                <i
-                  class="pi pi-cog text-base! leading-none! text-surface-500 dark:text-surface-400 group-hover:text-surface-900 dark:group-hover:text-surface-50" />
+              <RouterLink to="/settings" :aria-current="isActive('/settings') ? 'page' : undefined"
+                :class="[baseLinkClasses, isActive('/settings') ? activeClasses : inactiveClasses]">
+                <i class="pi pi-cog text-base! leading-none! group-hover:text-surface-900 dark:group-hover:text-surface-50"
+                  :class="isActive('/settings') ? activeIconClasses : inactiveIconClasses" />
                 <span class="text-base font-medium leading-tight">Settings</span>
               </RouterLink>
             </li>
@@ -133,5 +133,21 @@
 </template>
 
 <script setup>
-import Badge from "primevue/badge";
+import { useRoute } from 'vue-router';
+
+const route = useRoute();
+
+// Base + state classes separated to ensure active border visible (avoid border-transparent override in Tailwind order)
+const baseLinkClasses = 'group flex items-center gap-2 p-3 transition-colors duration-150 rounded-lg cursor-pointer text-surface-700 dark:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-800 hover:text-surface-900 dark:hover:text-surface-50';
+const inactiveClasses = 'border border-transparent hover:border hover:border-surface-200 dark:hover:border-surface-700';
+const activeClasses = 'border border-surface-200 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 text-surface-900 dark:text-surface-50';
+const inactiveIconClasses = 'text-surface-500 dark:text-surface-400';
+const activeIconClasses = 'text-surface-900 dark:text-surface-50';
+
+function isActive(target) {
+  if (target === '/') {
+    return route.path === '/';
+  }
+  return route.path === target || route.path.startsWith(target + '/');
+}
 </script>
