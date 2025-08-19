@@ -53,11 +53,8 @@ import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
 const navItems = [
-  { label: 'Profile', icon: 'pi pi-user', name: 'settings-profile' },
-  { label: 'Account', icon: 'pi pi-cog', name: 'settings-account' },
+  { label: 'Account', icon: 'pi pi-user', name: 'settings-account' },
   { label: 'Appearance', icon: 'pi pi-palette', name: 'settings-appearance' },
-  { label: 'Accessibility', icon: 'pi pi-sun', name: 'settings-accessibility' },
-  { label: 'Notifications', icon: 'pi pi-bell', name: 'settings-notifications' },
 ];
 
 const route = useRoute();

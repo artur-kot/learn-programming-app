@@ -3,6 +3,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import AboutView from './views/AboutView.vue';
 import MainLayout from './layouts/MainLayout.vue';
 import CoursesView from './views/CoursesView.vue';
+import CourseView from './views/CourseView.vue';
 import SettingsView from './views/SettingsView.vue';
 import SettingsProfile from './views/settings/SettingsProfile.vue';
 import SettingsAccount from './views/settings/SettingsAccount.vue';
@@ -18,16 +19,13 @@ const routes = [
     component: MainLayout,
     children: [
       { path: '', component: CoursesView },
+      { path: 'courses/:slug', name: 'course', component: CourseView },
       {
         path: 'settings',
         component: SettingsView,
         children: [
-          { path: '', redirect: { name: 'settings-profile' } },
-          { path: 'profile', name: 'settings-profile', component: SettingsProfile },
-          { path: 'account', name: 'settings-account', component: SettingsAccount },
+          { path: '', name: 'settings-account', component: SettingsAccount },
           { path: 'appearance', name: 'settings-appearance', component: SettingsAppearance },
-          { path: 'accessibility', name: 'settings-accessibility', component: SettingsAccessibility },
-          { path: 'notifications', name: 'settings-notifications', component: SettingsNotifications },
         ],
       },
     ],
