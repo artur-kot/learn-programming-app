@@ -13,12 +13,7 @@
             <li>
               <ul class="flex flex-col gap-1 p-0 m-0 overflow-hidden list-none">
                 <li>
-                  <RouterLink to="/" :aria-current="isActive('/') ? 'page' : undefined"
-                    :class="[baseLinkClasses, isActive('/') ? activeClasses : inactiveClasses]">
-                    <i class="pi pi-home text-base! leading-none! group-hover:text-surface-900 dark:group-hover:text-surface-50"
-                      :class="isActive('/') ? activeIconClasses : inactiveIconClasses" />
-                    <span class="text-base font-medium leading-tight">My Learning</span>
-                  </RouterLink>
+                  <MainLayoutLink label="My Learning" to="/" icon="pi-home" />
                 </li>
               </ul>
             </li>
@@ -133,12 +128,7 @@
               </a>
             </li>
             <li>
-              <RouterLink to="/settings" :aria-current="isActive('/settings') ? 'page' : undefined"
-                :class="[baseLinkClasses, isActive('/settings') ? activeClasses : inactiveClasses]">
-                <i class="pi pi-cog text-base! leading-none! group-hover:text-surface-900 dark:group-hover:text-surface-50"
-                  :class="isActive('/settings') ? activeIconClasses : inactiveIconClasses" />
-                <span class="text-base font-medium leading-tight">Settings</span>
-              </RouterLink>
+              <MainLayoutLink to="/settings" label="Settings" icon="pi-cog" />
             </li>
           </ul>
         </div>
@@ -170,6 +160,7 @@
 
 <script setup>
 import { useRoute } from 'vue-router';
+import MainLayoutLink from '../components/MainLayoutLink.vue';
 
 const route = useRoute();
 
