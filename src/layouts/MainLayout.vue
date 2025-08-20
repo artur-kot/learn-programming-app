@@ -13,7 +13,7 @@
             <li>
               <ul class="flex flex-col gap-1 p-0 m-0 overflow-hidden list-none">
                 <li>
-                  <MainLayoutLink label="My Learning" to="/" icon="pi-home" />
+                  <MainLayoutLink label="My Learning" to="/" icon="pi pi-home" />
                 </li>
               </ul>
             </li>
@@ -128,7 +128,7 @@
               </a>
             </li>
             <li>
-              <MainLayoutLink to="/settings" label="Settings" icon="pi-cog" />
+              <MainLayoutLink to="/settings" label="Settings" icon="pi pi-cog" />
             </li>
           </ul>
         </div>

@@ -3,9 +3,9 @@
     :class="[baseLinkClasses, isActive ? activeClasses : inactiveClasses]">
     <!-- Icon area -->
     <slot name="icon" v-if="$slots.icon" />
-    <template v-else>
+    <template v-else-if="icon">
       <!-- If an icon string is provided, treat it as full class list for an <i>. -->
-      <i v-if="icon" :class="[
+      <i :class="[
         icon,
         'text-base! leading-none! group-hover:text-surface-900 dark:group-hover:text-surface-50',
         isActive ? activeIconClasses : inactiveIconClasses,
