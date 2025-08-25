@@ -5,11 +5,8 @@ import MainLayout from './layouts/MainLayout.vue';
 import CoursesView from './views/CoursesView.vue';
 import CourseView from './views/CourseView.vue';
 import SettingsView from './views/SettingsView.vue';
-import SettingsProfile from './views/settings/SettingsProfile.vue';
 import SettingsAccount from './views/settings/SettingsAccount.vue';
 import SettingsAppearance from './views/settings/SettingsAppearance.vue';
-import SettingsAccessibility from './views/settings/SettingsAccessibility.vue';
-import SettingsNotifications from './views/settings/SettingsNotifications.vue';
 import LoginView from './views/auth/LoginView.vue';
 import pinia, { useAuthStore } from './stores/index.js';
 
