@@ -1,15 +1,20 @@
 <template>
-  <RouterLink :to="to" :aria-current="isActive ? 'page' : undefined"
-    :class="[baseLinkClasses, isActive ? activeClasses : inactiveClasses]">
+  <RouterLink
+    :to="to"
+    :aria-current="isActive ? 'page' : undefined"
+    :class="[baseLinkClasses, isActive ? activeClasses : inactiveClasses]"
+  >
     <!-- Icon area -->
     <slot name="icon" v-if="$slots.icon" />
     <template v-else-if="icon">
       <!-- If an icon string is provided, treat it as full class list for an <i>. -->
-      <i :class="[
-        icon,
-        'text-base! leading-none! group-hover:text-surface-900 dark:group-hover:text-surface-50',
-        isActive ? activeIconClasses : inactiveIconClasses,
-      ]" />
+      <i
+        :class="[
+          icon,
+          'text-base! leading-none! group-hover:text-surface-900 dark:group-hover:text-surface-50',
+          isActive ? activeIconClasses : inactiveIconClasses,
+        ]"
+      />
     </template>
     <!-- Label -->
     <span class="text-base font-medium leading-tight">
@@ -30,8 +35,8 @@ interface Props {
   /**
    * Icon class string (e.g. 'pi pi-cog', 'ri-home-line', 'fas fa-user').
    * Entire value is applied to the <i> element. If omitted, no icon is rendered unless slot provided.
-  * To override completely, provide a named slot 'icon'.
-  * Mutually exclusive with providing the 'icon' slot; using both will throw an error in dev.
+   * To override completely, provide a named slot 'icon'.
+   * Mutually exclusive with providing the 'icon' slot; using both will throw an error in dev.
    */
   icon?: string;
   /** When true, path must match exactly to be active (no prefix matching). */
@@ -44,7 +49,9 @@ const slots = useSlots();
 // Dev-time guard to prevent ambiguous double icon usage
 if (process.env.NODE_ENV !== 'production') {
   if (props.icon && slots.icon) {
-    throw new Error('[MainLayoutLink] Provide either the "icon" prop or the <template #icon> slot, not both.');
+    throw new Error(
+      '[MainLayoutLink] Provide either the "icon" prop or the <template #icon> slot, not both.'
+    );
   }
 }
 
