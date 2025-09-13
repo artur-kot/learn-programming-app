@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia';
-import { supabase } from '../lib/supabaseClient.js';
-import { AuthError, User } from '@supabase/supabase-js';
+import { auth } from '../lib/firebaseClient.js';
+import {
+  signInWithEmailAndPassword,
+  signOut as fbSignOut,
+  onAuthStateChanged,
+  updateProfile as fbUpdateProfile,
+  type User,
+} from 'firebase/auth';
 
 interface AuthState {
   user: User | null;
@@ -22,11 +28,9 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true;
       this.error = null;
       try {
-        const { data, error } = await supabase.auth.getUser();
-        if (error) throw error;
-        this.user = data.user || null;
+        this.user = auth.currentUser;
       } catch (err: any) {
-        this.error = err.message || 'Failed to fetch user';
+        this.error = err?.message || 'Failed to fetch user';
         this.user = null;
       } finally {
         this.loading = false;
@@ -36,12 +40,11 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true;
       this.error = null;
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        this.user = data.user || null;
-        return data;
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        this.user = cred.user || null;
+        return cred;
       } catch (err: any) {
-        this.error = err.message || 'Login failed';
+        this.error = err?.message || 'Login failed';
         throw err;
       } finally {
         this.loading = false;
@@ -51,31 +54,30 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true;
       this.error = null;
       try {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
+        await fbSignOut(auth);
         this.user = null;
       } catch (err: any) {
-        this.error = err.message || 'Logout failed';
+        this.error = err?.message || 'Logout failed';
         throw err;
       } finally {
         this.loading = false;
       }
     },
     listenToAuthChanges() {
-      supabase.auth.onAuthStateChange((_event: string, session) => {
-        this.user = session?.user || null;
+      onAuthStateChanged(auth, (user: User | null) => {
+        this.user = user || null;
       });
     },
-    async updateProfile(metadata: { display_name?: string }) {
+    async updateProfile(displayName: string) {
       this.loading = true;
       this.error = null;
       try {
-        const { data, error } = await supabase.auth.updateUser({ data: metadata });
-        if (error) throw error;
-        this.user = data.user || this.user; // keep existing if null
-        return data.user;
+        if (!auth.currentUser) throw new Error('No user');
+        await fbUpdateProfile(auth.currentUser, { displayName });
+        this.user = auth.currentUser;
+        return this.user;
       } catch (err: any) {
-        this.error = err.message || 'Update failed';
+        this.error = err?.message || 'Update failed';
         throw err;
       } finally {
         this.loading = false;

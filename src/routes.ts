@@ -42,7 +42,11 @@ router.beforeEach(async (to, _from) => {
   const auth = useAuthStore(pinia);
 
   if (auth.user === null && !auth.loading) {
-    try { await auth.fetchUser(); } catch {/* ignore */ }
+    try {
+      await auth.fetchUser();
+    } catch {
+      /* ignore */
+    }
   }
 
   const isAuthRoute = to.path.startsWith('/auth');

@@ -69,7 +69,7 @@ const saveError = ref(false);
 // Initialize when user changes
 watch(() => auth.user, (u) => {
   email.value = u?.email || '';
-  const metaDisplay = (u?.user_metadata as any)?.display_name || '';
+  const metaDisplay = u?.displayName || '';
   displayName.value = metaDisplay;
   originalDisplayName.value = metaDisplay;
 }, { immediate: true });
@@ -82,7 +82,7 @@ const onSaveProfile = async () => {
   saveError.value = false;
   saving.value = true;
   try {
-    await auth.updateProfile({ display_name: displayName.value.trim() });
+    await auth.updateProfile(displayName.value.trim());
     originalDisplayName.value = displayName.value.trim();
     saveMessage.value = 'Saved';
   } catch (e) {
