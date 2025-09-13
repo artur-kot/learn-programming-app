@@ -4,5 +4,6 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getThemePreference: (): Promise<'system' | 'light' | 'dark'> => ipcRenderer.invoke('theme:get'),
-  setThemePreference: (theme: 'system' | 'light' | 'dark'): Promise<'system' | 'light' | 'dark'> => ipcRenderer.invoke('theme:set', theme),
+  setThemePreference: (theme: 'system' | 'light' | 'dark'): Promise<'system' | 'light' | 'dark'> =>
+    ipcRenderer.invoke('theme:set', theme),
 });

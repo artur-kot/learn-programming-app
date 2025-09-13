@@ -10,8 +10,8 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "eslint --ext .ts,.tsx .",
-    "prettier": "prettier --write ."
+    "lint": "eslint --ext .ts,.tsx,.js,.jsx src",
+    "prettier": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "keywords": [],
   "author": {

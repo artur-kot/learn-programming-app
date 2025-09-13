@@ -36,7 +36,11 @@ export const useAppearanceStore = defineStore('appearance', () => {
   async function setPreference(pref: ThemePreference) {
     themePreference.value = pref;
     applyTheme(effectiveTheme.value);
-    try { await window.electronAPI?.setThemePreference?.(pref); } catch { /* ignore */ }
+    try {
+      await window.electronAPI?.setThemePreference?.(pref);
+    } catch {
+      /* ignore */
+    }
   }
 
   if (window.matchMedia) {
