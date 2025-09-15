@@ -7,12 +7,12 @@ import url from 'node:url';
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('learnfrontend', process.execPath, [
+    app.setAsDefaultProtocolClient('learnp', process.execPath, [
       path.resolve(process.argv[1]),
     ]);
   }
 } else {
-  app.setAsDefaultProtocolClient('learnfrontend');
+  app.setAsDefaultProtocolClient('learnp');
 }
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -91,7 +91,7 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
+  app.on('second-instance', (event, commandLine) => {
     // Someone tried to run a second instance, we should focus our window.
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();

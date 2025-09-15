@@ -1,10 +1,10 @@
 {
-  "name": "learnfrontend-app",
-  "productName": "learnfrontend-app",
+  "name": "learn-programming-app",
+  "productName": "learn-programming-app",
   "version": "1.0.0",
   "description": "My Electron application description",
   "type": "module",
-  "main": ".vite/build/learnfrontend-app.js",
+  "main": ".vite/build/learn-programming-app.js",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
@@ -28,7 +28,7 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.3",
     "@electron-forge/plugin-fuses": "^7.8.3",
     "@electron-forge/plugin-vite": "^7.8.3",
-    "@electron/fuses": "1.8.0",
+    "@electron/fuses": "^1.8.0",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/node-fetch": "^3.0.2",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
@@ -40,11 +40,10 @@
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.4",
     "postcss": "^8.5.6",
-    "prisma": "^6.14.0",
     "tailwindcss": "^4.1.12",
     "ts-node": "^10.9.2",
     "typescript": "~5.9.2",
-    "vite": "^7.1.2",
+    "vite": "7.1.5",
     "vite-tsconfig-paths": "^5.1.4"
   },
   "dependencies": {
@@ -56,6 +55,7 @@
     "dayjs": "^1.11.13",
     "dotenv": "^17.2.1",
     "electron-squirrel-startup": "^1.0.1",
+    "firebase": "^10.14.0",
     "i18next": "^25.3.6",
     "i18next-browser-languagedetector": "^8.2.0",
     "node-fetch": "^3.3.2",
@@ -69,7 +69,6 @@
     "unplugin-vue-components": "^29.0.0",
     "vue": "^3.5.18",
     "vue-i18n": "^11.1.11",
-    "vue-router": "^4.5.1",
-    "firebase": "^10.14.0"
+    "vue-router": "^4.5.1"
   }
 }
