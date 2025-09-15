@@ -2,7 +2,7 @@
   "name": "learn-programming-app",
   "productName": "learn-programming-app",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "Open source desktop application to learn programming",
   "type": "module",
   "main": ".vite/build/learn-programming-app.js",
   "scripts": {
@@ -55,7 +55,6 @@
     "dayjs": "^1.11.13",
     "dotenv": "^17.2.1",
     "electron-squirrel-startup": "^1.0.1",
-    "firebase": "^10.14.0",
     "i18next": "^25.3.6",
     "i18next-browser-languagedetector": "^8.2.0",
     "node-fetch": "^3.3.2",

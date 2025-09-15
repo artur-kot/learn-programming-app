@@ -89,10 +89,7 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
-const navItems = [
-  { label: 'Account', icon: 'pi pi-user', name: 'settings-account' },
-  { label: 'Appearance', icon: 'pi pi-palette', name: 'settings-appearance' },
-];
+const navItems = [{ label: 'Appearance', icon: 'pi pi-palette', name: 'settings-appearance' }];
 
 const route = useRoute();
 const activeName = computed(() => route.name);

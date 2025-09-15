@@ -7,18 +7,13 @@ import Aura from '@primeuix/themes/aura';
 import { definePreset } from '@primeuix/themes';
 import ToastService from 'primevue/toastservice';
 import i18n from './i18n.js';
-import './lib/firebaseClient.ts'; // initialize firebase client (optional side-effect import)
 import pinia from './stores/index.js';
 import { useAppearanceStore } from './stores/appearance.js';
-import { useAuthStore } from './stores/index.js';
 
 const app = createApp(App);
 app.use(router);
 app.use(i18n);
 app.use(pinia);
-
-const auth = useAuthStore();
-auth.listenToAuthChanges();
 
 const MyPreset = definePreset(Aura, {});
 

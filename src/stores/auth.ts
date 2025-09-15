@@ -1,12 +1,11 @@
 import { defineStore } from 'pinia';
-import { auth } from '../lib/firebaseClient.js';
-import {
-  signInWithEmailAndPassword,
-  signOut as fbSignOut,
-  onAuthStateChanged,
-  updateProfile as fbUpdateProfile,
-  type User,
-} from 'firebase/auth';
+// Firebase removed: using simple in-memory auth placeholder.
+
+export interface User {
+  id: string;
+  email: string;
+  displayName?: string;
+}
 
 interface AuthState {
   user: User | null;
@@ -25,24 +24,16 @@ export const useAuthStore = defineStore('auth', {
   },
   actions: {
     async fetchUser() {
-      this.loading = true;
-      this.error = null;
-      try {
-        this.user = auth.currentUser;
-      } catch (err: any) {
-        this.error = err?.message || 'Failed to fetch user';
-        this.user = null;
-      } finally {
-        this.loading = false;
-      }
+      // In a real replacement, load from local persisted storage.
+      this.user = this.user || null;
     },
-    async signInWithPassword(email: string, password: string) {
+    async signInWithPassword(email: string, _password: string) {
       this.loading = true;
       this.error = null;
       try {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        this.user = cred.user || null;
-        return cred;
+        // Placeholder: accept any credentials.
+        this.user = { id: 'local-user', email, displayName: email.split('@')[0] };
+        return this.user;
       } catch (err: any) {
         this.error = err?.message || 'Login failed';
         throw err;
@@ -51,37 +42,15 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async signOut() {
-      this.loading = true;
-      this.error = null;
-      try {
-        await fbSignOut(auth);
-        this.user = null;
-      } catch (err: any) {
-        this.error = err?.message || 'Logout failed';
-        throw err;
-      } finally {
-        this.loading = false;
-      }
+      this.user = null;
     },
     listenToAuthChanges() {
-      onAuthStateChanged(auth, (user: User | null) => {
-        this.user = user || null;
-      });
+      // No realtime auth backend.
     },
     async updateProfile(displayName: string) {
-      this.loading = true;
-      this.error = null;
-      try {
-        if (!auth.currentUser) throw new Error('No user');
-        await fbUpdateProfile(auth.currentUser, { displayName });
-        this.user = auth.currentUser;
-        return this.user;
-      } catch (err: any) {
-        this.error = err?.message || 'Update failed';
-        throw err;
-      } finally {
-        this.loading = false;
-      }
+      if (!this.user) throw new Error('No user');
+      this.user = { ...this.user, displayName };
+      return this.user;
     },
   },
 });
