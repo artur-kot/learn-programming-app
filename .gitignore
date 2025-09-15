@@ -94,6 +94,3 @@ out/
 # IDEs
 .vscode/
 .idea/
-/generated/prisma
-
-/generated/prisma

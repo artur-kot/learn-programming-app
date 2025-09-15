@@ -10,12 +10,12 @@ import os from 'node:os';
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('learnfrontend', process.execPath, [
+    app.setAsDefaultProtocolClient('learnp', process.execPath, [
       path.resolve(process.argv[1]),
     ]);
   }
 } else {
-  app.setAsDefaultProtocolClient('learnfrontend');
+  app.setAsDefaultProtocolClient('learnp');
 }
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
