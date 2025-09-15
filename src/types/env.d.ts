@@ -1,8 +1,10 @@
-/// <reference types="vite/client" />
+// Declarations for Vite Electron environment variables injected at build time.
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
+declare const MAIN_WINDOW_VITE_NAME: string;
 
+// Public Vite environment variables (exposed to renderer)
 interface ImportMetaEnv {
-  readonly VITE_APPWRITE_ENDPOINT: string;
-  readonly VITE_APPWRITE_PROJECT_ID: string;
+  // Firebase removed
 }
 
 interface ImportMeta {
