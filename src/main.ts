@@ -4,8 +4,9 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
-import { registerInvokeHandlers, createEmitter } from './ipc/rregister-handlers.js';
+import { registerInvokeHandlers, createEmitter } from './ipc/register-handlers.js';
 import { AppConfig } from './renderer/AppConfig.type.js';
+import { ipcHandlers } from './ipc/handlers/index.js';
 
 if (started) {
   app.quit();
@@ -58,16 +59,7 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
     createWindow();
 
-    registerInvokeHandlers({
-      // 'theme:get': async () => (await readConfig()).themePreference || currentThemePref,
-      // 'theme:set': async (theme: 'system' | 'light' | 'dark') => {
-      //   currentThemePref = theme;
-      //   await writeConfig({ themePreference: theme });
-      //   const webContents = mainWindow?.webContents;
-      //   if (webContents) createEmitter(webContents).emit('theme:changed', theme);
-      //   return theme;
-      // },
-    });
+    registerInvokeHandlers(mainWindow!, ipcHandlers);
   });
 }
 

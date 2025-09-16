@@ -1,9 +1,9 @@
-export type ThemePreference = 'system' | 'light' | 'dark';
+import { AppConfig } from '~/electron-store.js';
 
 // Request/response style IPC channels (ipcRenderer.invoke / ipcMain.handle)
 export interface IpcInvoke {
-  'theme:get': { args: []; result: ThemePreference };
-  'theme:set': { args: [ThemePreference]; result: ThemePreference };
+  'theme:get': { args: []; result: AppConfig['themePreference'] };
+  'theme:set': { args: [AppConfig['themePreference']]; result: AppConfig['themePreference'] };
 }
 
 // Fire-and-forget messages from renderer to main (ipcRenderer.send / ipcMain.on)
@@ -14,5 +14,5 @@ export interface IpcSend {
 
 // Events emitted from main to renderer (webContents.send / ipcRenderer.on)
 export interface IpcEvents {
-  'theme:changed': { args: [ThemePreference] };
+  'theme:changed': { args: [AppConfig['themePreference']] };
 }

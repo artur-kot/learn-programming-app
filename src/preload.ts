@@ -1,8 +1,10 @@
+import { AppConfig } from './electron-store.js';
 import { exposeBridge } from './ipc/bridge.js';
-import type { ThemePreference } from './ipc/contracts.js';
 
 exposeBridge({
-  getThemePreference: (): Promise<ThemePreference> => window.electronAPI.invoke('theme:get'),
-  setThemePreference: (theme: ThemePreference): Promise<ThemePreference> =>
-    window.electronAPI.invoke('theme:set', theme),
+  getThemePreference: (): Promise<AppConfig['themePreference']> =>
+    window.electronAPI.invoke('theme:get'),
+  setThemePreference: (
+    theme: AppConfig['themePreference']
+  ): Promise<AppConfig['themePreference']> => window.electronAPI.invoke('theme:set', theme),
 });

@@ -28,6 +28,7 @@ export const useAppearanceStore = defineStore('appearance', () => {
 
     // Then read saved preference from main and re-apply if needed
     const pref = await window.electronAPI.getThemePreference();
+    console.log({ pref });
     if (pref) themePreference.value = pref;
     applyTheme(effectiveTheme.value);
   }

@@ -1,16 +1,12 @@
 import { ipcMain, WebContents } from 'electron';
 import type { IpcEvents, IpcInvoke, IpcSend } from './contracts.js';
+import { IpcHandlersDef } from './handlers/shared.types.js';
 
-export function registerInvokeHandlers(impl: {
-  [K in keyof IpcInvoke]?: (
-    ...args: IpcInvoke[K] extends { args: infer A extends any[] } ? A : []
-  ) =>
-    | Promise<IpcInvoke[K] extends { result: infer R } ? R : void>
-    | (IpcInvoke[K] extends { result: infer R } ? R : void);
-}) {
+export function registerInvokeHandlers(window: Electron.BrowserWindow, impl: IpcHandlersDef) {
   for (const key in impl) {
     const handler = impl[key as keyof IpcInvoke] as any;
-    if (handler) ipcMain.handle(key, (_event, ...args) => Promise.resolve(handler(...args)));
+    if (handler)
+      ipcMain.handle(key, (_event, ...args) => Promise.resolve(handler(window, ...args)));
   }
 }
 

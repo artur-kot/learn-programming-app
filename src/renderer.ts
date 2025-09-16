@@ -28,8 +28,6 @@ app.use(PrimeVue, {
 // @ts-ignore
 app.use(ToastService);
 
-// Ensure theme is applied before mounting to prevent initial light flash when preference is 'system'
-
 app.mount('#app');
 
 const appearance = useAppearanceStore();

@@ -1,7 +1,8 @@
 import { IpcInvoke } from '../contracts.js';
 
-export type IpcHandlers = {
+export type IpcHandlersDef = {
   [K in keyof IpcInvoke]?: (
+    mainWindow?: Electron.BrowserWindow,
     ...args: IpcInvoke[K] extends {
       args: infer A extends any[];
     }

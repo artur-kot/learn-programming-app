@@ -1,23 +1,12 @@
-import { IpcInvoke } from '../contracts.js';
+import { electronStore } from '~/electron-store.js';
+import { IpcHandlersDef } from './shared.types.js';
 
-export const themeHandlers: {
-  [K in keyof IpcInvoke]?: (
-    ...args: IpcInvoke[K] extends {
-      args: infer A extends any[];
-    }
-      ? A
-      : []
-  ) =>
-    | Promise<
-        IpcInvoke[K] extends {
-          result: infer R;
-        }
-          ? R
-          : void
-      >
-    | (IpcInvoke[K] extends {
-        result: infer R;
-      }
-        ? R
-        : void);
-} = {};
+export const themeHandlers: IpcHandlersDef = {
+  'theme:get'() {
+    return electronStore.get('themePreference');
+  },
+  'theme:set'(_, theme) {
+    electronStore.set('themePreference', theme);
+    return theme;
+  },
+};
