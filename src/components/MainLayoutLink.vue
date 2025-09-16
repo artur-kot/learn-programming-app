@@ -4,10 +4,8 @@
     :aria-current="isActive ? 'page' : undefined"
     :class="[baseLinkClasses, isActive ? activeClasses : inactiveClasses]"
   >
-    <!-- Icon area -->
     <slot name="icon" v-if="$slots.icon" />
     <template v-else-if="icon">
-      <!-- If an icon string is provided, treat it as full class list for an <i>. -->
       <i
         :class="[
           icon,
@@ -20,7 +18,6 @@
     <span class="text-base font-medium leading-tight">
       <slot name="label">{{ label }}</slot>
     </span>
-    <!-- Additional trailing content (badges, counters, etc.) -->
     <slot />
   </RouterLink>
 </template>

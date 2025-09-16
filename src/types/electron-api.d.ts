@@ -1,13 +1,14 @@
 export {};
 
+import type { BaseBridge } from '../ipc/bridge.js';
+import type { ThemePreference } from '../ipc/contracts.js';
+
 declare global {
   interface Window {
-    electronAPI?: {
-      onNavigate: (callback: (path: string) => void) => void;
-      getThemePreference: () => Promise<'system' | 'light' | 'dark'>;
-      setThemePreference: (
-        theme: 'system' | 'light' | 'dark'
-      ) => Promise<'system' | 'light' | 'dark'>;
+    electronAPI: BaseBridge & {
+      // Convenience helpers used in the app today
+      getThemePreference: () => Promise<ThemePreference>;
+      setThemePreference: (theme: ThemePreference) => Promise<ThemePreference>;
     };
   }
 }

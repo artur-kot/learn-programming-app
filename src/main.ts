@@ -1,15 +1,14 @@
-import { app, BrowserWindow, dialog, screen, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, screen } from 'electron';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
+import { registerInvokeHandlers, createEmitter } from './ipc/main-handlers.js';
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('learnp', process.execPath, [
-      path.resolve(process.argv[1]),
-    ]);
+    app.setAsDefaultProtocolClient('learnp', process.execPath, [path.resolve(process.argv[1])]);
   }
 } else {
   app.setAsDefaultProtocolClient('learnp');
@@ -102,16 +101,20 @@ if (!gotTheLock) {
   });
 
   // Create mainWindow, load the rest of the app, etc...
-  app.whenReady().then(createWindow);
-  // Register IPC once app is ready
-  app.whenReady().then(() => {
-    ipcMain.handle('theme:get', async () => {
-      const cfg = await readConfig();
-      return cfg.themePreference || 'system';
-    });
-    ipcMain.handle('theme:set', async (_e, theme: 'system' | 'light' | 'dark') => {
-      await writeConfig({ themePreference: theme });
-      return theme;
+  app.whenReady().then(async () => {
+    createWindow();
+
+    // Register IPC once window is created so we can emit back to it
+    const cfg = await readConfig();
+
+    registerInvokeHandlers({
+      'theme:get': async () => cfg.themePreference || 'system',
+      'theme:set': async (theme: 'system' | 'light' | 'dark') => {
+        await writeConfig({ themePreference: theme });
+        const win = mainWindow?.webContents;
+        if (win) createEmitter(win).emit('theme:changed', theme);
+        return theme;
+      },
     });
   });
 }
