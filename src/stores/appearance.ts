@@ -23,30 +23,33 @@ export const useAppearanceStore = defineStore('appearance', () => {
   });
 
   async function load() {
-    try {
-      const pref = await window.electronAPI?.getThemePreference?.();
-      if (pref) themePreference.value = pref;
-    } catch {
-      // ignore
-    } finally {
-      applyTheme(effectiveTheme.value);
-    }
+    // Apply immediately based on current (likely 'system') to prevent FOUC
+    applyTheme(effectiveTheme.value);
+
+    // Then read saved preference from main and re-apply if needed
+    const pref = await window.electronAPI.getThemePreference();
+    if (pref) themePreference.value = pref;
+    applyTheme(effectiveTheme.value);
   }
 
   async function setPreference(pref: ThemePreference) {
     themePreference.value = pref;
     applyTheme(effectiveTheme.value);
-    try {
-      await window.electronAPI?.setThemePreference?.(pref);
-    } catch {
-      /* ignore */
-    }
+    await window.electronAPI.setThemePreference(pref);
   }
 
   if (window.matchMedia) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     mq.addEventListener('change', () => {
       if (themePreference.value === 'system') applyTheme(effectiveTheme.value);
+    });
+  }
+
+  // Keep in sync with changes broadcast by main (e.g., other windows)
+  if (window.electronAPI?.on) {
+    window.electronAPI.on('theme:changed', (pref: ThemePreference) => {
+      themePreference.value = pref;
+      applyTheme(effectiveTheme.value);
     });
   }
 

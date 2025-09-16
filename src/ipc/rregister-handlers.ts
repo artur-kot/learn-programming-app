@@ -1,7 +1,6 @@
 import { ipcMain, WebContents } from 'electron';
 import type { IpcEvents, IpcInvoke, IpcSend } from './contracts.js';
 
-// Strongly typed register helpers
 export function registerInvokeHandlers(impl: {
   [K in keyof IpcInvoke]?: (
     ...args: IpcInvoke[K] extends { args: infer A extends any[] } ? A : []

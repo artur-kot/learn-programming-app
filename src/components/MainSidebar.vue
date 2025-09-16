@@ -6,8 +6,9 @@
     <div class="flex flex-col h-full">
       <div class="flex flex-col flex-1 gap-4 p-2 overflow-y-auto">
         <ul class="flex flex-col gap-1 p-0 m-0 list-none">
-          <li>
+          <li class="flex flex-col gap-1">
             <MainLayoutLink label="JavaScript" to="/courses/javascript" icon="pi pi-code" />
+            <MainLayoutLink label="Settings" to="/settings" icon="pi pi-code" />
           </li>
         </ul>
       </div>

@@ -1,7 +1,6 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 import type { IpcEvents, IpcInvoke, IpcSend } from './contracts.js';
 
-// Utility types
 export type Args<T> = T extends { args: infer A extends any[] } ? A : [];
 export type Result<T> = T extends { result: infer R } ? R : void;
 
@@ -20,7 +19,7 @@ export type EventAPI = {
   on<K extends keyof IpcEvents>(
     channel: K,
     listener: (...args: Args<IpcEvents[K]>) => void
-  ): () => void; // unsubscribe
+  ): () => void;
 };
 
 export type BaseBridge = InvokeAPI & SendAPI & EventAPI;

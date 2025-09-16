@@ -4,17 +4,9 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
-import { registerInvokeHandlers, createEmitter } from './ipc/main-handlers.js';
+import { registerInvokeHandlers, createEmitter } from './ipc/rregister-handlers.js';
+import { AppConfig } from './AppConfig.type.js';
 
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('learnp', process.execPath, [path.resolve(process.argv[1])]);
-  }
-} else {
-  app.setAsDefaultProtocolClient('learnp');
-}
-
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
@@ -22,39 +14,6 @@ if (started) {
 const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
 
 let mainWindow: BrowserWindow | null = null;
-
-// ---------------- Appearance Config Persistence ----------------
-type AppConfig = {
-  themePreference?: 'system' | 'light' | 'dark';
-};
-
-const getConfigPath = () => {
-  return path.join(app.getPath('userData'), 'config.json');
-};
-
-async function readConfig(): Promise<AppConfig> {
-  const file = getConfigPath();
-  try {
-    if (!fs.existsSync(file)) {
-      return {};
-    }
-    const raw = await fsp.readFile(file, 'utf-8');
-    return JSON.parse(raw) as AppConfig;
-  } catch {
-    return {};
-  }
-}
-
-async function writeConfig(patch: Partial<AppConfig>) {
-  const current = await readConfig();
-  const next = { ...current, ...patch } as AppConfig;
-  try {
-    await fsp.mkdir(path.dirname(getConfigPath()), { recursive: true });
-    await fsp.writeFile(getConfigPath(), JSON.stringify(next, null, 2), 'utf-8');
-  } catch (e) {
-    // Silently ignore for now; could add logging.
-  }
-}
 
 const createWindow = () => {
   const screenSize = screen.getPrimaryDisplay().workAreaSize;
@@ -73,7 +32,6 @@ const createWindow = () => {
     mainWindow?.show();
   });
 
-  // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
@@ -91,30 +49,24 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', (event, commandLine) => {
-    // Someone tried to run a second instance, we should focus our window.
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
-    // the commandLine is array of strings in which last element is deep link url
-    dialog.showErrorBox('Welcome Back', `You arrived from: ${commandLine.pop()}`);
   });
 
-  // Create mainWindow, load the rest of the app, etc...
   app.whenReady().then(async () => {
     createWindow();
 
-    // Register IPC once window is created so we can emit back to it
-    const cfg = await readConfig();
-
     registerInvokeHandlers({
-      'theme:get': async () => cfg.themePreference || 'system',
-      'theme:set': async (theme: 'system' | 'light' | 'dark') => {
-        await writeConfig({ themePreference: theme });
-        const win = mainWindow?.webContents;
-        if (win) createEmitter(win).emit('theme:changed', theme);
-        return theme;
-      },
+      // 'theme:get': async () => (await readConfig()).themePreference || currentThemePref,
+      // 'theme:set': async (theme: 'system' | 'light' | 'dark') => {
+      //   currentThemePref = theme;
+      //   await writeConfig({ themePreference: theme });
+      //   const webContents = mainWindow?.webContents;
+      //   if (webContents) createEmitter(webContents).emit('theme:changed', theme);
+      //   return theme;
+      // },
     });
   });
 }
@@ -134,8 +86,4 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
-});
-
-app.on('open-url', (event, url) => {
-  dialog.showErrorBox('Welcome Back', `You arrived from: ${url}`);
 });

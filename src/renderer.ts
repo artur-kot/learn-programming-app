@@ -15,8 +15,6 @@ app.use(router);
 app.use(i18n);
 app.use(pinia);
 
-const MyPreset = definePreset(Aura, {});
-
 // @ts-ignore -- PrimeVue types are not compatible
 app.use(PrimeVue, {
   theme: {
@@ -31,8 +29,9 @@ app.use(PrimeVue, {
 // @ts-ignore
 app.use(ToastService);
 
+// Ensure theme is applied before mounting to prevent initial light flash when preference is 'system'
+
 app.mount('#app');
 
-// Load appearance preferences after mount so DOM is available
 const appearance = useAppearanceStore();
-appearance.load();
+await appearance.load();
