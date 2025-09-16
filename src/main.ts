@@ -5,7 +5,7 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
 import { registerInvokeHandlers, createEmitter } from './ipc/rregister-handlers.js';
-import { AppConfig } from './AppConfig.type.js';
+import { AppConfig } from './renderer/AppConfig.type.js';
 
 if (started) {
   app.quit();

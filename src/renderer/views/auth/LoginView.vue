@@ -168,7 +168,7 @@ import Checkbox from 'primevue/checkbox';
 import Divider from 'primevue/divider';
 import InputText from 'primevue/inputtext';
 import { ref } from 'vue';
-import { useAuthStore } from '../../stores/auth.js';
+import { useAuthStore } from '../../renderer/stores/auth.js';
 import { useRouter, useRoute } from 'vue-router';
 
 const checked2 = ref(true);

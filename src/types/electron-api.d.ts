@@ -1,7 +1,7 @@
 export {};
 
-import type { BaseBridge } from '../ipc/bridge.js';
-import type { ThemePreference } from '../ipc/contracts.js';
+import type { BaseBridge } from '../ipc/bridge.ts';
+import type { ThemePreference } from '../ipc/contracts.ts';
 
 declare global {
   interface Window {

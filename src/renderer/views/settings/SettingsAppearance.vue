@@ -56,7 +56,8 @@
 <script setup lang="ts">
 import RadioButton from 'primevue/radiobutton';
 import { ref, watch } from 'vue';
-import { useAppearanceStore, ThemePreference } from '../../stores/appearance';
+import { ThemePreference } from '~/ipc/contracts';
+import { useAppearanceStore } from '~/renderer/stores';
 
 const appearance = useAppearanceStore();
 // Local copy to keep UI fast while persisting

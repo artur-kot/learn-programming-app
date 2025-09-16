@@ -1,14 +1,13 @@
 import { createApp } from 'vue';
-import App from './App.vue';
-import './styles.css';
-import router from './routes.js';
+import App from './renderer/App.vue';
+import './renderer/styles.css';
+import router from './renderer/routes.js';
 import PrimeVue from 'primevue/config';
 import Aura from '@primeuix/themes/aura';
-import { definePreset } from '@primeuix/themes';
 import ToastService from 'primevue/toastservice';
-import i18n from './i18n.js';
-import pinia from './stores/index.js';
-import { useAppearanceStore } from './stores/appearance.js';
+import i18n from './renderer/i18n.js';
+import pinia from './renderer/stores/index.js';
+import { useAppearanceStore } from './renderer/stores/appearance.js';
 
 const app = createApp(App);
 app.use(router);
