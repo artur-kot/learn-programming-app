@@ -26,6 +26,7 @@
             :expandedKeys="expandedKeys"
             :expandOnClick="false"
             :toggleable="false"
+            @update:selectionKeys="onSelectionUpdate"
           >
             <template #default="slotProps">
               <span :style="{ fontWeight: slotProps.node.children ? 'bold' : 'normal' }">
@@ -70,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Tree from 'primevue/tree';
@@ -113,7 +114,116 @@ const nodes = ref([
   },
 ]);
 
+// Always-expanded keys map
+const expandedKeys = ref({});
+
+// Selected key(s) model (PrimeVue uses v-model:selectionKeys for single as well)
 const selectedKeys = ref(null);
+// Track last valid selection to prevent unselect
+const lastSelectedKey = ref(null);
+
+// Mark folder nodes (with children) as unselectable
+const markFoldersUnselectable = (tree) => {
+  const visit = (node) => {
+    if (!node) return;
+    if (node.children && node.children.length) {
+      node.selectable = false;
+      node.children.forEach(visit);
+    }
+  };
+  tree.forEach(visit);
+};
+
+const buildExpandedKeys = (tree) => {
+  const keys = {};
+  const visit = (node) => {
+    if (!node || !node.key) return;
+    keys[node.key] = true;
+    if (node.children && node.children.length) node.children.forEach(visit);
+  };
+  tree.forEach(visit);
+  return keys;
+};
+
+const findNodeByKey = (tree, key) => {
+  let found = null;
+  const visit = (node) => {
+    if (found || !node) return;
+    if (node.key === key) {
+      found = node;
+      return;
+    }
+    if (node.children && node.children.length) node.children.forEach(visit);
+  };
+  tree.forEach(visit);
+  return found;
+};
+
+const isSelectableNodeKey = (key) => {
+  const node = findNodeByKey(nodes.value, key);
+  return !!node && (!node.children || node.children.length === 0) && node.selectable !== false;
+};
+
+const firstSelectableKey = (tree) => {
+  let result = null;
+  const visit = (node) => {
+    if (result) return;
+    if (node.children && node.children.length) {
+      node.children.forEach(visit);
+    } else if (node.key) {
+      result = node.key;
+    }
+  };
+  tree.forEach(visit);
+  return result;
+};
+
+const ensureSingleSelection = (value) => {
+  // Normalize to a single key and disallow folder selection
+  let resolved = value;
+
+  // Empty or undefined selection -> fallback to first selectable leaf
+  if (!resolved || (typeof resolved === 'object' && Object.keys(resolved).length === 0)) {
+    const fallbackKey = lastSelectedKey.value ?? firstSelectableKey(nodes.value);
+    if (fallbackKey == null) return;
+    resolved = typeof value === 'object' ? { [fallbackKey]: true } : fallbackKey;
+  }
+
+  // If object with multiple keys, keep only the first
+  if (typeof resolved === 'object') {
+    const key = Object.keys(resolved)[0];
+    resolved = { [key]: true };
+  }
+
+  // Validate selectability (disallow folders)
+  let key = typeof resolved === 'string' ? resolved : Object.keys(resolved)[0];
+  if (!isSelectableNodeKey(key)) {
+    const fallbackKey = lastSelectedKey.value ?? firstSelectableKey(nodes.value);
+    if (fallbackKey == null) return;
+    key = fallbackKey;
+  }
+
+  // Apply final shape matching the incoming value type
+  const finalValue = typeof value === 'string' ? key : { [key]: true };
+
+  selectedKeys.value = finalValue;
+  lastSelectedKey.value = key;
+};
+
+const onSelectionUpdate = (value) => {
+  ensureSingleSelection(value);
+};
+
+onMounted(() => {
+  // Make folders unselectable
+  markFoldersUnselectable(nodes.value);
+
+  // Expand all nodes on mount (also covers re-entry to the page)
+  expandedKeys.value = buildExpandedKeys(nodes.value);
+
+  // If nothing selected, select the first selectable (leaf) node
+  ensureSingleSelection(selectedKeys.value);
+});
 </script>
 
 <style scoped>
