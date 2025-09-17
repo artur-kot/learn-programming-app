@@ -34,23 +34,7 @@ function runGitStreaming(
   });
 }
 
-function runGit(
-  args: string[],
-  cwd?: string
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('git', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (d) => (stdout += d.toString()));
-    child.stderr.on('data', (d) => (stderr += d.toString()));
-    child.on('error', reject);
-    child.on('close', (code) => resolve({ code: code ?? 0, stdout, stderr }));
-  });
-}
-
 function getCoursesRoot(): string {
-  // Store courses under the application's userData directory
   return path.join(app.getPath('userData'), 'courses');
 }
 

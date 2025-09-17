@@ -2,6 +2,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 
 import AboutView from './views/AboutView.vue';
 import MainLayout from './layouts/MainLayout.vue';
+import CourseLayout from './layouts/CourseLayout.vue';
 import CoursesView from './views/CoursesView.vue';
 import CourseView from './views/CourseView.vue';
 import SettingsView from './views/SettingsView.vue';
@@ -9,14 +10,14 @@ import SettingsAccount from './views/settings/SettingsAccount.vue';
 import SettingsAppearance from './views/settings/SettingsAppearance.vue';
 
 const routes = [
+  // Home uses MainLayout
   {
     path: '/',
     component: MainLayout,
     children: [
       { path: '', component: CoursesView },
-      { path: 'courses/:slug', name: 'course', component: CourseView },
       {
-        path: 'settings',
+        path: '/settings',
         component: SettingsView,
         children: [
           { path: '', name: 'settings-account', component: SettingsAccount },
@@ -25,7 +26,14 @@ const routes = [
       },
     ],
   },
-  { path: '/about', component: AboutView },
+  // Courses use CourseLayout
+  {
+    path: '/courses',
+    component: CourseLayout,
+    children: [{ path: ':slug', name: 'course', component: CourseView }],
+  },
+  // Settings as standalone (not under MainLayout)
+
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ];
 
