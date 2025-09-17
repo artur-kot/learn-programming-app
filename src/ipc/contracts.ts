@@ -11,27 +11,30 @@ export interface IpcInvoke {
         slug: string; // local directory name under courses/, e.g. 'javascript'
         repoUrl: string; // public git repo URL
         branch?: string; // defaults to 'main'
+        id?: string; // optional correlation id
       },
     ];
-    result: { path: string };
+    result: { path: string; id: string };
   };
   'git-course:is-update-available': {
     args: [
       {
         slug: string; // local directory name under courses/
         branch?: string; // defaults to 'main'
+        id?: string; // optional correlation id
       },
     ];
-    result: { updateAvailable: boolean; aheadBy: number; behindBy: number };
+    result: { id: string; updateAvailable: boolean; aheadBy: number; behindBy: number };
   };
   'git-course:pull': {
     args: [
       {
         slug: string; // local directory name under courses/
         branch?: string; // defaults to 'main'
+        id?: string; // optional correlation id
       },
     ];
-    result: { updated: boolean; output: string };
+    result: { id: string; updated: boolean; output: string };
   };
 }
 
@@ -41,7 +44,40 @@ export interface IpcSend {
   // 'log:message': { args: [level: 'info' | 'warn' | 'error', message: string] };
 }
 
-// Events emitted from main to renderer (webContents.send / ipcRenderer.on)
 export interface IpcEvents {
   'theme:changed': { args: [AppConfig['themePreference']] };
+  'git-course:progress': {
+    args: [
+      {
+        id: string;
+        slug: string;
+        op: 'clone' | 'check' | 'pull';
+        step: string;
+        percent?: number;
+        message?: string;
+      },
+    ];
+  };
+  'git-course:log': {
+    args: [
+      {
+        id: string;
+        slug: string;
+        op: 'clone' | 'check' | 'pull';
+        stream: 'stdout' | 'stderr';
+        chunk: string;
+      },
+    ];
+  };
+  'git-course:done': {
+    args: [
+      {
+        id: string;
+        slug: string;
+        op: 'clone' | 'check' | 'pull';
+        success: boolean;
+        error?: string;
+      },
+    ];
+  };
 }
