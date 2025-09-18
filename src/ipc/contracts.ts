@@ -1,5 +1,12 @@
 import { AppConfig } from '~/electron-store.js';
 
+export type CourseTreeNode = {
+  key: string; // unique key (e.g., relative path)
+  label: string; // human readable title
+  path: string; // relative path from course root
+  children?: CourseTreeNode[];
+};
+
 // Request/response style IPC channels (ipcRenderer.invoke / ipcMain.handle)
 export interface IpcInvoke {
   'theme:get': { args: []; result: AppConfig['themePreference'] };
@@ -35,6 +42,15 @@ export interface IpcInvoke {
       },
     ];
     result: { id: string; updated: boolean; output: string };
+  };
+  // List filtered course folder tree for sidebar
+  'git-course:list-tree': {
+    args: [
+      {
+        slug: string; // course slug under courses/
+      },
+    ];
+    result: CourseTreeNode[];
   };
 }
 

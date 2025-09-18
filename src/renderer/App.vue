@@ -1,3 +1,4 @@
 <template>
+  <Toast />
   <RouterView />
 </template>

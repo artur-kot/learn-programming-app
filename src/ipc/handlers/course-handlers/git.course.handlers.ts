@@ -1,10 +1,11 @@
 import { IpcHandlersDef } from '../shared.types.js';
 import path from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { app, BrowserWindow } from 'electron';
+import { app } from 'electron';
 import { createEmitter } from '../../register-handlers.js';
+import type { CourseTreeNode } from '../../contracts.js';
 
 function runGitStreaming(
   win: Electron.BrowserWindow,
@@ -40,6 +41,43 @@ function getCoursesRoot(): string {
 
 function ensureId(id?: string) {
   return id ?? Math.random().toString(36).slice(2);
+}
+
+function isNumericPrefixed(name: string) {
+  // Matches: 1_overview, 01_intro, 1_1_example, 10_2_topic, etc.
+  return /^\d+(?:_\d+)*(?:_.*)?$/.test(name);
+}
+
+function labelFromSegment(seg: string) {
+  // Strip leading number parts and underscores up to first non-number token
+  // E.g., '1_overview' -> 'overview', '1_2_arrays' -> 'arrays'
+  const parts = seg.split('_');
+  while (parts.length && /^\d+$/.test(parts[0]!)) parts.shift();
+  const label = parts.join(' ');
+  // Fallback to original if empty
+  return label || seg;
+}
+
+function buildTree(rootAbs: string, rel: string = ''): CourseTreeNode[] {
+  const full = path.join(rootAbs, rel);
+  const entries = readdirSync(full, { withFileTypes: true });
+  // Keep only directories
+  const dirs = entries.filter((e) => e.isDirectory());
+  // Filter by numeric-prefixed pattern
+  const filtered = dirs.filter((d) => isNumericPrefixed(d.name));
+  // Sort using natural order by numbers then by name to preserve repo order if already numbered
+  filtered.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return filtered.map((dirent): CourseTreeNode => {
+    const name = dirent.name;
+    const childRel = rel ? path.posix.join(rel, name) : name;
+    const children: CourseTreeNode[] = buildTree(rootAbs, childRel);
+    return {
+      key: childRel,
+      label: labelFromSegment(name),
+      path: childRel,
+      children: children.length ? children : undefined,
+    };
+  });
 }
 
 export const gitCourseHandlers: IpcHandlersDef = {
@@ -190,5 +228,11 @@ export const gitCourseHandlers: IpcHandlersDef = {
 
     emitter.emit('git-course:done', { id, slug, op: 'pull', success: true });
     return { id, updated: true, output: res.stdout };
+  },
+
+  async 'git-course:list-tree'(_win, { slug }) {
+    const root = path.join(getCoursesRoot(), slug);
+    if (!existsSync(root)) throw new Error('Course not found.');
+    return buildTree(root);
   },
 };
