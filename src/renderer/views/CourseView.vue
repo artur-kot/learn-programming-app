@@ -14,33 +14,228 @@
       </div>
     </div>
 
-    <div v-else class="flex flex-col gap-4">
-      <div class="text-xl font-semibold text-surface-900 dark:text-surface-0">{{ slug }}</div>
-      <div class="text-sm text-surface-600 dark:text-surface-300" v-if="updateText">
-        {{ updateText }}
+    <div v-else class="flex flex-col h-full gap-3">
+      <!-- Top bar with file tabs and actions -->
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2 overflow-x-auto">
+          <div
+            v-for="f in files"
+            :key="f"
+            class="px-3 py-2 rounded-md cursor-pointer whitespace-nowrap"
+            :class="
+              selectedFile === f
+                ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-200'
+                : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-200'
+            "
+            @click="selectFile(f)"
+          >
+            {{ f }}
+            <i
+              v-if="dirtyFiles.has(f)"
+              class="ml-2 text-xs pi pi-circle-fill"
+              :title="'Unsaved changes'"
+            />
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <Button size="small" label="Run" icon="pi pi-play" @click="run" />
+          <Button size="small" label="Test" icon="pi pi-check" severity="secondary" @click="test" />
+          <Button
+            size="small"
+            label="Save"
+            icon="pi pi-save"
+            severity="secondary"
+            :disabled="!selectedFile || !dirtyFiles.size"
+            @click="save"
+          />
+        </div>
       </div>
-      <!-- Content of a selected lesson would render here -->
-      <div class="text-surface-700 dark:text-surface-200">Select a lesson from the sidebar.</div>
+
+      <!-- Editor + Description -->
+      <div class="grid flex-1 min-h-0 grid-cols-12 gap-3">
+        <div class="min-h-0 col-span-12 xl:col-span-7 2xl:col-span-8">
+          <div
+            class="h-full overflow-hidden border rounded-lg border-surface-200 dark:border-surface-700"
+          >
+            <MonacoEditor
+              v-if="selectedFile"
+              class="h-full"
+              :value="editorValue"
+              :language="languageFor(selectedFile)"
+              theme="vs-dark"
+              :options="{ automaticLayout: true, fontSize: 14, minimap: { enabled: false } }"
+              @change="onEditorChange"
+            />
+            <div
+              v-else
+              class="flex items-center justify-center h-full text-surface-500 dark:text-surface-400"
+            >
+              Select a file to start editing
+            </div>
+          </div>
+        </div>
+        <div class="col-span-12 xl:col-span-5 2xl:col-span-4">
+          <div
+            class="h-full p-4 overflow-auto border rounded-lg bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700"
+          >
+            <div class="mb-2 text-sm text-surface-500 dark:text-surface-400">Description</div>
+            <div
+              v-if="markdownHtml"
+              v-html="markdownHtml"
+              class="prose prose-invert max-w-none"
+            ></div>
+            <div v-else class="text-surface-500 dark:text-surface-400">
+              No description provided.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal Emulator -->
+      <div
+        class="border rounded-lg bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700"
+      >
+        <div
+          class="flex items-center justify-between px-3 py-2 border-b border-surface-200 dark:border-surface-700"
+        >
+          <div class="font-medium text-surface-700 dark:text-surface-200">Terminal</div>
+          <div class="flex items-center gap-2">
+            <Button size="small" icon="pi pi-trash" text rounded @click="clearTerminal" />
+          </div>
+        </div>
+        <div class="h-40 p-3 overflow-auto font-mono text-sm">
+          <pre
+            class="m-0 whitespace-pre-wrap"
+          ><span v-for="(line, idx) in terminal" :key="idx" :class="line.type === 'stderr' ? 'text-red-500' : 'text-surface-800 dark:text-surface-200'">{{ line.text }}</span></pre>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { onMounted, ref, watch, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useCourseStore } from '~/renderer/stores';
 import { useToast } from 'primevue/usetoast';
+import { marked } from 'marked';
+// @ts-ignore - vue-monaco-editor types
+import MonacoEditor from '@guolao/vue-monaco-editor';
 
 const route = useRoute();
+const router = useRouter();
 const toast = useToast();
 const course = useCourseStore();
 
 const slug = ref<string>(route.params.slug as string);
+const exercisePath = computed(() => (route.query.exercise as string) || '');
 const hasCourse = ref<boolean | null>(null);
 const busy = ref(false);
 const updateText = ref('');
 
+const files = ref<string[]>([]);
+const selectedFile = ref<string>('');
+const editorValue = ref('');
+const originalContent = ref<string>('');
+const dirtyFiles = ref<Set<string>>(new Set());
+const terminal = ref<{ type: 'stdout' | 'stderr'; text: string }[]>([]);
+const markdownHtml = ref<string>('');
+
 const DEFAULT_BRANCH = 'main';
+
+function languageFor(f: string) {
+  if (f.endsWith('.ts')) return 'typescript';
+  if (f.endsWith('.js')) return 'javascript';
+  if (f.endsWith('.json')) return 'json';
+  if (f.endsWith('.md')) return 'markdown';
+  return 'plaintext';
+}
+
+function addTerminal(type: 'stdout' | 'stderr', text: string) {
+  terminal.value.push({ type, text });
+}
+function clearTerminal() {
+  terminal.value = [];
+}
+
+async function loadFiles() {
+  if (!exercisePath.value) return;
+  try {
+    const { files: list } = await window.electronAPI.courseListFiles({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+    });
+    files.value = list;
+    // auto-select first file
+    if (list.length && !selectedFile.value) selectFile(list[0]!);
+    await loadMarkdown();
+  } catch (e: any) {
+    files.value = [];
+    selectedFile.value = '';
+  }
+}
+
+async function loadFileContent(f: string) {
+  const { content } = await window.electronAPI.courseReadFile({
+    slug: slug.value,
+    exercisePath: exercisePath.value,
+    file: f,
+  });
+  editorValue.value = content;
+  originalContent.value = content;
+}
+
+async function loadMarkdown() {
+  const { markdown } = await window.electronAPI.courseReadMarkdown({
+    slug: slug.value,
+    exercisePath: exercisePath.value,
+  });
+  const html = await (marked.parse(markdown || '') as any);
+  markdownHtml.value = typeof html === 'string' ? html : '';
+}
+
+function selectFile(f: string) {
+  selectedFile.value = f;
+  loadFileContent(f);
+}
+
+function onEditorChange(val: string) {
+  editorValue.value = val;
+  if (selectedFile.value) {
+    if (editorValue.value !== originalContent.value) dirtyFiles.value.add(selectedFile.value);
+    else dirtyFiles.value.delete(selectedFile.value);
+  }
+}
+
+async function save() {
+  if (!selectedFile.value) return;
+  await window.electronAPI.courseWriteFile({
+    slug: slug.value,
+    exercisePath: exercisePath.value,
+    file: selectedFile.value,
+    content: editorValue.value,
+  });
+  originalContent.value = editorValue.value;
+  dirtyFiles.value.delete(selectedFile.value);
+  toast.add({ severity: 'success', summary: 'Saved', detail: selectedFile.value, life: 2000 });
+}
+
+async function run() {
+  clearTerminal();
+  const { id } = await window.electronAPI.courseRun({
+    slug: slug.value,
+    exercisePath: exercisePath.value,
+  });
+  // logs listened globally in onMounted
+}
+
+async function test() {
+  clearTerminal();
+  const { id } = await window.electronAPI.courseTest({
+    slug: slug.value,
+    exercisePath: exercisePath.value,
+  });
+}
 
 async function checkExists() {
   try {
@@ -88,6 +283,7 @@ async function download() {
       life: 4000,
     });
     await checkForUpdates();
+    await loadFiles();
   } catch (e: any) {
     toast.add({
       severity: 'error',
@@ -100,18 +296,60 @@ async function download() {
   }
 }
 
-watch(
-  () => route.params.slug,
-  async (v) => {
-    slug.value = String(v || '');
-    await checkExists();
-    if (hasCourse.value) await checkForUpdates();
-  },
-  { immediate: true }
-);
-
+// Wire IPC log streams
 onMounted(async () => {
   await checkExists();
-  if (hasCourse.value) await checkForUpdates();
+  if (hasCourse.value) {
+    await checkForUpdates();
+    await loadFiles();
+  }
+
+  const offRunLog = window.electronAPI.on?.('course:run-log' as any, (...args: any[]) => {
+    const payload = args[0];
+    addTerminal(payload.stream, payload.chunk);
+  });
+  const offTestLog = window.electronAPI.on?.('course:test-log' as any, (...args: any[]) => {
+    const payload = args[0];
+    addTerminal(payload.stream, payload.chunk);
+  });
+  const offRunDone = window.electronAPI.on?.('course:run-done' as any, (...args: any[]) => {
+    const payload = args[0];
+    const msg = payload.success ? 'Run finished successfully' : `Run failed (code ${payload.code})`;
+    toast.add({
+      severity: payload.success ? 'success' : 'error',
+      summary: 'Run',
+      detail: msg,
+      life: 3000,
+    });
+  });
+  const offTestDone = window.electronAPI.on?.('course:test-done' as any, (...args: any[]) => {
+    const payload = args[0];
+    const msg = payload.success ? 'All tests passed' : `Tests failed (code ${payload.code})`;
+    toast.add({
+      severity: payload.success ? 'success' : 'error',
+      summary: 'Tests',
+      detail: msg,
+      life: 3000,
+    });
+  });
+
+  // cleanup not strictly necessary in SPA memory router, omitted for brevity
 });
+
+watch(
+  () => route.fullPath,
+  async () => {
+    slug.value = String(route.params.slug || '');
+    await checkExists();
+    if (hasCourse.value) await loadFiles();
+  }
+);
 </script>
+
+<style scoped>
+.prose :where(code) {
+  background: color-mix(in oklab, var(--p-surface-200) 50%, transparent);
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+</style>

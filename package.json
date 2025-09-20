@@ -47,6 +47,7 @@
     "vite-tsconfig-paths": "^5.1.4"
   },
   "dependencies": {
+    "@guolao/vue-monaco-editor": "^1.5.5",
     "@monaco-editor/react": "^4.7.0",
     "@primeuix/themes": "^1.2.3",
     "@primevue/auto-import-resolver": "^4.3.7",
@@ -58,6 +59,8 @@
     "electron-store": "^10.1.0",
     "i18next": "^25.3.6",
     "i18next-browser-languagedetector": "^8.2.0",
+    "marked": "^16.3.0",
+    "monaco-editor": "^0.53.0",
     "node-fetch": "^3.3.2",
     "pinia": "^2.3.1",
     "primeicons": "^7.0.0",

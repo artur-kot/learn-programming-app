@@ -51,6 +51,67 @@ export interface IpcInvoke {
     ];
     result: CourseTreeNode[];
   };
+
+  // Course file/exercise operations
+  'course:list-files': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string; // e.g. '1_hello_world'
+      },
+    ];
+    result: { files: string[] };
+  };
+  'course:read-file': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string;
+        file: string; // relative to exercisePath
+      },
+    ];
+    result: { content: string };
+  };
+  'course:write-file': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string;
+        file: string;
+        content: string;
+      },
+    ];
+    result: { ok: true };
+  };
+  'course:read-markdown': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string;
+      },
+    ];
+    result: { markdown: string };
+  };
+  'course:run': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string;
+        id?: string;
+      },
+    ];
+    result: { id: string };
+  };
+  'course:test': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string;
+        id?: string;
+      },
+    ];
+    result: { id: string };
+  };
 }
 
 // Fire-and-forget messages from renderer to main (ipcRenderer.send / ipcMain.on)
@@ -91,6 +152,53 @@ export interface IpcEvents {
         slug: string;
         op: 'clone' | 'check' | 'pull';
         success: boolean;
+        error?: string;
+      },
+    ];
+  };
+  // Streaming for run & test
+  'course:run-log': {
+    args: [
+      {
+        id: string;
+        slug: string;
+        exercisePath: string;
+        stream: 'stdout' | 'stderr';
+        chunk: string;
+      },
+    ];
+  };
+  'course:test-log': {
+    args: [
+      {
+        id: string;
+        slug: string;
+        exercisePath: string;
+        stream: 'stdout' | 'stderr';
+        chunk: string;
+      },
+    ];
+  };
+  'course:run-done': {
+    args: [
+      {
+        id: string;
+        slug: string;
+        exercisePath: string;
+        success: boolean;
+        code: number;
+        error?: string;
+      },
+    ];
+  };
+  'course:test-done': {
+    args: [
+      {
+        id: string;
+        slug: string;
+        exercisePath: string;
+        success: boolean;
+        code: number;
         error?: string;
       },
     ];

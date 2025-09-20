@@ -1,6 +1,6 @@
 import { IpcHandlersDef } from '../shared.types.js';
 import path from 'node:path';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { app } from 'electron';
@@ -79,6 +79,19 @@ function buildTree(rootAbs: string, rel: string = ''): CourseTreeNode[] {
       children: children.length ? children : undefined,
     };
   });
+}
+
+function resolveExerciseRoot(slug: string, exercisePath: string) {
+  return path.join(getCoursesRoot(), slug, exercisePath);
+}
+
+function listExerciseFiles(absExerciseRoot: string) {
+  // list only files not starting with '_' in the exercise root (non-recursive for simplicity)
+  const entries = readdirSync(absExerciseRoot, { withFileTypes: true });
+  return entries
+    .filter((e) => e.isFile() && !e.name.startsWith('_'))
+    .map((e) => e.name)
+    .sort();
 }
 
 export const gitCourseHandlers: IpcHandlersDef = {
@@ -235,5 +248,178 @@ export const gitCourseHandlers: IpcHandlersDef = {
     const root = path.join(getCoursesRoot(), slug);
     if (!existsSync(root)) throw new Error('Course not found.');
     return buildTree(root);
+  },
+
+  // Course file/exercise operations
+  async 'course:list-files'(_win, { slug, exercisePath }) {
+    const root = resolveExerciseRoot(slug, exercisePath);
+    if (!existsSync(root)) throw new Error('Exercise not found');
+    return { files: listExerciseFiles(root) };
+  },
+
+  async 'course:read-file'(_win, { slug, exercisePath, file }) {
+    const root = resolveExerciseRoot(slug, exercisePath);
+    const abs = path.join(root, file);
+    if (!abs.startsWith(root)) throw new Error('Invalid path');
+    const content = readFileSync(abs, 'utf-8');
+    return { content };
+  },
+
+  async 'course:write-file'(_win, { slug, exercisePath, file, content }) {
+    const root = resolveExerciseRoot(slug, exercisePath);
+    const abs = path.join(root, file);
+    if (!abs.startsWith(root)) throw new Error('Invalid path');
+    writeFileSync(abs, content, 'utf-8');
+    return { ok: true as const };
+  },
+
+  async 'course:read-markdown'(_win, { slug, exercisePath }) {
+    const exerciseRoot = resolveExerciseRoot(slug, exercisePath);
+    const courseRoot = path.join(getCoursesRoot(), slug);
+    const candidates = [
+      path.join(exerciseRoot, '_meta', 'README.md'),
+      path.join(exerciseRoot, '_meta', 'overview.md'),
+      path.join(exerciseRoot, 'README.md'),
+      path.join(courseRoot, '_overview', 'overview.md'),
+    ];
+    for (const abs of candidates) {
+      if (existsSync(abs)) {
+        return { markdown: readFileSync(abs, 'utf-8') };
+      }
+    }
+    return { markdown: '' };
+  },
+
+  async 'course:run'(win, { slug, exercisePath, id: _id }) {
+    const id = ensureId(_id);
+    const emitter = createEmitter(win!.webContents);
+    const cwd = resolveExerciseRoot(slug, exercisePath);
+    // Find a default runnable file (first .js file) if exists
+    const files = listExerciseFiles(cwd);
+    const mainFile = files.find((f) => f.endsWith('.js')) || files[0];
+    if (!mainFile) throw new Error('No runnable file found');
+
+    const child = spawn(process.execPath, [mainFile], {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env },
+    });
+
+    child.stdout.on('data', (d) =>
+      emitter.emit('course:run-log', {
+        id,
+        slug,
+        exercisePath,
+        stream: 'stdout',
+        chunk: d.toString(),
+      })
+    );
+    child.stderr.on('data', (d) =>
+      emitter.emit('course:run-log', {
+        id,
+        slug,
+        exercisePath,
+        stream: 'stderr',
+        chunk: d.toString(),
+      })
+    );
+
+    child.on('close', (code) =>
+      emitter.emit('course:run-done', {
+        id,
+        slug,
+        exercisePath,
+        success: (code ?? 0) === 0,
+        code: code ?? 0,
+      })
+    );
+    child.on('error', (err) =>
+      emitter.emit('course:run-done', {
+        id,
+        slug,
+        exercisePath,
+        success: false,
+        code: 1,
+        error: String(err),
+      })
+    );
+
+    return { id };
+  },
+
+  async 'course:test'(win, { slug, exercisePath, id: _id }) {
+    const id = ensureId(_id);
+    const emitter = createEmitter(win!.webContents);
+    const cwd = resolveExerciseRoot(slug, exercisePath);
+
+    // Convention: `_meta/meta.json` has a `test` command
+    const metaPath = path.join(cwd, '_meta', 'meta.json');
+    let cmd = process.execPath;
+    let args: string[] = [];
+    if (existsSync(metaPath)) {
+      try {
+        const meta = JSON.parse(readFileSync(metaPath, 'utf-8')) as { test?: string };
+        if (meta.test) {
+          const parts = meta.test.trim().split(/\s+/);
+          cmd = parts.shift() || cmd;
+          args = parts;
+          // If first arg points to non-existing file and an _meta alternative exists, rewrite
+          if (cmd === 'node' && args[0]) {
+            const candidate = path.join(cwd, args[0]);
+            if (!existsSync(candidate)) {
+              const alt = path.join(cwd, '_meta', args[0].replace(/^\.\//, ''));
+              if (existsSync(alt)) {
+                args[0] = './_meta/' + args[0].replace(/^\.\//, '');
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const child = spawn(cmd, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env },
+    });
+    child.stdout.on('data', (d) =>
+      emitter.emit('course:test-log', {
+        id,
+        slug,
+        exercisePath,
+        stream: 'stdout',
+        chunk: d.toString(),
+      })
+    );
+    child.stderr.on('data', (d) =>
+      emitter.emit('course:test-log', {
+        id,
+        slug,
+        exercisePath,
+        stream: 'stderr',
+        chunk: d.toString(),
+      })
+    );
+    child.on('close', (code) =>
+      emitter.emit('course:test-done', {
+        id,
+        slug,
+        exercisePath,
+        success: (code ?? 0) === 0,
+        code: code ?? 0,
+      })
+    );
+    child.on('error', (err) =>
+      emitter.emit('course:test-done', {
+        id,
+        slug,
+        exercisePath,
+        success: false,
+        code: 1,
+        error: String(err),
+      })
+    );
+
+    return { id };
   },
 };

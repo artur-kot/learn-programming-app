@@ -30,14 +30,12 @@
             :expandedKeys="expandedKeys"
             :expandOnClick="false"
             @update:selectionKeys="onSelectionUpdate"
+            @node-expand="onNodeExpand"
           >
             <template #default="slotProps">
               <span :style="{ fontWeight: slotProps.node.children ? 'bold' : 'normal' }">
                 {{ slotProps.node.label }}
               </span>
-            </template>
-            <template #nodetoggleicon>
-              <!-- Hide chevron icon by rendering nothing -->
             </template>
           </Tree>
         </div>
@@ -47,7 +45,7 @@
     <!-- Content -->
     <div class="flex flex-col flex-auto h-screen bg-surface-50 dark:bg-surface-950 p-7 md:p-8">
       <div
-        class="flex flex-col flex-auto p-8 overflow-auto border shadow-md 2xl:p-12 bg-surface-0 dark:bg-surface-900 rounded-xl border-surface-200 dark:border-surface-700"
+        class="flex flex-col flex-auto p-4 overflow-auto border shadow-md bg-surface-0 dark:bg-surface-900 rounded-xl border-surface-200 dark:border-surface-700"
       >
         <RouterView />
       </div>
@@ -56,15 +54,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useCourseStore } from '~/renderer/stores';
+import { useCourseStore } from '../stores';
 
 const route = useRoute();
 const router = useRouter();
 const course = useCourseStore();
 
-const title = computed(() => (route.params.slug as string) || 'Course');
+const slug = computed(() => route.params.slug as string);
+const title = computed(() =>
+  slug.value ? slug.value.charAt(0).toUpperCase() + slug.value.slice(1) : ''
+);
 const nodes = computed(() => course.nodes);
 
 const selectedKeys = ref<Record<string, boolean>>({});
@@ -76,38 +77,31 @@ function goHome() {
 
 function onSelectionUpdate(keys: Record<string, boolean>) {
   selectedKeys.value = keys;
+  const key = Object.keys(keys).find((k) => keys[k]);
+  if (key) {
+    course.setExercise(key);
+    router.push({ name: 'course', params: { slug: slug.value }, query: { exercise: key } });
+  }
+}
+
+function onNodeExpand(e: any) {
+  if (e?.node?.key) expandedKeys.value[e.node.key] = true;
 }
 
 watch(
-  () => route.params.slug,
-  async (slug) => {
-    if (typeof slug === 'string' && slug) {
-      try {
-        await course.loadTree(slug);
-        function expandAll(nodes: any[]) {
-          let keys: Record<string, boolean> = {};
-          function recurse(items: any[]) {
-            for (const node of items) {
-              keys[node.key] = true;
-              if (node.children && node.children.length) {
-                recurse(node.children);
-              }
-            }
-          }
-          recurse(nodes);
-          return keys;
-        }
-        expandedKeys.value = expandAll(course.nodes);
-        selectedKeys.value = { [course.nodes[0].key]: true };
-      } catch {
-        // ignore, CourseView handles empty state
-      }
-    } else {
-      course.clear();
-    }
+  () => slug.value,
+  async (s) => {
+    if (s) await course.loadTree(s);
+    // if we navigated with exercise in query, reflect it into selection
+    const q = (route.query.exercise as string) || '';
+    if (q) selectedKeys.value = { [q]: true };
   },
   { immediate: true }
 );
+
+onMounted(async () => {
+  if (slug.value) await course.loadTree(slug.value);
+});
 </script>
 
 <style scoped>

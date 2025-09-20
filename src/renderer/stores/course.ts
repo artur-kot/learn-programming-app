@@ -6,6 +6,7 @@ export const useCourseStore = defineStore('course', {
     nodes: [] as CourseTreeNode[],
     loading: false,
     error: null as string | null,
+    currentExercise: '' as string,
   }),
   actions: {
     async loadTree(slug: string) {
@@ -21,9 +22,13 @@ export const useCourseStore = defineStore('course', {
         this.loading = false;
       }
     },
+    setExercise(path: string) {
+      this.currentExercise = path;
+    },
     clear() {
       this.nodes = [];
       this.error = null;
+      this.currentExercise = '';
     },
   },
 });

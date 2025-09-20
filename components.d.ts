@@ -22,6 +22,7 @@ declare module 'vue' {
     MainSidebar: typeof import('./src/components/MainSidebar.vue')['default']
     Menu: typeof import('primevue/menu')['default']
     Message: typeof import('primevue/message')['default']
+    MonacoEditor: typeof import('@guolao/vue-monaco-editor')['MonacoEditor']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Textarea: typeof import('primevue/textarea')['default']

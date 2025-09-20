@@ -28,6 +28,39 @@ declare global {
       gitListTree: (payload: {
         slug: string;
       }) => Promise<import('../ipc/contracts.ts').CourseTreeNode[]>;
+
+      // Course file ops
+      courseListFiles: (payload: {
+        slug: string;
+        exercisePath: string;
+      }) => Promise<{ files: string[] }>;
+      courseReadFile: (payload: {
+        slug: string;
+        exercisePath: string;
+        file: string;
+      }) => Promise<{ content: string }>;
+      courseWriteFile: (payload: {
+        slug: string;
+        exercisePath: string;
+        file: string;
+        content: string;
+      }) => Promise<{ ok: true }>;
+      courseReadMarkdown: (payload: {
+        slug: string;
+        exercisePath: string;
+      }) => Promise<{ markdown: string }>;
+
+      // Run/Test
+      courseRun: (payload: {
+        slug: string;
+        exercisePath: string;
+        id?: string;
+      }) => Promise<{ id: string }>;
+      courseTest: (payload: {
+        slug: string;
+        exercisePath: string;
+        id?: string;
+      }) => Promise<{ id: string }>;
     };
   }
 }

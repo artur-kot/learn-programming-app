@@ -6,3 +6,10 @@
 .p-tree {
   border-radius: 8px;
 }
+
+.prose {
+  --tw-prose-body: theme(colors.slate.800);
+}
+.dark .prose {
+  --tw-prose-body: theme(colors.slate.200);
+}
