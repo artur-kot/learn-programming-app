@@ -98,11 +98,7 @@
             class="h-full p-4 overflow-auto border rounded-lg bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700"
           >
             <div class="mb-2 text-sm text-surface-500 dark:text-surface-400">Description</div>
-            <div
-              v-if="markdownHtml"
-              v-html="markdownHtml"
-              class="prose prose-invert max-w-none"
-            ></div>
+            <div v-if="markdownHtml" v-html="markdownHtml" class="markdown max-w-none"></div>
             <div v-else class="text-surface-500 dark:text-surface-400">
               No description provided.
             </div>
@@ -176,6 +172,7 @@ const originalContent = ref<string>('');
 const dirtyFiles = ref<Set<string>>(new Set());
 const terminal = ref<{ type: 'stdout' | 'stderr'; text: string }[]>([]);
 const markdownHtml = ref<string>('');
+const markdownBaseDir = ref<string>('');
 const confirmResetVisible = ref(false);
 
 // Per-file buffers to support Save All
@@ -267,11 +264,13 @@ async function loadFileContent(f: string) {
 }
 
 async function loadMarkdown() {
-  const { markdown } = await window.electronAPI.courseReadMarkdown({
+  const { markdown, baseDir } = await window.electronAPI.courseReadMarkdown({
     slug: slug.value,
     exercisePath: exercisePath.value,
   });
-  const html = await (marked.parse(markdown || '') as any);
+  markdownBaseDir.value = baseDir || '';
+  const base = markdownBaseDir.value ? `file://${markdownBaseDir.value.replace(/\\/g, '/')}/` : '';
+  const html = await marked.parse(markdown || '', { baseUrl: base } as any);
   markdownHtml.value = typeof html === 'string' ? html : '';
 }
 

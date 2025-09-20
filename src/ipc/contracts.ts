@@ -90,7 +90,7 @@ export interface IpcInvoke {
         exercisePath: string;
       },
     ];
-    result: { markdown: string };
+    result: { markdown: string; baseDir: string };
   };
   'course:run': {
     args: [

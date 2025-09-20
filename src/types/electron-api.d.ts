@@ -48,7 +48,7 @@ declare global {
       courseReadMarkdown: (payload: {
         slug: string;
         exercisePath: string;
-      }) => Promise<{ markdown: string }>;
+      }) => Promise<{ markdown: string; baseDir: string }>;
 
       // Run/Test
       courseRun: (payload: {

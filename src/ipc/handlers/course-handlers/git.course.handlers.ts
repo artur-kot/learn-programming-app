@@ -333,17 +333,21 @@ export const gitCourseHandlers: IpcHandlersDef = {
     const exerciseRoot = resolveExerciseWorkspaceRoot(slug, exercisePath);
     const courseRoot = path.join(getCoursesRoot(), slug);
     const candidates = [
+      // Prefer exercise-specific TODO/description
+      path.join(exerciseRoot, '_meta', 'todo.md'),
+      // Other common exercise-local fallbacks
       path.join(exerciseRoot, '_meta', 'README.md'),
       path.join(exerciseRoot, '_meta', 'overview.md'),
       path.join(exerciseRoot, 'README.md'),
+      // Legacy/root course overview fallback
       path.join(courseRoot, '_overview', 'overview.md'),
     ];
     for (const abs of candidates) {
       if (existsSync(abs)) {
-        return { markdown: readFileSync(abs, 'utf-8') };
+        return { markdown: readFileSync(abs, 'utf-8'), baseDir: path.dirname(abs) };
       }
     }
-    return { markdown: '' };
+    return { markdown: '', baseDir: exerciseRoot };
   },
 
   async 'course:run'(win, { slug, exercisePath, id: _id }) {
