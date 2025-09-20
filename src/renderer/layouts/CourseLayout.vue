@@ -29,7 +29,6 @@
             v-model:selectionKeys="selectedKeys"
             :expandedKeys="expandedKeys"
             :expandOnClick="false"
-            :toggleable="false"
             @update:selectionKeys="onSelectionUpdate"
           >
             <template #default="slotProps">
@@ -83,11 +82,23 @@ watch(
   () => route.params.slug,
   async (slug) => {
     if (typeof slug === 'string' && slug) {
-      // Load tree if available; errors are handled in CourseView to show empty state.
       try {
         await course.loadTree(slug);
-        // Expand top-level nodes by default
-        expandedKeys.value = Object.fromEntries(course.nodes.map((n) => [n.key, true]));
+        function expandAll(nodes: any[]) {
+          let keys: Record<string, boolean> = {};
+          function recurse(items: any[]) {
+            for (const node of items) {
+              keys[node.key] = true;
+              if (node.children && node.children.length) {
+                recurse(node.children);
+              }
+            }
+          }
+          recurse(nodes);
+          return keys;
+        }
+        expandedKeys.value = expandAll(course.nodes);
+        selectedKeys.value = { [course.nodes[0].key]: true };
       } catch {
         // ignore, CourseView handles empty state
       }

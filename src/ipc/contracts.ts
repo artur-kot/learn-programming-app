@@ -16,7 +16,6 @@ export interface IpcInvoke {
     args: [
       {
         slug: string; // local directory name under courses/, e.g. 'javascript'
-        repoUrl: string; // public git repo URL
         branch?: string; // defaults to 'main'
         id?: string; // optional correlation id
       },

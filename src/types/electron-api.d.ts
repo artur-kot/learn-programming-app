@@ -12,7 +12,6 @@ declare global {
       // Git course helpers
       gitClone: (payload: {
         slug: string;
-        repoUrl: string;
         branch?: string;
         id?: string;
       }) => Promise<{ path: string; id: string }>;

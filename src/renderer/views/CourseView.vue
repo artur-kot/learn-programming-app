@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col items-stretch h-full">
-    <div v-if="!hasCourse && !busy" class="flex items-center justify-center flex-1">
+    <div v-if="hasCourse === false && !busy" class="flex items-center justify-center flex-1">
       <div
         class="flex flex-col items-center gap-4 p-10 rounded-xl bg-surface-0 dark:bg-surface-900"
       >
@@ -36,7 +36,7 @@ const toast = useToast();
 const course = useCourseStore();
 
 const slug = ref<string>(route.params.slug as string);
-const hasCourse = ref<boolean>(false);
+const hasCourse = ref<boolean | null>(null);
 const busy = ref(false);
 const updateText = ref('');
 
@@ -44,7 +44,6 @@ const DEFAULT_BRANCH = 'main';
 
 async function checkExists() {
   try {
-    // Try listing, if it errors, assume not present
     await course.loadTree(slug.value);
     hasCourse.value = course.nodes.length > 0 || course.error === null;
     return hasCourse.value;
@@ -61,7 +60,7 @@ async function checkForUpdates() {
       branch: DEFAULT_BRANCH,
     });
     if (res.updateAvailable) {
-      updateText.value = `Updates available (behind by ${res.behindBy}).`;
+      updateText.value = `Updates available.`;
       toast.add({
         severity: 'info',
         summary: 'Updates available',
@@ -79,8 +78,7 @@ async function checkForUpdates() {
 async function download() {
   busy.value = true;
   try {
-    const repoUrl = `https://github.com/ArturKot95/learn-programming-javascript.git`;
-    await window.electronAPI.gitClone({ slug: slug.value, repoUrl, branch: DEFAULT_BRANCH });
+    await window.electronAPI.gitClone({ slug: slug.value, branch: DEFAULT_BRANCH });
     await course.loadTree(slug.value);
     hasCourse.value = true;
     toast.add({

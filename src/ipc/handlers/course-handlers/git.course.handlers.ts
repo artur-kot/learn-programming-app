@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { app } from 'electron';
 import { createEmitter } from '../../register-handlers.js';
 import type { CourseTreeNode } from '../../contracts.js';
+import { courseSlugToRepoUrl } from './course-repos.js';
 
 function runGitStreaming(
   win: Electron.BrowserWindow,
@@ -81,7 +82,7 @@ function buildTree(rootAbs: string, rel: string = ''): CourseTreeNode[] {
 }
 
 export const gitCourseHandlers: IpcHandlersDef = {
-  async 'git-course:clone'(win, { slug, repoUrl, branch = 'main', id: _id }) {
+  async 'git-course:clone'(win, { slug, branch = 'main', id: _id }) {
     const id = ensureId(_id);
     const emitter = createEmitter(win!.webContents);
     const root = getCoursesRoot();
@@ -103,7 +104,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
       '--branch',
       branch,
       '--single-branch',
-      repoUrl,
+      courseSlugToRepoUrl[slug as keyof typeof courseSlugToRepoUrl],
       dest,
     ]);
 
