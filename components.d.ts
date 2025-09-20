@@ -26,6 +26,7 @@ declare module 'vue' {
     MonacoEditor: typeof import('@guolao/vue-monaco-editor')['MonacoEditor']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SplitButton: typeof import('primevue/splitbutton')['default']
     Textarea: typeof import('primevue/textarea')['default']
     Toast: typeof import('primevue/toast')['default']
     Tree: typeof import('primevue/tree')['default']

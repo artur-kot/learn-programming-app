@@ -17,51 +17,56 @@
     <div v-else class="flex flex-col h-full gap-3">
       <!-- Top bar with file tabs and actions -->
       <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-2 overflow-x-auto">
-          <div
-            v-for="f in files"
-            :key="f"
-            class="px-3 py-2 rounded-md cursor-pointer whitespace-nowrap"
-            :class="
-              selectedFile === f
-                ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-200'
-                : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-200'
-            "
-            @click="selectFile(f)"
-          >
-            {{ f }}
-            <i
-              v-if="dirtyFiles.has(f)"
-              class="ml-2 text-xs pi pi-circle-fill"
-              :title="'Unsaved changes'"
-            />
-          </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <Button size="small" label="Run" icon="pi pi-play" @click="run" />
-          <Button size="small" label="Test" icon="pi pi-check" severity="secondary" @click="test" />
-          <Button
-            size="small"
-            label="Solution"
-            icon="pi pi-lightbulb"
-            severity="help"
-            @click="applySolution"
-          />
-          <Button
-            size="small"
-            label="Reset"
-            icon="pi pi-undo"
-            severity="danger"
-            @click="askReset"
-          />
-          <Button
+        <!-- Left: Save split button + file tabs -->
+        <div class="flex items-center gap-2 min-w-0">
+          <SplitButton
             size="small"
             label="Save"
             icon="pi pi-save"
-            severity="secondary"
-            :disabled="!selectedFile || !dirtyFiles.size"
+            :model="saveMenuItems"
+            :disabled="dirtyFiles.size === 0"
             @click="save"
           />
+
+          <div class="flex items-center gap-2 overflow-x-auto">
+            <div
+              v-for="f in files"
+              :key="f"
+              class="px-3 py-2 rounded-md cursor-pointer whitespace-nowrap"
+              :class="
+                selectedFile === f
+                  ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-200'
+                  : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-200'
+              "
+              @click="selectFile(f)"
+            >
+              {{ f }}
+              <i
+                v-if="dirtyFiles.has(f)"
+                class="ml-2 text-xs pi pi-circle-fill"
+                :title="'Unsaved changes'"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: actions -->
+        <div class="flex items-center gap-2">
+          <Button size="small" label="Run" icon="pi pi-play" @click="run" />
+
+          <!-- More (Solution, Reset) -->
+          <Button
+            size="small"
+            text
+            rounded
+            icon="pi pi-ellipsis-v"
+            aria-label="More"
+            @click="toggleMoreMenu"
+          />
+          <Menu ref="moreMenu" :model="moreMenuItems" :popup="true" />
+
+          <!-- Check (renamed Test) - far right, green -->
+          <Button size="small" label="Check" icon="pi pi-check" severity="success" @click="test" />
         </div>
       </div>
 
@@ -146,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch, computed } from 'vue';
+import { onMounted, ref, watch, computed, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCourseStore } from '~/renderer/stores';
 import { useToast } from 'primevue/usetoast';
@@ -173,6 +178,24 @@ const terminal = ref<{ type: 'stdout' | 'stderr'; text: string }[]>([]);
 const markdownHtml = ref<string>('');
 const confirmResetVisible = ref(false);
 
+// Per-file buffers to support Save All
+const fileBuffers = ref(new Map<string, { value: string; original: string }>());
+
+// Menus
+const moreMenu = ref();
+const moreMenuItems = computed(() => [
+  { label: 'Solution', icon: 'pi pi-lightbulb', command: () => applySolution() },
+  { label: 'Reset', icon: 'pi pi-undo', command: () => askReset() },
+]);
+const saveMenuItems = computed(() => [
+  {
+    label: 'Save All',
+    icon: 'pi pi-copy',
+    command: () => saveAll(),
+    disabled: dirtyFiles.value.size === 0,
+  },
+]);
+
 const DEFAULT_BRANCH = 'main';
 
 function languageFor(f: string) {
@@ -188,6 +211,13 @@ function addTerminal(type: 'stdout' | 'stderr', text: string) {
 }
 function clearTerminal() {
   terminal.value = [];
+}
+
+function markDirty(file: string, isDirty: boolean) {
+  const next = new Set(dirtyFiles.value);
+  if (isDirty) next.add(file);
+  else next.delete(file);
+  dirtyFiles.value = next;
 }
 
 async function loadFiles() {
@@ -218,6 +248,14 @@ async function loadFiles() {
 }
 
 async function loadFileContent(f: string) {
+  // If we already have a buffer (user edited before), restore from buffer
+  const buf = fileBuffers.value.get(f);
+  if (buf) {
+    selectedFile.value = f;
+    editorValue.value = buf.value;
+    originalContent.value = buf.original;
+    return;
+  }
   const { content } = await window.electronAPI.courseReadFile({
     slug: slug.value,
     exercisePath: exercisePath.value,
@@ -225,6 +263,7 @@ async function loadFileContent(f: string) {
   });
   editorValue.value = content;
   originalContent.value = content;
+  fileBuffers.value.set(f, { value: content, original: content });
 }
 
 async function loadMarkdown() {
@@ -244,22 +283,53 @@ function selectFile(f: string) {
 function onEditorChange(val: string) {
   editorValue.value = val;
   if (selectedFile.value) {
-    if (editorValue.value !== originalContent.value) dirtyFiles.value.add(selectedFile.value);
-    else dirtyFiles.value.delete(selectedFile.value);
+    const buf = fileBuffers.value.get(selectedFile.value);
+    if (buf) {
+      buf.value = val;
+      originalContent.value = buf.original;
+      markDirty(selectedFile.value, buf.value !== buf.original);
+    }
   }
 }
 
 async function save() {
   if (!selectedFile.value) return;
+  const buf = fileBuffers.value.get(selectedFile.value);
+  if (!buf) return;
   await window.electronAPI.courseWriteFile({
     slug: slug.value,
     exercisePath: exercisePath.value,
     file: selectedFile.value,
-    content: editorValue.value,
+    content: buf.value,
   });
+  buf.original = buf.value;
   originalContent.value = editorValue.value;
-  dirtyFiles.value.delete(selectedFile.value);
+  markDirty(selectedFile.value, false);
   toast.add({ severity: 'success', summary: 'Saved', detail: selectedFile.value, life: 2000 });
+}
+
+async function saveAll() {
+  if (dirtyFiles.value.size === 0) return;
+  const writes: Promise<any>[] = [];
+  for (const f of dirtyFiles.value) {
+    const buf = fileBuffers.value.get(f);
+    if (!buf) continue;
+    writes.push(
+      window.electronAPI.courseWriteFile({
+        slug: slug.value,
+        exercisePath: exercisePath.value,
+        file: f,
+        content: buf.value,
+      })
+    );
+  }
+  await Promise.all(writes);
+  for (const f of Array.from(dirtyFiles.value)) {
+    const buf = fileBuffers.value.get(f);
+    if (buf) buf.original = buf.value;
+  }
+  dirtyFiles.value = new Set();
+  toast.add({ severity: 'success', summary: 'All changes saved', life: 2000 });
 }
 
 async function run() {
@@ -286,7 +356,8 @@ async function doReset() {
   confirmResetVisible.value = false;
   try {
     await window.electronAPI.courseReset({ slug: slug.value, exercisePath: exercisePath.value });
-    dirtyFiles.value.clear();
+    dirtyFiles.value = new Set();
+    fileBuffers.value.clear();
     await loadFiles();
     toast.add({ severity: 'success', summary: 'Exercise reset', life: 2000 });
   } catch (e: any) {
@@ -305,6 +376,8 @@ async function applySolution() {
       slug: slug.value,
       exercisePath: exercisePath.value,
     });
+    dirtyFiles.value = new Set();
+    fileBuffers.value.clear();
     await loadFiles();
     toast.add({ severity: 'success', summary: 'Solution applied', life: 2000 });
   } catch (e: any) {
@@ -366,9 +439,6 @@ async function download() {
     await loadFiles();
   } catch (e: any) {
     toast.add({
-      severity: 'error',
-      summary: 'Download failed',
-      detail: e?.message ?? String(e),
       life: 7000,
     });
   } finally {
@@ -376,8 +446,40 @@ async function download() {
   }
 }
 
+function toggleMoreMenu(event: MouseEvent) {
+  (moreMenu.value as any)?.toggle(event);
+}
+
+// Hotkeys: Save (Ctrl/Cmd+S), Save All (Ctrl/Cmd+Alt+S)
+function onKeydown(e: KeyboardEvent) {
+  const key = e.key?.toLowerCase();
+  const isCmd = e.metaKey || e.ctrlKey;
+  if (isCmd && key === 's' && !e.altKey) {
+    e.preventDefault();
+    save();
+  } else if (isCmd && e.altKey && key === 's') {
+    e.preventDefault();
+    saveAll();
+  }
+}
+
+// Respond when exercise changes (clear buffers and reload)
+watch(
+  () => exercisePath.value,
+  async () => {
+    dirtyFiles.value = new Set();
+    fileBuffers.value.clear();
+    selectedFile.value = '';
+    editorValue.value = '';
+    originalContent.value = '';
+    await loadFiles();
+  }
+);
+
 // Wire IPC log streams
 onMounted(async () => {
+  window.addEventListener('keydown', onKeydown);
+
   await checkExists();
   if (hasCourse.value) {
     await checkForUpdates();
@@ -394,42 +496,25 @@ onMounted(async () => {
   });
   const offRunDone = window.electronAPI.on?.('course:run-done' as any, (...args: any[]) => {
     const payload = args[0];
-    const msg = payload.success ? 'Run finished successfully' : `Run failed (code ${payload.code})`;
-    toast.add({
-      severity: payload.success ? 'success' : 'error',
-      summary: 'Run',
-      detail: msg,
-      life: 3000,
-    });
+    if (payload?.code === 0) {
+      toast.add({ severity: 'success', summary: 'Run finished', life: 2000 });
+    } else {
+      toast.add({ severity: 'warn', summary: 'Run exited with errors', life: 3000 });
+    }
   });
   const offTestDone = window.electronAPI.on?.('course:test-done' as any, (...args: any[]) => {
     const payload = args[0];
-    const msg = payload.success ? 'All tests passed' : `Tests failed (code ${payload.code})`;
-    toast.add({
-      severity: payload.success ? 'success' : 'error',
-      summary: 'Tests',
-      detail: msg,
-      life: 3000,
-    });
+    if (payload?.code === 0) {
+      toast.add({ severity: 'success', summary: 'All tests passed', life: 2500 });
+    } else {
+      toast.add({ severity: 'error', summary: 'Tests failed', life: 3500 });
+    }
   });
 
-  // cleanup not strictly necessary in SPA memory router, omitted for brevity
+  // Note: in this SPA we don't strictly need to clean up, but keep references if needed
 });
 
-watch(
-  () => route.fullPath,
-  async () => {
-    slug.value = String(route.params.slug || '');
-    await checkExists();
-    if (hasCourse.value) await loadFiles();
-  }
-);
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown);
+});
 </script>
-
-<style scoped>
-.prose :where(code) {
-  background: color-mix(in oklab, var(--p-surface-200) 50%, transparent);
-  padding: 0.1rem 0.3rem;
-  border-radius: 4px;
-}
-</style>
