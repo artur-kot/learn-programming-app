@@ -18,13 +18,14 @@
       <!-- Top bar with file tabs and actions -->
       <div class="flex items-center justify-between gap-3">
         <!-- Left: Save split button + file tabs -->
-        <div class="flex items-center gap-2 min-w-0">
+        <div class="flex items-center min-w-0 gap-2">
           <SplitButton
             size="small"
             label="Save"
             icon="pi pi-save"
             :model="saveMenuItems"
             :disabled="dirtyFiles.size === 0"
+            severity="secondary"
             @click="save"
           />
 
@@ -52,8 +53,6 @@
 
         <!-- Right: actions -->
         <div class="flex items-center gap-2">
-          <Button size="small" label="Run" icon="pi pi-play" @click="run" />
-
           <!-- More (Solution, Reset) -->
           <Button
             size="small"
@@ -64,6 +63,7 @@
             @click="toggleMoreMenu"
           />
           <Menu ref="moreMenu" :model="moreMenuItems" :popup="true" />
+          <Button size="small" label="Run" icon="pi pi-play" severity="contrast" @click="run" />
 
           <!-- Check (renamed Test) - far right, green -->
           <Button size="small" label="Check" icon="pi pi-check" severity="success" @click="test" />
@@ -305,7 +305,6 @@ async function save() {
   buf.original = buf.value;
   originalContent.value = editorValue.value;
   markDirty(selectedFile.value, false);
-  toast.add({ severity: 'success', summary: 'Saved', detail: selectedFile.value, life: 2000 });
 }
 
 async function saveAll() {
@@ -329,7 +328,6 @@ async function saveAll() {
     if (buf) buf.original = buf.value;
   }
   dirtyFiles.value = new Set();
-  toast.add({ severity: 'success', summary: 'All changes saved', life: 2000 });
 }
 
 async function run() {
@@ -359,7 +357,6 @@ async function doReset() {
     dirtyFiles.value = new Set();
     fileBuffers.value.clear();
     await loadFiles();
-    toast.add({ severity: 'success', summary: 'Exercise reset', life: 2000 });
   } catch (e: any) {
     toast.add({
       severity: 'error',
