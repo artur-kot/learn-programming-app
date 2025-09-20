@@ -19,6 +19,17 @@
             <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-100">
               {{ title }}
             </h2>
+            <div class="ml-auto">
+              <Button
+                v-if="updateAvailable"
+                size="small"
+                :label="syncing ? 'Syncing…' : 'Sync'"
+                icon="pi pi-refresh"
+                :loading="syncing"
+                severity="help"
+                @click="syncRepo"
+              />
+            </div>
           </div>
 
           <Tree
@@ -57,10 +68,12 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCourseStore } from '../stores';
+import { useToast } from 'primevue/usetoast';
 
 const route = useRoute();
 const router = useRouter();
 const course = useCourseStore();
+const toast = useToast();
 
 const slug = computed(() => route.params.slug as string);
 const title = computed(() =>
@@ -71,8 +84,51 @@ const nodes = computed(() => course.nodes);
 const selectedKeys = ref<Record<string, boolean>>({});
 const expandedKeys = ref<Record<string, boolean>>({});
 
+const updateAvailable = ref(false);
+const syncing = ref(false);
+const DEFAULT_BRANCH = 'main';
+
 function goHome() {
   router.push('/');
+}
+
+async function checkUpdates() {
+  if (!slug.value) return;
+  try {
+    const res = await window.electronAPI.gitCheckUpdates({
+      slug: slug.value,
+      branch: DEFAULT_BRANCH,
+    });
+    updateAvailable.value = !!res.updateAvailable;
+  } catch {
+    updateAvailable.value = false;
+  }
+}
+
+async function syncRepo() {
+  if (!slug.value) return;
+  try {
+    syncing.value = true;
+    await window.electronAPI.gitPull({ slug: slug.value, branch: DEFAULT_BRANCH });
+    await course.loadTree(slug.value);
+    toast.add({
+      severity: 'success',
+      summary: 'Synchronized',
+      detail: 'Course updated from repo',
+      life: 3000,
+    });
+    // refresh app to ensure content reflects updates
+    window.location.reload();
+  } catch (e: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Sync failed',
+      detail: e?.message ?? String(e),
+      life: 5000,
+    });
+  } finally {
+    syncing.value = false;
+  }
 }
 
 function onSelectionUpdate(keys: Record<string, boolean>) {
@@ -91,7 +147,10 @@ function onNodeExpand(e: any) {
 watch(
   () => slug.value,
   async (s) => {
-    if (s) await course.loadTree(s);
+    if (s) {
+      await course.loadTree(s);
+      await checkUpdates();
+    }
     // if we navigated with exercise in query, reflect it into selection
     const q = (route.query.exercise as string) || '';
     if (q) selectedKeys.value = { [q]: true };
@@ -101,6 +160,7 @@ watch(
 
 onMounted(async () => {
   if (slug.value) await course.loadTree(slug.value);
+  await checkUpdates();
 });
 </script>
 

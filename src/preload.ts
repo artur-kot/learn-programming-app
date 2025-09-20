@@ -9,7 +9,7 @@ exposeBridge({
     theme: AppConfig['themePreference']
   ): Promise<AppConfig['themePreference']> => bridge.invoke('theme:set', theme),
   // Git course helpers
-  gitClone: (payload: { slug: string; repoUrl: string; branch?: string; id?: string }) =>
+  gitClone: (payload: { slug: string; branch?: string; id?: string }) =>
     bridge.invoke('git-course:clone', payload),
   gitCheckUpdates: (payload: { slug: string; branch?: string; id?: string }) =>
     bridge.invoke('git-course:is-update-available', payload),
@@ -33,4 +33,8 @@ exposeBridge({
     bridge.invoke('course:run', payload),
   courseTest: (payload: { slug: string; exercisePath: string; id?: string }) =>
     bridge.invoke('course:test', payload),
+  courseReset: (payload: { slug: string; exercisePath: string }) =>
+    bridge.invoke('course:reset', payload),
+  courseApplySolution: (payload: { slug: string; exercisePath: string }) =>
+    bridge.invoke('course:apply-solution', payload),
 });

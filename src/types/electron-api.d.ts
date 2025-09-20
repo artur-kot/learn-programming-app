@@ -61,6 +61,13 @@ declare global {
         exercisePath: string;
         id?: string;
       }) => Promise<{ id: string }>;
+
+      // Workspace management
+      courseReset: (payload: { slug: string; exercisePath: string }) => Promise<{ ok: true }>;
+      courseApplySolution: (payload: {
+        slug: string;
+        exercisePath: string;
+      }) => Promise<{ ok: true }>;
     };
   }
 }

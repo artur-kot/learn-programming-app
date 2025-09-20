@@ -42,6 +42,20 @@
           <Button size="small" label="Test" icon="pi pi-check" severity="secondary" @click="test" />
           <Button
             size="small"
+            label="Solution"
+            icon="pi pi-lightbulb"
+            severity="help"
+            @click="applySolution"
+          />
+          <Button
+            size="small"
+            label="Reset"
+            icon="pi pi-undo"
+            severity="danger"
+            @click="askReset"
+          />
+          <Button
+            size="small"
             label="Save"
             icon="pi pi-save"
             severity="secondary"
@@ -91,6 +105,24 @@
         </div>
       </div>
 
+      <!-- Confirm Reset Modal -->
+      <Dialog
+        v-model:visible="confirmResetVisible"
+        modal
+        header="Reset exercise?"
+        :style="{ width: '28rem' }"
+      >
+        <div class="text-surface-700 dark:text-surface-200">
+          This will discard all your changes in this exercise and restore initial files. Continue?
+        </div>
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <Button label="Cancel" text @click="confirmResetVisible = false" />
+            <Button label="Reset" severity="danger" @click="doReset" />
+          </div>
+        </template>
+      </Dialog>
+
       <!-- Terminal Emulator -->
       <div
         class="border rounded-lg bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700"
@@ -119,7 +151,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { useCourseStore } from '~/renderer/stores';
 import { useToast } from 'primevue/usetoast';
 import { marked } from 'marked';
-// @ts-ignore - vue-monaco-editor types
 import MonacoEditor from '@guolao/vue-monaco-editor';
 
 const route = useRoute();
@@ -140,6 +171,7 @@ const originalContent = ref<string>('');
 const dirtyFiles = ref<Set<string>>(new Set());
 const terminal = ref<{ type: 'stdout' | 'stderr'; text: string }[]>([]);
 const markdownHtml = ref<string>('');
+const confirmResetVisible = ref(false);
 
 const DEFAULT_BRANCH = 'main';
 
@@ -166,8 +198,18 @@ async function loadFiles() {
       exercisePath: exercisePath.value,
     });
     files.value = list;
-    // auto-select first file
-    if (list.length && !selectedFile.value) selectFile(list[0]!);
+    // auto-select first file or keep current if still exists
+    if (!selectedFile.value || !list.includes(selectedFile.value)) {
+      if (list.length) selectFile(list[0]!);
+      else {
+        selectedFile.value = '';
+        editorValue.value = '';
+        originalContent.value = '';
+      }
+    } else {
+      // refresh current content from disk
+      await loadFileContent(selectedFile.value);
+    }
     await loadMarkdown();
   } catch (e: any) {
     files.value = [];
@@ -222,7 +264,7 @@ async function save() {
 
 async function run() {
   clearTerminal();
-  const { id } = await window.electronAPI.courseRun({
+  await window.electronAPI.courseRun({
     slug: slug.value,
     exercisePath: exercisePath.value,
   });
@@ -231,10 +273,48 @@ async function run() {
 
 async function test() {
   clearTerminal();
-  const { id } = await window.electronAPI.courseTest({
+  await window.electronAPI.courseTest({
     slug: slug.value,
     exercisePath: exercisePath.value,
   });
+}
+
+function askReset() {
+  confirmResetVisible.value = true;
+}
+async function doReset() {
+  confirmResetVisible.value = false;
+  try {
+    await window.electronAPI.courseReset({ slug: slug.value, exercisePath: exercisePath.value });
+    dirtyFiles.value.clear();
+    await loadFiles();
+    toast.add({ severity: 'success', summary: 'Exercise reset', life: 2000 });
+  } catch (e: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Reset failed',
+      detail: e?.message ?? String(e),
+      life: 4000,
+    });
+  }
+}
+
+async function applySolution() {
+  try {
+    await window.electronAPI.courseApplySolution({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+    });
+    await loadFiles();
+    toast.add({ severity: 'success', summary: 'Solution applied', life: 2000 });
+  } catch (e: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'No solution',
+      detail: e?.message ?? String(e),
+      life: 4000,
+    });
+  }
 }
 
 async function checkExists() {

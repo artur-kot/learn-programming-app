@@ -1,7 +1,7 @@
 import { IpcHandlersDef } from '../shared.types.js';
 import path from 'node:path';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { mkdir, rm } from 'node:fs/promises';
+import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { mkdir, rm, cp } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { app } from 'electron';
 import { createEmitter } from '../../register-handlers.js';
@@ -38,6 +38,9 @@ function runGitStreaming(
 
 function getCoursesRoot(): string {
   return path.join(app.getPath('userData'), 'courses');
+}
+function getWorkspaceRoot(): string {
+  return path.join(app.getPath('userData'), 'courses-workspace');
 }
 
 function ensureId(id?: string) {
@@ -81,8 +84,11 @@ function buildTree(rootAbs: string, rel: string = ''): CourseTreeNode[] {
   });
 }
 
-function resolveExerciseRoot(slug: string, exercisePath: string) {
+function resolveRepoExerciseRoot(slug: string, exercisePath: string) {
   return path.join(getCoursesRoot(), slug, exercisePath);
+}
+function resolveExerciseWorkspaceRoot(slug: string, exercisePath: string) {
+  return path.join(getWorkspaceRoot(), slug, exercisePath);
 }
 
 function listExerciseFiles(absExerciseRoot: string) {
@@ -92,6 +98,52 @@ function listExerciseFiles(absExerciseRoot: string) {
     .filter((e) => e.isFile() && !e.name.startsWith('_'))
     .map((e) => e.name)
     .sort();
+}
+
+async function ensureExerciseWorkspace(slug: string, exercisePath: string) {
+  const src = resolveRepoExerciseRoot(slug, exercisePath);
+  const dst = resolveExerciseWorkspaceRoot(slug, exercisePath);
+  if (!existsSync(src)) throw new Error('Exercise not found');
+  if (!existsSync(dst)) {
+    await mkdir(dst, { recursive: true });
+    // Copy visible exercise files
+    for (const file of listExerciseFiles(src)) {
+      const from = path.join(src, file);
+      const to = path.join(dst, file);
+      writeFileSync(to, readFileSync(from));
+    }
+    // Copy _meta if present (tests, overview, etc.)
+    const metaSrc = path.join(src, '_meta');
+    if (existsSync(metaSrc)) {
+      await cp(metaSrc, path.join(dst, '_meta'), { recursive: true });
+    }
+  }
+}
+
+async function resetExerciseWorkspace(slug: string, exercisePath: string) {
+  const dst = resolveExerciseWorkspaceRoot(slug, exercisePath);
+  if (existsSync(dst)) {
+    await rm(dst, { recursive: true, force: true });
+  }
+  await ensureExerciseWorkspace(slug, exercisePath);
+}
+
+async function applySolutionToWorkspace(slug: string, exercisePath: string) {
+  const src = resolveRepoExerciseRoot(slug, exercisePath);
+  const dst = resolveExerciseWorkspaceRoot(slug, exercisePath);
+  await ensureExerciseWorkspace(slug, exercisePath);
+  const solutionDir = path.join(src, '_meta', 'solution');
+  if (!existsSync(solutionDir) || !statSync(solutionDir).isDirectory()) {
+    throw new Error('No solution available for this exercise');
+  }
+  const entries = readdirSync(solutionDir, { withFileTypes: true });
+  for (const e of entries) {
+    if (e.isFile()) {
+      const from = path.join(solutionDir, e.name);
+      const to = path.join(dst, e.name);
+      writeFileSync(to, readFileSync(from));
+    }
+  }
 }
 
 export const gitCourseHandlers: IpcHandlersDef = {
@@ -250,15 +302,17 @@ export const gitCourseHandlers: IpcHandlersDef = {
     return buildTree(root);
   },
 
-  // Course file/exercise operations
+  // Course file/exercise operations (use workspace)
   async 'course:list-files'(_win, { slug, exercisePath }) {
-    const root = resolveExerciseRoot(slug, exercisePath);
+    await ensureExerciseWorkspace(slug, exercisePath);
+    const root = resolveExerciseWorkspaceRoot(slug, exercisePath);
     if (!existsSync(root)) throw new Error('Exercise not found');
     return { files: listExerciseFiles(root) };
   },
 
   async 'course:read-file'(_win, { slug, exercisePath, file }) {
-    const root = resolveExerciseRoot(slug, exercisePath);
+    await ensureExerciseWorkspace(slug, exercisePath);
+    const root = resolveExerciseWorkspaceRoot(slug, exercisePath);
     const abs = path.join(root, file);
     if (!abs.startsWith(root)) throw new Error('Invalid path');
     const content = readFileSync(abs, 'utf-8');
@@ -266,7 +320,8 @@ export const gitCourseHandlers: IpcHandlersDef = {
   },
 
   async 'course:write-file'(_win, { slug, exercisePath, file, content }) {
-    const root = resolveExerciseRoot(slug, exercisePath);
+    await ensureExerciseWorkspace(slug, exercisePath);
+    const root = resolveExerciseWorkspaceRoot(slug, exercisePath);
     const abs = path.join(root, file);
     if (!abs.startsWith(root)) throw new Error('Invalid path');
     writeFileSync(abs, content, 'utf-8');
@@ -274,7 +329,8 @@ export const gitCourseHandlers: IpcHandlersDef = {
   },
 
   async 'course:read-markdown'(_win, { slug, exercisePath }) {
-    const exerciseRoot = resolveExerciseRoot(slug, exercisePath);
+    await ensureExerciseWorkspace(slug, exercisePath);
+    const exerciseRoot = resolveExerciseWorkspaceRoot(slug, exercisePath);
     const courseRoot = path.join(getCoursesRoot(), slug);
     const candidates = [
       path.join(exerciseRoot, '_meta', 'README.md'),
@@ -293,7 +349,8 @@ export const gitCourseHandlers: IpcHandlersDef = {
   async 'course:run'(win, { slug, exercisePath, id: _id }) {
     const id = ensureId(_id);
     const emitter = createEmitter(win!.webContents);
-    const cwd = resolveExerciseRoot(slug, exercisePath);
+    await ensureExerciseWorkspace(slug, exercisePath);
+    const cwd = resolveExerciseWorkspaceRoot(slug, exercisePath);
     // Find a default runnable file (first .js file) if exists
     const files = listExerciseFiles(cwd);
     const mainFile = files.find((f) => f.endsWith('.js')) || files[0];
@@ -350,9 +407,10 @@ export const gitCourseHandlers: IpcHandlersDef = {
   async 'course:test'(win, { slug, exercisePath, id: _id }) {
     const id = ensureId(_id);
     const emitter = createEmitter(win!.webContents);
-    const cwd = resolveExerciseRoot(slug, exercisePath);
+    await ensureExerciseWorkspace(slug, exercisePath);
+    const cwd = resolveExerciseWorkspaceRoot(slug, exercisePath);
 
-    // Convention: `_meta/meta.json` has a `test` command
+    // Convention: `_meta/meta.json` has a `test` command (present in workspace)
     const metaPath = path.join(cwd, '_meta', 'meta.json');
     let cmd = process.execPath;
     let args: string[] = [];
@@ -421,5 +479,15 @@ export const gitCourseHandlers: IpcHandlersDef = {
     );
 
     return { id };
+  },
+
+  async 'course:reset'(_win, { slug, exercisePath }) {
+    await resetExerciseWorkspace(slug, exercisePath);
+    return { ok: true as const };
+  },
+
+  async 'course:apply-solution'(_win, { slug, exercisePath }) {
+    await applySolutionToWorkspace(slug, exercisePath);
+    return { ok: true as const };
   },
 };

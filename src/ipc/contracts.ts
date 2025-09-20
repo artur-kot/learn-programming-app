@@ -15,7 +15,7 @@ export interface IpcInvoke {
   'git-course:clone': {
     args: [
       {
-        slug: string; // local directory name under courses/, e.g. 'javascript'
+        slug: string; // local directory name under courses/, e.g., 'javascript'
         branch?: string; // defaults to 'main'
         id?: string; // optional correlation id
       },
@@ -52,7 +52,7 @@ export interface IpcInvoke {
     result: CourseTreeNode[];
   };
 
-  // Course file/exercise operations
+  // Course file/exercise operations (operate on a working copy of the exercise)
   'course:list-files': {
     args: [
       {
@@ -111,6 +111,25 @@ export interface IpcInvoke {
       },
     ];
     result: { id: string };
+  };
+  // Manage working copy
+  'course:reset': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string;
+      },
+    ];
+    result: { ok: true };
+  };
+  'course:apply-solution': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string;
+      },
+    ];
+    result: { ok: true };
   };
 }
 
