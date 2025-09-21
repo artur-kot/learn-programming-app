@@ -39,7 +39,7 @@
             <div
               v-for="f in files"
               :key="f"
-              class="px-3 py-2 rounded-md cursor-pointer whitespace-nowrap"
+              class="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer whitespace-nowrap"
               :class="
                 selectedFile === f
                   ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-200'
@@ -47,7 +47,8 @@
               "
               @click="selectFile(f)"
             >
-              {{ f }}
+              <i :class="fileIconClass(f)" class="text-xs" />
+              <span>{{ f }}</span>
               <i
                 v-if="dirtyFiles.has(f)"
                 class="ml-2 text-xs pi pi-circle-fill"
@@ -196,6 +197,7 @@ const moreMenuItems = computed(() => [
   { label: 'Solution', icon: 'pi pi-lightbulb', command: () => applySolution() },
   { label: 'Reset', icon: 'pi pi-undo', command: () => askReset() },
 ]);
+
 const saveMenuItems = computed(() => [
   {
     label: 'Save All',
@@ -212,7 +214,18 @@ function languageFor(f: string) {
   if (f.endsWith('.js')) return 'javascript';
   if (f.endsWith('.json')) return 'json';
   if (f.endsWith('.md')) return 'markdown';
+  if (f.endsWith('.css')) return 'css';
+  if (f.endsWith('.html')) return 'html';
   return 'plaintext';
+}
+
+function fileIconClass(f: string) {
+  if (f.endsWith('.ts') || f.endsWith('.js')) return 'pi pi-code';
+  if (f.endsWith('.json')) return 'pi pi-list';
+  if (f.endsWith('.md')) return 'pi pi-book';
+  if (f.endsWith('.css')) return 'pi pi-palette';
+  if (f.endsWith('.html')) return 'pi pi-globe';
+  return 'pi pi-file';
 }
 
 function addTerminal(type: 'stdout' | 'stderr', text: string) {
@@ -537,6 +550,10 @@ onMounted(async () => {
     if (payload?.code === 0) {
       toast.add({ severity: 'success', summary: 'All tests passed', life: 2500 });
       await refreshCompletedFlag();
+      // Refresh sidebar tree to reflect completed badge
+      try {
+        await course.loadTree(slug.value);
+      } catch {}
     } else {
       toast.add({ severity: 'error', summary: 'Tests failed', life: 3500 });
     }

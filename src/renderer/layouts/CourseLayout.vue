@@ -44,9 +44,16 @@
             @node-expand="onNodeExpand"
           >
             <template #default="slotProps">
-              <span :style="{ fontWeight: slotProps.node.children ? 'bold' : 'normal' }">
-                {{ slotProps.node.label }}
-              </span>
+              <div class="flex items-center gap-2 w-full">
+                <span :style="{ fontWeight: slotProps.node.children ? 'bold' : 'normal' }">
+                  {{ slotProps.node.label }}
+                </span>
+                <i
+                  v-if="!slotProps.node.children && slotProps.node.completed"
+                  class="ml-auto text-green-500 pi pi-check-circle"
+                  :title="'Completed'"
+                />
+              </div>
             </template>
           </Tree>
         </div>
@@ -65,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCourseStore } from '../stores';
 import { useToast } from 'primevue/usetoast';
@@ -83,6 +90,7 @@ const nodes = computed(() => course.nodes);
 
 const selectedKeys = ref<Record<string, boolean>>({});
 const expandedKeys = ref<Record<string, boolean>>({});
+const lastSelectedKey = ref<string>('');
 
 const updateAvailable = ref(false);
 const syncing = ref(false);
@@ -132,9 +140,19 @@ async function syncRepo() {
 }
 
 function onSelectionUpdate(keys: Record<string, boolean>) {
-  selectedKeys.value = keys;
+  // Prevent clearing selection once something was selected at least once
   const key = Object.keys(keys).find((k) => keys[k]);
+  if (!key && lastSelectedKey.value) {
+    // restore previous
+    nextTick(() => {
+      selectedKeys.value = { [lastSelectedKey.value]: true };
+    });
+    return;
+  }
+
+  selectedKeys.value = keys;
   if (key) {
+    lastSelectedKey.value = key;
     course.setExercise(key);
     router.push({ name: 'course', params: { slug: slug.value }, query: { exercise: key } });
   }
@@ -153,7 +171,13 @@ watch(
     }
     // if we navigated with exercise in query, reflect it into selection
     const q = (route.query.exercise as string) || '';
-    if (q) selectedKeys.value = { [q]: true };
+    if (q) {
+      selectedKeys.value = { [q]: true };
+      lastSelectedKey.value = q;
+    } else {
+      selectedKeys.value = {};
+      lastSelectedKey.value = '';
+    }
   },
   { immediate: true }
 );

@@ -54,35 +54,48 @@ function isNumericPrefixed(name: string) {
 }
 
 function labelFromSegment(seg: string) {
-  // Strip leading number parts and underscores up to first non-number token
-  // E.g., '1_overview' -> 'overview', '1_2_arrays' -> 'arrays'
+  // Strip leading numeric parts (e.g., 1_ or 1_2_) and convert remaining to Title Case
   const parts = seg.split('_');
   while (parts.length && /^\d+$/.test(parts[0]!)) parts.shift();
-  const label = parts.join(' ');
-  // Fallback to original if empty
-  return label || seg;
+  const titled = parts
+    .filter((p) => p.length > 0)
+    .map((p) =>
+      p
+        .split('-')
+        .map((q) => (q ? q.charAt(0).toUpperCase() + q.slice(1) : q))
+        .join(' ')
+    )
+    .join(' ');
+  return titled || seg;
 }
 
-function buildTree(rootAbs: string, rel: string = ''): CourseTreeNode[] {
+async function buildTreeWithCompletion(
+  slug: string,
+  rootAbs: string,
+  rel: string = ''
+): Promise<CourseTreeNode[]> {
   const full = path.join(rootAbs, rel);
   const entries = readdirSync(full, { withFileTypes: true });
-  // Keep only directories
   const dirs = entries.filter((e) => e.isDirectory());
-  // Filter by numeric-prefixed pattern
   const filtered = dirs.filter((d) => isNumericPrefixed(d.name));
-  // Sort using natural order by numbers then by name to preserve repo order if already numbered
   filtered.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  return filtered.map((dirent): CourseTreeNode => {
+
+  const nodes: CourseTreeNode[] = [];
+  for (const dirent of filtered) {
     const name = dirent.name;
     const childRel = rel ? path.posix.join(rel, name) : name;
-    const children: CourseTreeNode[] = buildTree(rootAbs, childRel);
-    return {
+    const children = await buildTreeWithCompletion(slug, rootAbs, childRel);
+    const node: CourseTreeNode = {
       key: childRel,
       label: labelFromSegment(name),
       path: childRel,
+      // Leaf nodes represent exercises; mark completion
+      ...(children.length === 0 ? { completed: await isExerciseCompleted(slug, childRel) } : {}),
       children: children.length ? children : undefined,
     };
-  });
+    nodes.push(node);
+  }
+  return nodes;
 }
 
 function resolveRepoExerciseRoot(slug: string, exercisePath: string) {
@@ -300,7 +313,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
   async 'git-course:list-tree'(_win, { slug }) {
     const root = path.join(getCoursesRoot(), slug);
     if (!existsSync(root)) throw new Error('Course not found.');
-    return buildTree(root);
+    return await buildTreeWithCompletion(slug, root);
   },
 
   // Course file/exercise operations (use workspace)

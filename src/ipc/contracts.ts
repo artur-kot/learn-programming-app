@@ -4,6 +4,7 @@ export type CourseTreeNode = {
   key: string; // unique key (e.g., relative path)
   label: string; // human readable title
   path: string; // relative path from course root
+  completed?: boolean; // whether this exercise (leaf) is completed locally
   children?: CourseTreeNode[];
 };
 
