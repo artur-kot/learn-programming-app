@@ -89,12 +89,11 @@
           <div
             class="h-full overflow-hidden border rounded-lg border-surface-200 dark:border-surface-700"
           >
-            <MonacoEditor
+            <CodeEditor
               v-if="selectedFile"
               class="h-full"
               :value="editorValue"
               :language="languageFor(selectedFile)"
-              theme="vs-dark"
               :options="{ automaticLayout: true, fontSize: 14, minimap: { enabled: false } }"
               @change="onEditorChange"
             />
@@ -164,7 +163,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useCourseStore } from '~/renderer/stores';
 import { useToast } from 'primevue/usetoast';
 import { marked } from 'marked';
-import MonacoEditor from '@guolao/vue-monaco-editor';
+import CodeEditor from '~/renderer/components/CodeEditor.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -479,12 +478,13 @@ function selectFile(f: string) {
   loadFileContent(f);
 }
 
-function onEditorChange(val: string) {
-  editorValue.value = val;
+function onEditorChange(val?: string) {
+  const value = val ?? '';
+  editorValue.value = value;
   if (selectedFile.value) {
     const buf = fileBuffers.value.get(selectedFile.value);
     if (buf) {
-      buf.value = val;
+      buf.value = value;
       originalContent.value = buf.original;
       markDirty(selectedFile.value, buf.value !== buf.original);
     }
