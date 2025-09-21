@@ -163,9 +163,23 @@ watch(
     } else {
       selectedKeys.value = {};
       lastSelectedKey.value = '';
+      course.setExercise('');
     }
   },
   { immediate: true }
+);
+
+// Also react to query changes while staying on the same slug route
+watch(
+  () => route.query.exercise,
+  (q) => {
+    const ex = (q as string) || '';
+    if (!ex) {
+      selectedKeys.value = {};
+      lastSelectedKey.value = '';
+      course.setExercise('');
+    }
+  }
 );
 
 onMounted(async () => {

@@ -9,7 +9,7 @@
           label="Save"
           icon="pi pi-save"
           :model="saveMenuItems"
-          :disabled="dirtyFiles.size === 0"
+          :disabled="dirtyCount === 0"
           severity="secondary"
           @click="save"
         />
@@ -146,7 +146,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch, computed, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useCourseStore } from '~/renderer/stores';
+import { useCourseStore, useEditorStore } from '~/renderer/stores';
 import { useToast } from 'primevue/usetoast';
 import { marked } from 'marked';
 import CodeEditor from '~/renderer/components/CodeEditor.vue';
@@ -156,6 +156,7 @@ const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const course = useCourseStore();
+const editor = useEditorStore();
 
 const slug = ref<string>(route.params.slug as string);
 const exercisePath = computed(() => (route.query.exercise as string) || '');
@@ -164,9 +165,11 @@ const busy = ref(false);
 
 const files = ref<string[]>([]);
 const selectedFile = computed(() => (route.query.file as string) || '');
+const currentFile = ref('');
+const dirtyCount = computed(() => editor.dirtyFiles.size);
+
 const editorValue = ref('');
 const originalContent = ref<string>('');
-const dirtyFiles = ref<Set<string>>(new Set());
 const terminal = ref<{ type: 'stdout' | 'stderr'; text: string }[]>([]);
 const markdownHtml = ref<string>('');
 const markdownBaseDir = ref<string>('');
@@ -192,7 +195,7 @@ const saveMenuItems = computed(() => [
     label: 'Save All',
     icon: 'pi pi-copy',
     command: () => saveAll(),
-    disabled: dirtyFiles.value.size === 0,
+    disabled: dirtyCount.value === 0,
   },
 ]);
 
@@ -229,10 +232,7 @@ function clearTerminal() {
 }
 
 function markDirty(file: string, isDirty: boolean) {
-  const next = new Set(dirtyFiles.value);
-  if (isDirty) next.add(file);
-  else next.delete(file);
-  dirtyFiles.value = next;
+  editor.markDirty(file, isDirty);
 }
 
 async function refreshCompletedFlag() {
@@ -279,6 +279,7 @@ async function loadFiles() {
 }
 
 async function loadFileContent(f: string) {
+  if (!f || f === currentFile.value) return;
   const buf = fileBuffers.value.get(f);
   if (buf) {
     router.replace({
@@ -288,6 +289,7 @@ async function loadFileContent(f: string) {
     });
     editorValue.value = buf.value;
     originalContent.value = buf.original;
+    currentFile.value = f;
     return;
   }
   const { content } = await window.electronAPI.courseReadFile({
@@ -303,6 +305,7 @@ async function loadFileContent(f: string) {
   editorValue.value = content;
   originalContent.value = content;
   fileBuffers.value.set(f, { value: content, original: content });
+  currentFile.value = f;
 }
 
 async function loadMarkdown() {
@@ -349,9 +352,9 @@ async function save() {
 }
 
 async function saveAll() {
-  if (dirtyFiles.value.size === 0) return;
+  if (dirtyCount.value === 0) return;
   const writes: Promise<any>[] = [];
-  for (const f of dirtyFiles.value) {
+  for (const f of editor.dirtyFiles) {
     const buf = fileBuffers.value.get(f);
     if (!buf) continue;
     writes.push(
@@ -364,18 +367,17 @@ async function saveAll() {
     );
   }
   await Promise.all(writes);
-  for (const f of Array.from(dirtyFiles.value)) {
+  for (const f of Array.from(editor.dirtyFiles)) {
     const buf = fileBuffers.value.get(f);
     if (buf) buf.original = buf.value;
   }
-  dirtyFiles.value = new Set();
+  editor.clearDirty();
 }
 
 async function run() {
   clearTerminal();
   await window.electronAPI.courseRun({ slug: slug.value, exercisePath: exercisePath.value });
 }
-
 async function test() {
   clearTerminal();
   await window.electronAPI.courseTest({ slug: slug.value, exercisePath: exercisePath.value });
@@ -388,7 +390,7 @@ async function doReset() {
   confirmResetVisible.value = false;
   try {
     await window.electronAPI.courseReset({ slug: slug.value, exercisePath: exercisePath.value });
-    dirtyFiles.value = new Set();
+    editor.clearDirty();
     fileBuffers.value.clear();
     await loadFiles();
   } catch (e: any) {
@@ -407,7 +409,7 @@ async function applySolution() {
       slug: slug.value,
       exercisePath: exercisePath.value,
     });
-    dirtyFiles.value = new Set();
+    editor.clearDirty();
     fileBuffers.value.clear();
     await loadFiles();
     toast.add({ severity: 'success', summary: 'Solution applied', life: 2000 });
@@ -430,14 +432,13 @@ async function doApplySolution() {
 }
 
 function onExportClicked() {
-  if (dirtyFiles.value.size > 0) {
+  if (dirtyCount.value > 0) {
     pendingExport = true;
     confirmExportVisible.value = true;
   } else {
     doExport();
   }
 }
-
 async function confirmExport() {
   confirmExportVisible.value = false;
   if (pendingExport) {
@@ -473,12 +474,21 @@ function toggleMoreMenu(event: MouseEvent) {
 watch(
   () => exercisePath.value,
   async () => {
-    dirtyFiles.value = new Set();
+    editor.clearDirty();
     fileBuffers.value.clear();
     editorValue.value = '';
     originalContent.value = '';
+    currentFile.value = '';
     await loadFiles();
     await refreshCompletedFlag();
+  }
+);
+
+// React to file param changes
+watch(
+  () => selectedFile.value,
+  async (f) => {
+    if (f) await loadFileContent(f);
   }
 );
 
@@ -515,6 +525,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  // no-op for now
+  /* no-op */
 });
 </script>
