@@ -3,7 +3,7 @@ import path from 'node:path';
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { mkdir, rm, cp } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { app } from 'electron';
+import { app, dialog } from 'electron';
 import { createEmitter } from '../../register-handlers.js';
 import type { CourseTreeNode } from '../../contracts.js';
 import { courseSlugToRepoUrl } from './course-repos.js';
@@ -520,5 +520,36 @@ export const gitCourseHandlers: IpcHandlersDef = {
   async 'course:apply-solution'(_win, { slug, exercisePath }) {
     await applySolutionToWorkspace(slug, exercisePath);
     return { ok: true as const };
+  },
+
+  async 'course:export-workspace'(win, { slug, exercisePath }) {
+    await ensureExerciseWorkspace(slug, exercisePath);
+    const srcRoot = resolveExerciseWorkspaceRoot(slug, exercisePath);
+
+    // Show folder picker
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Select destination folder',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (res.canceled || res.filePaths.length === 0) {
+      return { canceled: true as const };
+    }
+    const destRoot = res.filePaths[0]!;
+
+    // Copy only visible exercise files (exclude _meta)
+    const entries = readdirSync(srcRoot, { withFileTypes: true });
+    for (const e of entries) {
+      if (e.isFile() && !e.name.startsWith('_')) {
+        const from = path.join(srcRoot, e.name);
+        const to = path.join(destRoot, e.name);
+        try {
+          writeFileSync(to, readFileSync(from));
+        } catch (err) {
+          throw new Error(`Failed to export ${e.name}: ${String(err)}`);
+        }
+      }
+    }
+
+    return { exportedTo: destRoot } as const;
   },
 };

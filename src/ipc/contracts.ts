@@ -141,6 +141,16 @@ export interface IpcInvoke {
     ];
     result: { ok: true };
   };
+  // Export current exercise workspace to a user-selected folder
+  'course:export-workspace': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string;
+      },
+    ];
+    result: { exportedTo?: string; canceled?: boolean };
+  };
 }
 
 // Fire-and-forget messages from renderer to main (ipcRenderer.send / ipcMain.on)

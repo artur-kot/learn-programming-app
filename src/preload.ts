@@ -39,4 +39,6 @@ exposeBridge({
     bridge.invoke('course:reset', payload),
   courseApplySolution: (payload: { slug: string; exercisePath: string }) =>
     bridge.invoke('course:apply-solution', payload),
+  courseExportWorkspace: (payload: { slug: string; exercisePath: string }) =>
+    bridge.invoke('course:export-workspace', payload),
 });

@@ -66,7 +66,7 @@
             class="text-green-500 pi pi-check-circle"
             :title="'Exercise completed'"
           />
-          <!-- More (Solution, Reset) -->
+          <!-- More (Solution, Reset, Export) -->
           <Button
             size="small"
             text
@@ -135,6 +135,43 @@
         </template>
       </Dialog>
 
+      <!-- Confirm Apply Solution Modal -->
+      <Dialog
+        v-model:visible="confirmSolutionVisible"
+        modal
+        header="Apply solution?"
+        :style="{ width: '28rem' }"
+      >
+        <div class="text-surface-700 dark:text-surface-200">
+          This will replace your current files with the official solution for this exercise.
+          Continue?
+        </div>
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <Button label="Cancel" text @click="confirmSolutionVisible = false" />
+            <Button label="Apply" severity="warn" @click="doApplySolution" />
+          </div>
+        </template>
+      </Dialog>
+
+      <!-- Confirm Export with Unsaved Changes Modal -->
+      <Dialog
+        v-model:visible="confirmExportVisible"
+        modal
+        header="Unsaved changes"
+        :style="{ width: '28rem' }"
+      >
+        <div class="text-surface-700 dark:text-surface-200">
+          You have unsaved changes. Save all files before exporting?
+        </div>
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <Button label="Cancel" text @click="cancelExport" />
+            <Button label="Save All & Continue" severity="primary" @click="confirmExport" />
+          </div>
+        </template>
+      </Dialog>
+
       <!-- Terminal Emulator -->
       <div
         class="border rounded-lg bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700"
@@ -164,6 +201,7 @@ import { useCourseStore } from '~/renderer/stores';
 import { useToast } from 'primevue/usetoast';
 import { marked } from 'marked';
 import CodeEditor from '~/renderer/components/CodeEditor.vue';
+import { EXT_ICON_MAP } from '~/renderer/constants/fileIcons.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -185,7 +223,10 @@ const terminal = ref<{ type: 'stdout' | 'stderr'; text: string }[]>([]);
 const markdownHtml = ref<string>('');
 const markdownBaseDir = ref<string>('');
 const confirmResetVisible = ref(false);
+const confirmSolutionVisible = ref(false);
+const confirmExportVisible = ref(false);
 const completed = ref(false);
+let pendingExport = false;
 
 // Per-file buffers to support Save All
 const fileBuffers = ref(new Map<string, { value: string; original: string }>());
@@ -193,8 +234,10 @@ const fileBuffers = ref(new Map<string, { value: string; original: string }>());
 // Menus
 const moreMenu = ref();
 const moreMenuItems = computed(() => [
-  { label: 'Solution', icon: 'pi pi-lightbulb', command: () => applySolution() },
+  { label: 'Solution', icon: 'pi pi-lightbulb', command: () => askApplySolution() },
   { label: 'Reset', icon: 'pi pi-undo', command: () => askReset() },
+  { separator: true },
+  { label: 'Export', icon: 'pi pi-upload', command: () => onExportClicked() },
 ]);
 
 const saveMenuItems = computed(() => [
@@ -237,109 +280,9 @@ function languageFor(f: string) {
 }
 
 // Optimized icon resolver using maps with Devicon where available and PrimeIcons as fallback
-const EXT_ICON_MAP: Record<string, string> = {
-  // languages
-  ts: 'devicon-typescript-plain',
-  tsx: 'devicon-react-original',
-  js: 'devicon-javascript-plain',
-  jsx: 'devicon-react-original',
-  mjs: 'devicon-javascript-plain',
-  cjs: 'devicon-javascript-plain',
-  json: 'pi pi-list',
-  md: 'pi pi-book',
-  markdown: 'pi pi-book',
-  html: 'devicon-html5-plain',
-  htm: 'devicon-html5-plain',
-  css: 'devicon-css3-plain',
-  scss: 'devicon-sass-plain',
-  sass: 'devicon-sass-plain',
-  less: 'devicon-less-plain-wordmark',
-  vue: 'devicon-vuejs-plain',
-  svelte: 'devicon-svelte-plain',
-  astro: 'devicon-astro-plain',
-  pug: 'pi pi-code',
-  ejs: 'pi pi-code',
+// Moved EXT_ICON_MAP to ~/renderer/constants/fileIcons
 
-  // node and config
-  yaml: 'pi pi-sliders-h',
-  yml: 'pi pi-sliders-h',
-  env: 'pi pi-sliders-h',
-  lock: 'pi pi-lock',
-  toml: 'pi pi-sliders-h',
-  ini: 'pi pi-sliders-h',
-  conf: 'pi pi-sliders-h',
-
-  // scripts & data
-  sh: 'devicon-bash-plain',
-  bash: 'devicon-bash-plain',
-  ps1: 'pi pi-terminal',
-  csv: 'pi pi-table',
-  txt: 'pi pi-file',
-  log: 'pi pi-align-left',
-
-  // images
-  png: 'pi pi-image',
-  jpg: 'pi pi-image',
-  jpeg: 'pi pi-image',
-  gif: 'pi pi-image',
-  svg: 'pi pi-image',
-  webp: 'pi pi-image',
-  ico: 'pi pi-image',
-
-  // archives
-  zip: 'pi pi-box',
-  tar: 'pi pi-box',
-  gz: 'pi pi-box',
-  tgz: 'pi pi-box',
-  rar: 'pi pi-box',
-
-  // code
-  py: 'devicon-python-plain',
-  java: 'devicon-java-plain',
-  kt: 'devicon-kotlin-plain',
-  rs: 'devicon-rust-plain',
-  go: 'devicon-go-plain',
-  rb: 'devicon-ruby-plain',
-  php: 'devicon-php-plain',
-  cs: 'devicon-csharp-plain',
-  cpp: 'devicon-cplusplus-plain',
-  cxx: 'devicon-cplusplus-plain',
-  cc: 'devicon-cplusplus-plain',
-  c: 'devicon-c-plain',
-  swift: 'devicon-swift-plain',
-  dart: 'devicon-dart-plain',
-  scala: 'devicon-scala-plain',
-  r: 'devicon-r-plain',
-  hs: 'devicon-haskell-plain',
-  lua: 'devicon-lua-plain',
-  ml: 'pi pi-code',
-  ex: 'devicon-elixir-plain',
-  exs: 'devicon-elixir-plain',
-
-  // web frameworks
-  nuxt: 'devicon-nuxtjs-plain',
-  next: 'devicon-nextjs-original',
-  nest: 'devicon-nestjs-plain',
-  angular: 'devicon-angularjs-plain',
-  react: 'devicon-react-original',
-  solid: 'pi pi-code',
-
-  // database
-  sql: 'devicon-mysql-plain',
-  sqlite: 'devicon-sqlite-plain',
-  prisma: 'devicon-prisma-original',
-  mongo: 'devicon-mongodb-plain',
-  bson: 'devicon-mongodb-plain',
-  yml_dist: 'pi pi-copy',
-
-  // docker
-  dockerfile: 'devicon-docker-plain',
-  docker: 'devicon-docker-plain',
-
-  // other
-  pdf: 'pi pi-file-pdf',
-};
-
+// Remove erroneous duplicate map; keep only basename-specific icons
 const BASENAME_ICON_MAP: Record<string, string> = {
   // dotfiles
   '.gitignore': 'devicon-git-plain',
@@ -601,6 +544,50 @@ async function applySolution() {
       detail: e?.message ?? String(e),
       life: 4000,
     });
+  }
+}
+
+function askApplySolution() {
+  confirmSolutionVisible.value = true;
+}
+async function doApplySolution() {
+  confirmSolutionVisible.value = false;
+  await applySolution();
+}
+
+function onExportClicked() {
+  if (dirtyFiles.value.size > 0) {
+    pendingExport = true;
+    confirmExportVisible.value = true;
+  } else {
+    doExport();
+  }
+}
+
+async function confirmExport() {
+  confirmExportVisible.value = false;
+  if (pendingExport) {
+    await saveAll();
+    await doExport();
+    pendingExport = false;
+  }
+}
+function cancelExport() {
+  pendingExport = false;
+  confirmExportVisible.value = false;
+}
+
+async function doExport() {
+  try {
+    const res = await window.electronAPI.courseExportWorkspace({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+    });
+    if (!res.canceled && res.exportedTo) {
+      toast.add({ severity: 'success', summary: 'Exported', detail: `Saved to ${res.exportedTo}` });
+    }
+  } catch (e: any) {
+    toast.add({ severity: 'error', summary: 'Export failed', detail: e?.message ?? String(e) });
   }
 }
 

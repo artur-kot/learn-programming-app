@@ -72,6 +72,10 @@ declare global {
         slug: string;
         exercisePath: string;
       }) => Promise<{ ok: true }>;
+      courseExportWorkspace: (payload: {
+        slug: string;
+        exercisePath: string;
+      }) => Promise<{ exportedTo?: string; canceled?: boolean }>;
     };
   }
 }
