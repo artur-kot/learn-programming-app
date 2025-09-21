@@ -162,11 +162,11 @@
         :style="{ width: '28rem' }"
       >
         <div class="text-surface-700 dark:text-surface-200">
-          You have unsaved changes. Save all files before exporting?
+          You have unsaved changes. Save all files before exporting.
         </div>
         <template #footer>
           <div class="flex justify-end gap-2">
-            <Button label="Cancel" text @click="cancelExport" />
+            <Button label="OK" text @click="cancelExport" />
             <Button label="Save All & Continue" severity="primary" @click="confirmExport" />
           </div>
         </template>
