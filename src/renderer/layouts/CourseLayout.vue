@@ -32,30 +32,14 @@
             </div>
           </div>
 
-          <Tree
-            :value="nodes"
-            selectionMode="single"
-            :filter="true"
-            filterMode="lenient"
-            v-model:selectionKeys="selectedKeys"
+          <!-- Custom Exercise Tree -->
+          <ExerciseTree
+            :nodes="nodes"
+            :selectionKeys="selectedKeys"
             :expandedKeys="expandedKeys"
-            :expandOnClick="false"
             @update:selectionKeys="onSelectionUpdate"
             @node-expand="onNodeExpand"
-          >
-            <template #default="slotProps">
-              <div class="flex items-center gap-2 w-full">
-                <span :style="{ fontWeight: slotProps.node.children ? 'bold' : 'normal' }">
-                  {{ slotProps.node.label }}
-                </span>
-                <i
-                  v-if="!slotProps.node.children && slotProps.node.completed"
-                  class="ml-auto text-green-500 pi pi-check-circle"
-                  :title="'Completed'"
-                />
-              </div>
-            </template>
-          </Tree>
+          />
         </div>
       </div>
     </aside>
@@ -76,6 +60,7 @@ import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCourseStore } from '../stores';
 import { useToast } from 'primevue/usetoast';
+import ExerciseTree from '../components/ExerciseTree.vue';
 
 const route = useRoute();
 const router = useRouter();

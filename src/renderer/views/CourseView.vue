@@ -36,25 +36,26 @@
           />
 
           <div class="flex items-center gap-2 overflow-x-auto">
-            <div
-              v-for="f in files"
-              :key="f"
-              class="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer whitespace-nowrap"
-              :class="
-                selectedFile === f
-                  ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-200'
-                  : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-200'
-              "
-              @click="selectFile(f)"
-            >
-              <i :class="fileIconClass(f)" class="text-xs" />
-              <span>{{ f }}</span>
-              <i
-                v-if="dirtyFiles.has(f)"
-                class="ml-2 text-xs pi pi-circle-fill"
-                :title="'Unsaved changes'"
-              />
-            </div>
+            <Tabs :value="selectedFile" class="min-w-max">
+              <TabList>
+                <Tab
+                  severity="secondary"
+                  v-for="f in files"
+                  :key="f"
+                  :value="f"
+                  class="flex items-center gap-2 px-3 py-2 cursor-pointer whitespace-nowrap"
+                  @click="selectFile(f)"
+                >
+                  <i :class="fileIconClass(f)" class="text-xs" />
+                  <span>{{ f }}</span>
+                  <i
+                    v-if="dirtyFiles.has(f)"
+                    class="ml-2 text-xs pi pi-circle-fill"
+                    :title="'Unsaved changes'"
+                  />
+                </Tab>
+              </TabList>
+            </Tabs>
           </div>
         </div>
 
