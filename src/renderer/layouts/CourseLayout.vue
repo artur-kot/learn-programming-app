@@ -139,7 +139,8 @@ function onSelectionUpdate(keys: Record<string, boolean>) {
   if (key) {
     lastSelectedKey.value = key;
     course.setExercise(key);
-    router.push({ name: 'course', params: { slug: slug.value }, query: { exercise: key } });
+    // Navigate to dedicated Exercise route
+    router.push({ name: 'exercise', params: { slug: slug.value }, query: { exercise: key } });
   }
 }
 

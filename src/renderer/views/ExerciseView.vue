@@ -1,0 +1,520 @@
+<template>
+  <div class="flex flex-col h-screen min-h-0 gap-3">
+    <!-- Top bar with actions only -->
+    <div class="flex items-center justify-between gap-3">
+      <!-- Left: Save split button -->
+      <div class="flex items-center min-w-0 gap-2">
+        <SplitButton
+          size="small"
+          label="Save"
+          icon="pi pi-save"
+          :model="saveMenuItems"
+          :disabled="dirtyFiles.size === 0"
+          severity="secondary"
+          @click="save"
+        />
+      </div>
+
+      <!-- Right: actions -->
+      <div class="flex items-center gap-2">
+        <i
+          v-if="completed"
+          class="text-green-500 pi pi-check-circle"
+          :title="'Exercise completed'"
+        />
+        <Button
+          size="small"
+          text
+          rounded
+          icon="pi pi-ellipsis-v"
+          aria-label="More"
+          @click="toggleMoreMenu"
+        />
+        <Menu ref="moreMenu" :model="moreMenuItems" :popup="true" />
+        <Button size="small" label="Run" icon="pi pi-play" severity="contrast" @click="run" />
+        <Button size="small" label="Check" icon="pi pi-check" severity="success" @click="test" />
+      </div>
+    </div>
+
+    <!-- Editor + Description -->
+    <div class="grid flex-1 min-h-0 grid-cols-12 gap-3">
+      <div class="min-h-0 col-span-12 xl:col-span-7 2xl:col-span-8">
+        <div
+          class="h-full overflow-hidden border rounded-lg border-surface-200 dark:border-surface-700"
+        >
+          <CodeEditor
+            v-if="selectedFile"
+            class="h-full"
+            :value="editorValue"
+            :language="languageFor(selectedFile)"
+            :options="{ automaticLayout: true, fontSize: 14, minimap: { enabled: false } }"
+            @change="onEditorChange"
+          />
+          <div
+            v-else
+            class="flex items-center justify-center h-full text-surface-500 dark:text-surface-400"
+          >
+            Select a file from Explorer to start editing
+          </div>
+        </div>
+      </div>
+      <div class="col-span-12 xl:col-span-5 2xl:col-span-4">
+        <div
+          class="h-full p-4 overflow-auto border rounded-lg bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700"
+        >
+          <div v-if="markdownHtml" v-html="markdownHtml" class="markdown max-w-none"></div>
+          <div v-else class="text-surface-500 dark:text-surface-400">No description provided.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Reset Modal -->
+    <Dialog
+      v-model:visible="confirmResetVisible"
+      modal
+      header="Reset exercise?"
+      :style="{ width: '28rem' }"
+    >
+      <div class="text-surface-700 dark:text-surface-200">
+        This will discard all your changes in this exercise and restore initial files. Continue?
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button label="Cancel" text @click="confirmResetVisible = false" />
+          <Button label="Reset" severity="danger" @click="doReset" />
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Confirm Apply Solution Modal -->
+    <Dialog
+      v-model:visible="confirmSolutionVisible"
+      modal
+      header="Apply solution?"
+      :style="{ width: '28rem' }"
+    >
+      <div class="text-surface-700 dark:text-surface-200">
+        This will replace your current files with the official solution for this exercise. Continue?
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button label="Cancel" text @click="confirmSolutionVisible = false" />
+          <Button label="Apply" severity="warn" @click="doApplySolution" />
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Confirm Export with Unsaved Changes Modal -->
+    <Dialog
+      v-model:visible="confirmExportVisible"
+      modal
+      header="Unsaved changes"
+      :style="{ width: '28rem' }"
+    >
+      <div class="text-surface-700 dark:text-surface-200">
+        You have unsaved changes. Save all files before exporting.
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button label="OK" text @click="cancelExport" />
+          <Button label="Save All & Continue" severity="primary" @click="confirmExport" />
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Terminal Emulator -->
+    <div
+      class="border rounded-lg bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700"
+    >
+      <div
+        class="flex items-center justify-between px-3 py-2 border-b border-surface-200 dark:border-surface-700"
+      >
+        <div class="font-medium text-surface-700 dark:text-surface-200">Terminal</div>
+        <div class="flex items-center gap-2">
+          <Button size="small" icon="pi pi-trash" text rounded @click="clearTerminal" />
+        </div>
+      </div>
+      <div class="h-40 p-3 overflow-auto font-mono text-sm">
+        <pre
+          class="m-0 whitespace-pre-wrap"
+        ><span v-for="(line, idx) in terminal" :key="idx" :class="line.type === 'stderr' ? 'text-red-500' : 'text-surface-800 dark:text-surface-200'">{{ line.text }}</span></pre>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted, ref, watch, computed, onUnmounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useCourseStore } from '~/renderer/stores';
+import { useToast } from 'primevue/usetoast';
+import { marked } from 'marked';
+import CodeEditor from '~/renderer/components/CodeEditor.vue';
+import { EXT_ICON_MAP } from '~/renderer/constants/fileIcons.js';
+
+const route = useRoute();
+const router = useRouter();
+const toast = useToast();
+const course = useCourseStore();
+
+const slug = ref<string>(route.params.slug as string);
+const exercisePath = computed(() => (route.query.exercise as string) || '');
+const hasCourse = ref<boolean | null>(null);
+const busy = ref(false);
+
+const files = ref<string[]>([]);
+const selectedFile = computed(() => (route.query.file as string) || '');
+const editorValue = ref('');
+const originalContent = ref<string>('');
+const dirtyFiles = ref<Set<string>>(new Set());
+const terminal = ref<{ type: 'stdout' | 'stderr'; text: string }[]>([]);
+const markdownHtml = ref<string>('');
+const markdownBaseDir = ref<string>('');
+const confirmResetVisible = ref(false);
+const confirmSolutionVisible = ref(false);
+const confirmExportVisible = ref(false);
+const completed = ref(false);
+let pendingExport = false;
+
+// Per-file buffers to support Save All
+const fileBuffers = ref(new Map<string, { value: string; original: string }>());
+
+const moreMenu = ref();
+const moreMenuItems = computed(() => [
+  { label: 'Solution', icon: 'pi pi-lightbulb', command: () => askApplySolution() },
+  { label: 'Reset', icon: 'pi pi-undo', command: () => askReset() },
+  { separator: true },
+  { label: 'Export', icon: 'pi pi-upload', command: () => onExportClicked() },
+]);
+
+const saveMenuItems = computed(() => [
+  {
+    label: 'Save All',
+    icon: 'pi pi-copy',
+    command: () => saveAll(),
+    disabled: dirtyFiles.value.size === 0,
+  },
+]);
+
+function languageFor(f: string) {
+  if (f.endsWith('.ts')) return 'typescript';
+  if (f.endsWith('.js')) return 'javascript';
+  if (f.endsWith('.json')) return 'json';
+  if (f.endsWith('.md')) return 'markdown';
+  if (f.endsWith('.css')) return 'css';
+  if (f.endsWith('.html')) return 'html';
+  return 'plaintext';
+}
+
+function fileIconClass(f: string) {
+  const name = f.split('/').pop() || f;
+  const lastDot = name.lastIndexOf('.');
+  const ext = lastDot >= 0 ? name.slice(lastDot + 1).toLowerCase() : '';
+  const parts = name.toLowerCase().split('.');
+  if (parts.length > 2) {
+    const lastTwo = parts.slice(-2).join('.');
+    if ((EXT_ICON_MAP as any)[lastTwo]) return (EXT_ICON_MAP as any)[lastTwo];
+  }
+  if ((EXT_ICON_MAP as any)[ext]) return (EXT_ICON_MAP as any)[ext];
+  if (/test|spec|\.test\.|\.spec\./i.test(name)) return 'pi pi-check-square';
+  if (/config|rc|\.config\./i.test(name)) return 'pi pi-sliders-h';
+  return 'pi pi-file';
+}
+
+function addTerminal(type: 'stdout' | 'stderr', text: string) {
+  terminal.value.push({ type, text });
+}
+function clearTerminal() {
+  terminal.value = [];
+}
+
+function markDirty(file: string, isDirty: boolean) {
+  const next = new Set(dirtyFiles.value);
+  if (isDirty) next.add(file);
+  else next.delete(file);
+  dirtyFiles.value = next;
+}
+
+async function refreshCompletedFlag() {
+  if (!exercisePath.value) {
+    completed.value = false;
+    return;
+  }
+  try {
+    const { completed: c } = await window.electronAPI.courseIsCompleted({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+    });
+    completed.value = !!c;
+  } catch {
+    completed.value = false;
+  }
+}
+
+async function loadFiles() {
+  if (!exercisePath.value) return;
+  try {
+    const { files: list } = await window.electronAPI.courseListFiles({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+    });
+    files.value = list;
+    if (!selectedFile.value || !list.includes(selectedFile.value)) {
+      if (list.length) selectFile(list[0]!);
+      else {
+        router.replace({
+          name: 'exercise',
+          params: { slug: slug.value },
+          query: { exercise: exercisePath.value },
+        });
+      }
+    } else {
+      await loadFileContent(selectedFile.value);
+    }
+    await loadMarkdown();
+    await refreshCompletedFlag();
+  } catch {
+    files.value = [];
+  }
+}
+
+async function loadFileContent(f: string) {
+  const buf = fileBuffers.value.get(f);
+  if (buf) {
+    router.replace({
+      name: 'exercise',
+      params: { slug: slug.value },
+      query: { exercise: exercisePath.value, file: f },
+    });
+    editorValue.value = buf.value;
+    originalContent.value = buf.original;
+    return;
+  }
+  const { content } = await window.electronAPI.courseReadFile({
+    slug: slug.value,
+    exercisePath: exercisePath.value,
+    file: f,
+  });
+  router.replace({
+    name: 'exercise',
+    params: { slug: slug.value },
+    query: { exercise: exercisePath.value, file: f },
+  });
+  editorValue.value = content;
+  originalContent.value = content;
+  fileBuffers.value.set(f, { value: content, original: content });
+}
+
+async function loadMarkdown() {
+  const { markdown, baseDir } = await window.electronAPI.courseReadMarkdown({
+    slug: slug.value,
+    exercisePath: exercisePath.value,
+  });
+  markdownBaseDir.value = baseDir || '';
+  const base = markdownBaseDir.value ? `file://${markdownBaseDir.value.replace(/\\/g, '/')}/` : '';
+  const html = await (marked as any).parse(markdown || '', { baseUrl: base } as any);
+  markdownHtml.value = typeof html === 'string' ? html : '';
+}
+
+function selectFile(f: string) {
+  loadFileContent(f);
+}
+
+function onEditorChange(val?: string) {
+  const value = val ?? '';
+  editorValue.value = value;
+  if (selectedFile.value) {
+    const buf = fileBuffers.value.get(selectedFile.value);
+    if (buf) {
+      buf.value = value;
+      originalContent.value = buf.original;
+      markDirty(selectedFile.value, buf.value !== buf.original);
+    }
+  }
+}
+
+async function save() {
+  if (!selectedFile.value) return;
+  const buf = fileBuffers.value.get(selectedFile.value);
+  if (!buf) return;
+  await window.electronAPI.courseWriteFile({
+    slug: slug.value,
+    exercisePath: exercisePath.value,
+    file: selectedFile.value,
+    content: buf.value,
+  });
+  buf.original = buf.value;
+  originalContent.value = editorValue.value;
+  markDirty(selectedFile.value, false);
+}
+
+async function saveAll() {
+  if (dirtyFiles.value.size === 0) return;
+  const writes: Promise<any>[] = [];
+  for (const f of dirtyFiles.value) {
+    const buf = fileBuffers.value.get(f);
+    if (!buf) continue;
+    writes.push(
+      window.electronAPI.courseWriteFile({
+        slug: slug.value,
+        exercisePath: exercisePath.value,
+        file: f,
+        content: buf.value,
+      })
+    );
+  }
+  await Promise.all(writes);
+  for (const f of Array.from(dirtyFiles.value)) {
+    const buf = fileBuffers.value.get(f);
+    if (buf) buf.original = buf.value;
+  }
+  dirtyFiles.value = new Set();
+}
+
+async function run() {
+  clearTerminal();
+  await window.electronAPI.courseRun({ slug: slug.value, exercisePath: exercisePath.value });
+}
+
+async function test() {
+  clearTerminal();
+  await window.electronAPI.courseTest({ slug: slug.value, exercisePath: exercisePath.value });
+}
+
+function askReset() {
+  confirmResetVisible.value = true;
+}
+async function doReset() {
+  confirmResetVisible.value = false;
+  try {
+    await window.electronAPI.courseReset({ slug: slug.value, exercisePath: exercisePath.value });
+    dirtyFiles.value = new Set();
+    fileBuffers.value.clear();
+    await loadFiles();
+  } catch (e: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Reset failed',
+      detail: e?.message ?? String(e),
+      life: 4000,
+    });
+  }
+}
+
+async function applySolution() {
+  try {
+    await window.electronAPI.courseApplySolution({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+    });
+    dirtyFiles.value = new Set();
+    fileBuffers.value.clear();
+    await loadFiles();
+    toast.add({ severity: 'success', summary: 'Solution applied', life: 2000 });
+  } catch (e: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'No solution',
+      detail: e?.message ?? String(e),
+      life: 4000,
+    });
+  }
+}
+
+function askApplySolution() {
+  confirmSolutionVisible.value = true;
+}
+async function doApplySolution() {
+  confirmSolutionVisible.value = false;
+  await applySolution();
+}
+
+function onExportClicked() {
+  if (dirtyFiles.value.size > 0) {
+    pendingExport = true;
+    confirmExportVisible.value = true;
+  } else {
+    doExport();
+  }
+}
+
+async function confirmExport() {
+  confirmExportVisible.value = false;
+  if (pendingExport) {
+    await saveAll();
+    await doExport();
+    pendingExport = false;
+  }
+}
+function cancelExport() {
+  pendingExport = false;
+  confirmExportVisible.value = false;
+}
+
+async function doExport() {
+  try {
+    const res = await window.electronAPI.courseExportWorkspace({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+    });
+    if (!res.canceled && res.exportedTo) {
+      toast.add({ severity: 'success', summary: 'Exported', detail: `Saved to ${res.exportedTo}` });
+    }
+  } catch (e: any) {
+    toast.add({ severity: 'error', summary: 'Export failed', detail: e?.message ?? String(e) });
+  }
+}
+
+function toggleMoreMenu(event: MouseEvent) {
+  (moreMenu.value as any)?.toggle(event);
+}
+
+// Respond when exercise changes
+watch(
+  () => exercisePath.value,
+  async () => {
+    dirtyFiles.value = new Set();
+    fileBuffers.value.clear();
+    editorValue.value = '';
+    originalContent.value = '';
+    await loadFiles();
+    await refreshCompletedFlag();
+  }
+);
+
+// Wire IPC log streams
+onMounted(async () => {
+  await loadFiles();
+  await refreshCompletedFlag();
+
+  const offRunLog = window.electronAPI.on?.('course:run-log' as any, (...args: any[]) => {
+    const payload = args[0];
+    addTerminal(payload.stream, payload.chunk);
+  });
+  const offTestLog = window.electronAPI.on?.('course:test-log' as any, (...args: any[]) => {
+    const payload = args[0];
+    addTerminal(payload.stream, payload.chunk);
+  });
+  const offRunDone = window.electronAPI.on?.('course:run-done' as any, (...args: any[]) => {
+    const payload = args[0];
+    if (payload?.code === 0) {
+      toast.add({ severity: 'success', summary: 'Run finished', life: 2000 });
+    } else {
+      toast.add({ severity: 'warn', summary: 'Run exited with errors', life: 3000 });
+    }
+  });
+  const offTestDone = window.electronAPI.on?.('course:test-done' as any, async (...args: any[]) => {
+    const payload = args[0];
+    if (payload?.code === 0) {
+      toast.add({ severity: 'success', summary: 'All tests passed', life: 2500 });
+      await refreshCompletedFlag();
+    } else {
+      toast.add({ severity: 'error', summary: 'Tests failed', life: 3500 });
+    }
+  });
+});
+
+onUnmounted(() => {
+  // no-op for now
+});
+</script>
