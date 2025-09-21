@@ -112,6 +112,15 @@ export interface IpcInvoke {
     ];
     result: { id: string };
   };
+  'course:is-completed': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string;
+      },
+    ];
+    result: { completed: boolean };
+  };
   // Manage working copy
   'course:reset': {
     args: [

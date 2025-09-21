@@ -7,6 +7,7 @@ import { app } from 'electron';
 import { createEmitter } from '../../register-handlers.js';
 import type { CourseTreeNode } from '../../contracts.js';
 import { courseSlugToRepoUrl } from './course-repos.js';
+import { markExerciseCompleted, isExerciseCompleted } from '../../../db/progress.js';
 
 function runGitStreaming(
   win: Electron.BrowserWindow,
@@ -462,15 +463,24 @@ export const gitCourseHandlers: IpcHandlersDef = {
         chunk: d.toString(),
       })
     );
-    child.on('close', (code) =>
+    child.on('close', async (code) => {
+      const success = (code ?? 0) === 0;
+      // Mark as completed in DB on success
+      if (success) {
+        try {
+          await markExerciseCompleted(slug, exercisePath);
+        } catch (e) {
+          // swallow DB errors to not break UX; logs can be added if needed
+        }
+      }
       emitter.emit('course:test-done', {
         id,
         slug,
         exercisePath,
-        success: (code ?? 0) === 0,
+        success,
         code: code ?? 0,
-      })
-    );
+      });
+    });
     child.on('error', (err) =>
       emitter.emit('course:test-done', {
         id,
@@ -483,6 +493,10 @@ export const gitCourseHandlers: IpcHandlersDef = {
     );
 
     return { id };
+  },
+
+  async 'course:is-completed'(_win, { slug, exercisePath }) {
+    return { completed: await isExerciseCompleted(slug, exercisePath) } as const;
   },
 
   async 'course:reset'(_win, { slug, exercisePath }) {

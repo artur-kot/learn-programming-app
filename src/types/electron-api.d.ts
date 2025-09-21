@@ -61,6 +61,10 @@ declare global {
         exercisePath: string;
         id?: string;
       }) => Promise<{ id: string }>;
+      courseIsCompleted: (payload: {
+        slug: string;
+        exercisePath: string;
+      }) => Promise<{ completed: boolean }>;
 
       // Workspace management
       courseReset: (payload: { slug: string; exercisePath: string }) => Promise<{ ok: true }>;

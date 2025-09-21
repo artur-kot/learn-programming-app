@@ -14,6 +14,12 @@
       </div>
     </div>
 
+    <div v-else-if="!exercisePath" class="flex items-center justify-center flex-1">
+      <div class="text-surface-600 dark:text-surface-300">
+        Select an exercise from the left to begin.
+      </div>
+    </div>
+
     <div v-else class="flex flex-col h-full gap-3">
       <!-- Top bar with file tabs and actions -->
       <div class="flex items-center justify-between gap-3">
@@ -53,6 +59,11 @@
 
         <!-- Right: actions -->
         <div class="flex items-center gap-2">
+          <i
+            v-if="completed"
+            class="text-green-500 pi pi-check-circle"
+            :title="'Exercise completed'"
+          />
           <!-- More (Solution, Reset) -->
           <Button
             size="small"
@@ -174,6 +185,7 @@ const terminal = ref<{ type: 'stdout' | 'stderr'; text: string }[]>([]);
 const markdownHtml = ref<string>('');
 const markdownBaseDir = ref<string>('');
 const confirmResetVisible = ref(false);
+const completed = ref(false);
 
 // Per-file buffers to support Save All
 const fileBuffers = ref(new Map<string, { value: string; original: string }>());
@@ -217,6 +229,22 @@ function markDirty(file: string, isDirty: boolean) {
   dirtyFiles.value = next;
 }
 
+async function refreshCompletedFlag() {
+  if (!exercisePath.value) {
+    completed.value = false;
+    return;
+  }
+  try {
+    const { completed: c } = await window.electronAPI.courseIsCompleted({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+    });
+    completed.value = !!c;
+  } catch {
+    completed.value = false;
+  }
+}
+
 async function loadFiles() {
   if (!exercisePath.value) return;
   try {
@@ -238,6 +266,7 @@ async function loadFiles() {
       await loadFileContent(selectedFile.value);
     }
     await loadMarkdown();
+    await refreshCompletedFlag();
   } catch (e: any) {
     files.value = [];
     selectedFile.value = '';
@@ -435,6 +464,9 @@ async function download() {
     await loadFiles();
   } catch (e: any) {
     toast.add({
+      severity: 'error',
+      summary: 'Download failed',
+      detail: e?.message ?? String(e),
       life: 7000,
     });
   } finally {
@@ -469,6 +501,7 @@ watch(
     editorValue.value = '';
     originalContent.value = '';
     await loadFiles();
+    await refreshCompletedFlag();
   }
 );
 
@@ -480,6 +513,7 @@ onMounted(async () => {
   if (hasCourse.value) {
     await checkForUpdates();
     await loadFiles();
+    await refreshCompletedFlag();
   }
 
   const offRunLog = window.electronAPI.on?.('course:run-log' as any, (...args: any[]) => {
@@ -498,10 +532,11 @@ onMounted(async () => {
       toast.add({ severity: 'warn', summary: 'Run exited with errors', life: 3000 });
     }
   });
-  const offTestDone = window.electronAPI.on?.('course:test-done' as any, (...args: any[]) => {
+  const offTestDone = window.electronAPI.on?.('course:test-done' as any, async (...args: any[]) => {
     const payload = args[0];
     if (payload?.code === 0) {
       toast.add({ severity: 'success', summary: 'All tests passed', life: 2500 });
+      await refreshCompletedFlag();
     } else {
       toast.add({ severity: 'error', summary: 'Tests failed', life: 3500 });
     }

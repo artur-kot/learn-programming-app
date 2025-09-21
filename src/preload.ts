@@ -33,6 +33,8 @@ exposeBridge({
     bridge.invoke('course:run', payload),
   courseTest: (payload: { slug: string; exercisePath: string; id?: string }) =>
     bridge.invoke('course:test', payload),
+  courseIsCompleted: (payload: { slug: string; exercisePath: string }) =>
+    bridge.invoke('course:is-completed', payload),
   courseReset: (payload: { slug: string; exercisePath: string }) =>
     bridge.invoke('course:reset', payload),
   courseApplySolution: (payload: { slug: string; exercisePath: string }) =>
