@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'tailwindcss-primeui';
 @import 'primeicons/primeicons.css';
+@import 'devicon/devicon.min.css';
 @custom-variant dark (&:where(.app-dark, .app-dark *));
 
 .p-tree {

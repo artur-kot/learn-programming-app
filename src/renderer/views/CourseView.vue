@@ -109,7 +109,6 @@
           <div
             class="h-full p-4 overflow-auto border rounded-lg bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700"
           >
-            <div class="mb-2 text-sm text-surface-500 dark:text-surface-400">Description</div>
             <div v-if="markdownHtml" v-html="markdownHtml" class="markdown max-w-none"></div>
             <div v-else class="text-surface-500 dark:text-surface-400">
               No description provided.
@@ -219,12 +218,170 @@ function languageFor(f: string) {
   return 'plaintext';
 }
 
+// Optimized icon resolver using maps with Devicon where available and PrimeIcons as fallback
+const EXT_ICON_MAP: Record<string, string> = {
+  // languages
+  ts: 'devicon-typescript-plain',
+  tsx: 'devicon-react-original',
+  js: 'devicon-javascript-plain',
+  jsx: 'devicon-react-original',
+  mjs: 'devicon-javascript-plain',
+  cjs: 'devicon-javascript-plain',
+  json: 'pi pi-list',
+  md: 'pi pi-book',
+  markdown: 'pi pi-book',
+  html: 'devicon-html5-plain',
+  htm: 'devicon-html5-plain',
+  css: 'devicon-css3-plain',
+  scss: 'devicon-sass-plain',
+  sass: 'devicon-sass-plain',
+  less: 'devicon-less-plain-wordmark',
+  vue: 'devicon-vuejs-plain',
+  svelte: 'devicon-svelte-plain',
+  astro: 'devicon-astro-plain',
+  pug: 'pi pi-code',
+  ejs: 'pi pi-code',
+
+  // node and config
+  yaml: 'pi pi-sliders-h',
+  yml: 'pi pi-sliders-h',
+  env: 'pi pi-sliders-h',
+  lock: 'pi pi-lock',
+  toml: 'pi pi-sliders-h',
+  ini: 'pi pi-sliders-h',
+  conf: 'pi pi-sliders-h',
+
+  // scripts & data
+  sh: 'devicon-bash-plain',
+  bash: 'devicon-bash-plain',
+  ps1: 'pi pi-terminal',
+  csv: 'pi pi-table',
+  txt: 'pi pi-file',
+  log: 'pi pi-align-left',
+
+  // images
+  png: 'pi pi-image',
+  jpg: 'pi pi-image',
+  jpeg: 'pi pi-image',
+  gif: 'pi pi-image',
+  svg: 'pi pi-image',
+  webp: 'pi pi-image',
+  ico: 'pi pi-image',
+
+  // archives
+  zip: 'pi pi-box',
+  tar: 'pi pi-box',
+  gz: 'pi pi-box',
+  tgz: 'pi pi-box',
+  rar: 'pi pi-box',
+
+  // code
+  py: 'devicon-python-plain',
+  java: 'devicon-java-plain',
+  kt: 'devicon-kotlin-plain',
+  rs: 'devicon-rust-plain',
+  go: 'devicon-go-plain',
+  rb: 'devicon-ruby-plain',
+  php: 'devicon-php-plain',
+  cs: 'devicon-csharp-plain',
+  cpp: 'devicon-cplusplus-plain',
+  cxx: 'devicon-cplusplus-plain',
+  cc: 'devicon-cplusplus-plain',
+  c: 'devicon-c-plain',
+  swift: 'devicon-swift-plain',
+  dart: 'devicon-dart-plain',
+  scala: 'devicon-scala-plain',
+  r: 'devicon-r-plain',
+  hs: 'devicon-haskell-plain',
+  lua: 'devicon-lua-plain',
+  ml: 'pi pi-code',
+  ex: 'devicon-elixir-plain',
+  exs: 'devicon-elixir-plain',
+
+  // web frameworks
+  nuxt: 'devicon-nuxtjs-plain',
+  next: 'devicon-nextjs-original',
+  nest: 'devicon-nestjs-plain',
+  angular: 'devicon-angularjs-plain',
+  react: 'devicon-react-original',
+  solid: 'pi pi-code',
+
+  // database
+  sql: 'devicon-mysql-plain',
+  sqlite: 'devicon-sqlite-plain',
+  prisma: 'devicon-prisma-original',
+  mongo: 'devicon-mongodb-plain',
+  bson: 'devicon-mongodb-plain',
+  yml_dist: 'pi pi-copy',
+
+  // docker
+  dockerfile: 'devicon-docker-plain',
+  docker: 'devicon-docker-plain',
+
+  // other
+  pdf: 'pi pi-file-pdf',
+};
+
+const BASENAME_ICON_MAP: Record<string, string> = {
+  // dotfiles
+  '.gitignore': 'devicon-git-plain',
+  '.gitattributes': 'devicon-git-plain',
+  '.editorconfig': 'pi pi-cog',
+  '.env': 'pi pi-sliders-h',
+  '.eslintrc': 'devicon-eslint-plain',
+  '.eslintrc.js': 'devicon-eslint-plain',
+  '.eslintrc.cjs': 'devicon-eslint-plain',
+  '.eslintrc.json': 'devicon-eslint-plain',
+  '.prettierrc': 'pi pi-sliders-h',
+  '.prettierrc.js': 'pi pi-sliders-h',
+  '.prettierrc.json': 'pi pi-sliders-h',
+
+  // package managers
+  'package.json': 'devicon-npm-original-wordmark',
+  'package-lock.json': 'devicon-npm-original-wordmark',
+  'pnpm-lock.yaml': 'devicon-pnpm-plain',
+  'yarn.lock': 'devicon-yarn-plain',
+
+  // common config
+  'README.md': 'pi pi-book',
+  LICENSE: 'pi pi-id-card',
+  'tsconfig.json': 'devicon-typescript-plain',
+  'vite.config.ts': 'devicon-vitejs-plain',
+  'vite.config.js': 'devicon-vitejs-plain',
+  'vite.main.config.ts': 'devicon-vitejs-plain',
+  'vite.preload.config.ts': 'devicon-vitejs-plain',
+  'vite.renderer.config.ts': 'devicon-vitejs-plain',
+  'tailwind.config.js': 'devicon-tailwindcss-plain',
+  'postcss.config.js': 'devicon-postcss-plain',
+  'docker-compose.yml': 'devicon-docker-plain',
+  Dockerfile: 'devicon-docker-plain',
+  Makefile: 'pi pi-cog',
+  'CMakeLists.txt': 'pi pi-cog',
+  '.gitlab-ci.yml': 'pi pi-refresh',
+  '.github': 'pi pi-github',
+};
+
 function fileIconClass(f: string) {
-  if (f.endsWith('.ts') || f.endsWith('.js')) return 'pi pi-code';
-  if (f.endsWith('.json')) return 'pi pi-list';
-  if (f.endsWith('.md')) return 'pi pi-book';
-  if (f.endsWith('.css')) return 'pi pi-palette';
-  if (f.endsWith('.html')) return 'pi pi-globe';
+  const name = f.split('/').pop() || f;
+  if (BASENAME_ICON_MAP[name]) return BASENAME_ICON_MAP[name];
+  const lastDot = name.lastIndexOf('.');
+  const ext = lastDot >= 0 ? name.slice(lastDot + 1).toLowerCase() : '';
+
+  // handle special double extensions
+  const parts = name.toLowerCase().split('.');
+  if (parts.length > 2) {
+    const lastTwo = parts.slice(-2).join('.');
+    if (EXT_ICON_MAP[lastTwo as keyof typeof EXT_ICON_MAP]) {
+      return EXT_ICON_MAP[lastTwo as keyof typeof EXT_ICON_MAP];
+    }
+  }
+
+  if (ext && EXT_ICON_MAP[ext]) return EXT_ICON_MAP[ext];
+
+  // Fallbacks based on simple categories
+  if (/test|spec|\.test\.|\.spec\./i.test(name)) return 'pi pi-check-square';
+  if (/config|rc|\.config\./i.test(name)) return 'pi pi-sliders-h';
+
   return 'pi pi-file';
 }
 
