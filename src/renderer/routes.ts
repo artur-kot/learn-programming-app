@@ -1,9 +1,8 @@
 import { createMemoryHistory, createRouter } from 'vue-router';
 
-import AboutView from './views/AboutView.vue';
 import MainLayout from './layouts/MainLayout.vue';
 import CourseLayout from './layouts/CourseLayout.vue';
-import CoursesView from './views/CoursesView.vue';
+import MyLearningView from './views/MyLearningView.vue';
 import CourseView from './views/CourseView.vue';
 import SettingsView from './views/SettingsView.vue';
 import SettingsAccount from './views/settings/SettingsAccount.vue';
@@ -15,7 +14,7 @@ const routes = [
     path: '/',
     component: MainLayout,
     children: [
-      { path: '', component: CoursesView },
+      { path: '', component: MyLearningView },
       {
         path: '/settings',
         component: SettingsView,

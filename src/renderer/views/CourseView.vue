@@ -208,6 +208,24 @@ const saveMenuItems = computed(() => [
 
 const DEFAULT_BRANCH = 'main';
 
+// Track recently opened courses for MyLearningView
+const RECENTS_KEY = 'lp_recent_courses_v1';
+function recordRecent() {
+  try {
+    const raw = localStorage.getItem(RECENTS_KEY);
+    const list: Array<{ slug: string; ts: number }> = raw ? JSON.parse(raw) : [];
+    const now = Date.now();
+    const map = new Map<string, number>();
+    for (const it of list) map.set(it.slug, Math.max(map.get(it.slug) ?? 0, it.ts || 0));
+    map.set(slug.value, now);
+    const next = Array.from(map.entries())
+      .map(([s, t]) => ({ slug: s, ts: t }))
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 50);
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(next));
+  } catch {}
+}
+
 function languageFor(f: string) {
   if (f.endsWith('.ts')) return 'typescript';
   if (f.endsWith('.js')) return 'javascript';
@@ -687,6 +705,9 @@ onMounted(async () => {
     await refreshCompletedFlag();
   }
 
+  // Record as recently opened
+  recordRecent();
+
   const offRunLog = window.electronAPI.on?.('course:run-log' as any, (...args: any[]) => {
     const payload = args[0];
     addTerminal(payload.stream, payload.chunk);
@@ -719,6 +740,12 @@ onMounted(async () => {
 
   // Note: in this SPA we don't strictly need to clean up, but keep references if needed
 });
+
+// Update recents when slug changes
+watch(
+  () => slug.value,
+  () => recordRecent()
+);
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown);
