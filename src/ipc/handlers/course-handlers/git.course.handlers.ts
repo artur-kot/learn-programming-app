@@ -2,7 +2,7 @@ import { IpcHandlersDef } from '../shared.types.js';
 import path from 'node:path';
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { mkdir, rm, cp } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { app, dialog } from 'electron';
 import { createEmitter } from '../../register-handlers.js';
 import type { CourseTreeNode } from '../../contracts.js';
@@ -161,6 +161,37 @@ async function applySolutionToWorkspace(slug: string, exercisePath: string) {
 }
 
 export const gitCourseHandlers: IpcHandlersDef = {
+  // --- Runtime process tracking & termination helpers ---
+  // Track children per exercise so we can terminate on route leave
+  // Keyed by `${slug}|${exercisePath}`
+
+  async 'course:terminate'(
+    _win: Electron.BrowserWindow | undefined,
+    {
+      slug,
+      exercisePath,
+    }: {
+      slug: string;
+      exercisePath: string;
+    }
+  ) {
+    const key = `${slug}|${exercisePath}`;
+    const set = runningChildren.get(key);
+    if (!set || set.size === 0) return { terminated: 0 as const };
+    const procs = Array.from(set);
+    let terminated = 0;
+    await Promise.all(
+      procs.map(async (child) => {
+        try {
+          await terminateChild(child);
+          terminated++;
+        } catch {
+          // ignore
+        }
+      })
+    );
+    return { terminated } as const;
+  },
   async 'git-course:clone'(win, { slug, branch = 'main', id: _id }) {
     const id = ensureId(_id);
     const emitter = createEmitter(win!.webContents);
@@ -379,6 +410,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env },
     });
+    trackChild(slug, exercisePath, child);
 
     child.stdout.on('data', (d) =>
       emitter.emit('course:run-log', {
@@ -418,6 +450,8 @@ export const gitCourseHandlers: IpcHandlersDef = {
         error: String(err),
       })
     );
+    child.on('close', () => untrackChild(slug, exercisePath, child));
+    child.on('error', () => untrackChild(slug, exercisePath, child));
 
     return { id };
   },
@@ -458,6 +492,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env },
     });
+    trackChild(slug, exercisePath, child);
     child.stdout.on('data', (d) =>
       emitter.emit('course:test-log', {
         id,
@@ -493,6 +528,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
         success,
         code: code ?? 0,
       });
+      untrackChild(slug, exercisePath, child);
     });
     child.on('error', (err) =>
       emitter.emit('course:test-done', {
@@ -504,6 +540,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
         error: String(err),
       })
     );
+    child.on('error', () => untrackChild(slug, exercisePath, child));
 
     return { id };
   },
@@ -553,3 +590,49 @@ export const gitCourseHandlers: IpcHandlersDef = {
     return { exportedTo: destRoot } as const;
   },
 };
+
+// --- Internal helpers & state for process tracking ---
+const runningChildren = new Map<string, Set<ChildProcess>>();
+
+function keyFor(slug: string, exercisePath: string) {
+  return `${slug}|${exercisePath}`;
+}
+function trackChild(slug: string, exercisePath: string, child: ChildProcess) {
+  const key = keyFor(slug, exercisePath);
+  let set = runningChildren.get(key);
+  if (!set) {
+    set = new Set();
+    runningChildren.set(key, set);
+  }
+  set.add(child);
+}
+function untrackChild(slug: string, exercisePath: string, child: ChildProcess) {
+  const key = keyFor(slug, exercisePath);
+  const set = runningChildren.get(key);
+  if (!set) return;
+  set.delete(child);
+  if (set.size === 0) runningChildren.delete(key);
+}
+function terminateChild(child: ChildProcess): Promise<void> {
+  return new Promise((resolve) => {
+    if (!child.pid) return resolve();
+    // Try graceful first
+    try {
+      child.kill('SIGTERM');
+    } catch {}
+    const timeout = setTimeout(() => {
+      try {
+        child.kill('SIGKILL');
+      } catch {}
+      resolve();
+    }, 1500);
+    child.once('exit', () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+    child.once('close', () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+  });
+}

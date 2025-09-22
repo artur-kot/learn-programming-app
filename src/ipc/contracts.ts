@@ -113,6 +113,16 @@ export interface IpcInvoke {
     ];
     result: { id: string };
   };
+  // Terminate any running processes for a specific exercise (run/test servers etc.)
+  'course:terminate': {
+    args: [
+      {
+        slug: string;
+        exercisePath: string;
+      },
+    ];
+    result: { terminated: number };
+  };
   'course:is-completed': {
     args: [
       {

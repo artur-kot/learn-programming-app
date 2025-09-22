@@ -376,10 +376,24 @@ async function saveAll() {
 
 async function run() {
   clearTerminal();
+  // Ensure no stale background process keeps running
+  try {
+    await window.electronAPI.courseTerminate({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+    });
+  } catch {}
   await window.electronAPI.courseRun({ slug: slug.value, exercisePath: exercisePath.value });
 }
 async function test() {
   clearTerminal();
+  // Ensure no stale background process keeps running
+  try {
+    await window.electronAPI.courseTerminate({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+    });
+  } catch {}
   await window.electronAPI.courseTest({ slug: slug.value, exercisePath: exercisePath.value });
 }
 
@@ -473,7 +487,13 @@ function toggleMoreMenu(event: MouseEvent) {
 // Respond when exercise changes
 watch(
   () => exercisePath.value,
-  async () => {
+  async (newVal, oldVal) => {
+    // Terminate any processes from the previous exercise before switching
+    if (oldVal) {
+      try {
+        await window.electronAPI.courseTerminate({ slug: slug.value, exercisePath: oldVal });
+      } catch {}
+    }
     editor.clearDirty();
     fileBuffers.value.clear();
     editorValue.value = '';
@@ -524,7 +544,15 @@ onMounted(async () => {
   });
 });
 
-onUnmounted(() => {
-  /* no-op */
+onUnmounted(async () => {
+  // Terminate any lingering run/test processes for this exercise on leave
+  try {
+    if (exercisePath.value) {
+      await window.electronAPI.courseTerminate({
+        slug: slug.value,
+        exercisePath: exercisePath.value,
+      });
+    }
+  } catch {}
 });
 </script>

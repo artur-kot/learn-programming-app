@@ -61,6 +61,10 @@ declare global {
         exercisePath: string;
         id?: string;
       }) => Promise<{ id: string }>;
+      courseTerminate: (payload: {
+        slug: string;
+        exercisePath: string;
+      }) => Promise<{ terminated: number }>;
       courseIsCompleted: (payload: {
         slug: string;
         exercisePath: string;
