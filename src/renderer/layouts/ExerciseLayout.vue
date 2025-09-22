@@ -25,7 +25,7 @@
         <div
           class="px-3 py-2 text-xs font-semibold tracking-wider text-surface-500 dark:text-surface-400"
         >
-          EXPLORER
+          FILE EXPLORER
         </div>
         <div class="mx-1 overflow-y-auto rounded-md">
           <ul>
@@ -43,7 +43,7 @@
                 :class="fileIconClass(f)"
                 class="w-4 text-xs text-surface-600 dark:text-surface-300"
               ></i>
-              <span class="truncate flex-1 text-surface-800 dark:text-surface-200">{{
+              <span class="flex-1 truncate text-surface-800 dark:text-surface-200">{{
                 basename(f)
               }}</span>
               <i

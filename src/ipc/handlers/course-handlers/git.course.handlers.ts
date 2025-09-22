@@ -304,16 +304,31 @@ export const gitCourseHandlers: IpcHandlersDef = {
 
     emitter.emit('git-course:progress', { id, slug, op: 'pull', step: 'checkout', percent: 10 });
 
+    // Try to checkout the branch; if it doesn't exist locally, create it from origin
     let res = await runGitStreaming(win!, id, slug, 'pull', ['checkout', branch], dest);
     if (res.code !== 0) {
-      emitter.emit('git-course:done', {
+      // Attempt to create local branch tracking origin/<branch>
+      const fallback = await runGitStreaming(
+        win!,
         id,
         slug,
-        op: 'pull',
-        success: false,
-        error: res.stderr || res.stdout,
-      });
-      throw new Error(`git checkout failed: ${res.stderr || res.stdout}`);
+        'pull',
+        ['checkout', '-B', branch, `origin/${branch}`],
+        dest
+      );
+      if (fallback.code !== 0) {
+        emitter.emit('git-course:done', {
+          id,
+          slug,
+          op: 'pull',
+          success: false,
+          error: res.stderr || res.stdout || fallback.stderr || fallback.stdout,
+        });
+        throw new Error(
+          `git checkout failed: ${res.stderr || res.stdout || ''}\n${fallback.stderr || fallback.stdout || ''}`
+        );
+      }
+      res = fallback;
     }
 
     emitter.emit('git-course:progress', { id, slug, op: 'pull', step: 'pulling', percent: 40 });
@@ -326,19 +341,79 @@ export const gitCourseHandlers: IpcHandlersDef = {
       ['pull', '--ff-only', 'origin', branch],
       dest
     );
+    let forced = false;
     if (res.code !== 0) {
-      emitter.emit('git-course:done', {
+      // If fast-forward pull failed (diverged or conflicts), force sync to origin as source of truth
+      emitter.emit('git-course:progress', {
         id,
         slug,
         op: 'pull',
-        success: false,
-        error: res.stderr || res.stdout,
+        step: 'force-sync:fetch',
+        percent: 55,
       });
-      throw new Error(`git pull failed: ${res.stderr || res.stdout}`);
+      let forceRes = await runGitStreaming(
+        win!,
+        id,
+        slug,
+        'pull',
+        ['fetch', '--prune', 'origin'],
+        dest
+      );
+      if (forceRes.code !== 0) {
+        emitter.emit('git-course:done', {
+          id,
+          slug,
+          op: 'pull',
+          success: false,
+          error: forceRes.stderr || forceRes.stdout || res.stderr || res.stdout,
+        });
+        throw new Error(`git fetch (force-sync) failed: ${forceRes.stderr || forceRes.stdout}`);
+      }
+
+      emitter.emit('git-course:progress', {
+        id,
+        slug,
+        op: 'pull',
+        step: 'force-sync:reset',
+        percent: 75,
+      });
+      forceRes = await runGitStreaming(
+        win!,
+        id,
+        slug,
+        'pull',
+        ['reset', '--hard', `origin/${branch}`],
+        dest
+      );
+      if (forceRes.code !== 0) {
+        emitter.emit('git-course:done', {
+          id,
+          slug,
+          op: 'pull',
+          success: false,
+          error: forceRes.stderr || forceRes.stdout,
+        });
+        throw new Error(`git reset --hard failed: ${forceRes.stderr || forceRes.stdout}`);
+      }
+
+      // Optionally clean untracked files to fully match origin state
+      emitter.emit('git-course:progress', {
+        id,
+        slug,
+        op: 'pull',
+        step: 'force-sync:clean',
+        percent: 90,
+      });
+      const cleanRes = await runGitStreaming(win!, id, slug, 'pull', ['clean', '-fd'], dest);
+      if (cleanRes.code !== 0) {
+        // Not fatal; proceed but include output
+      }
+      forced = true;
+      res = forceRes;
     }
 
     emitter.emit('git-course:done', { id, slug, op: 'pull', success: true });
-    return { id, updated: true, output: res.stdout };
+    return { id, updated: true, output: res.stdout, forced };
   },
 
   async 'git-course:list-tree'(_win, { slug }) {
