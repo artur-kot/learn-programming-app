@@ -178,6 +178,10 @@ watch(
       selectedKeys.value = {};
       lastSelectedKey.value = '';
       course.setExercise('');
+    } else {
+      selectedKeys.value = { [ex]: true };
+      lastSelectedKey.value = ex;
+      course.setExercise(ex);
     }
   }
 );

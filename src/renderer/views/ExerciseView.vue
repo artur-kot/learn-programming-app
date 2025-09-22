@@ -32,7 +32,23 @@
         />
         <Menu ref="moreMenu" :model="moreMenuItems" :popup="true" />
         <Button size="small" label="Run" icon="pi pi-play" severity="contrast" @click="run" />
-        <Button size="small" label="Check" icon="pi pi-check" severity="success" @click="test" />
+        <Button
+          v-if="!justCompleted"
+          size="small"
+          label="Check"
+          icon="pi pi-check"
+          severity="success"
+          @click="test"
+        />
+        <Button
+          v-else-if="hasNextExercise"
+          size="small"
+          label="Next"
+          icon="pi pi-arrow-right"
+          iconPos="right"
+          severity="info"
+          @click="goNext"
+        />
       </div>
     </div>
 
@@ -151,6 +167,7 @@ import { useToast } from 'primevue/usetoast';
 import { marked } from 'marked';
 import CodeEditor from '~/renderer/components/CodeEditor.vue';
 import { EXT_ICON_MAP } from '~/renderer/constants/fileIcons.js';
+import type { CourseTreeNode } from '~/ipc/contracts.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -178,6 +195,8 @@ const confirmSolutionVisible = ref(false);
 const confirmExportVisible = ref(false);
 const completed = ref(false);
 let pendingExport = false;
+// Tracks completion in this session to control Check/Next button swap
+const justCompleted = ref(false);
 
 // Per-file buffers to support Save All
 const fileBuffers = ref(new Map<string, { value: string; original: string }>());
@@ -198,6 +217,41 @@ const saveMenuItems = computed(() => [
     disabled: dirtyCount.value === 0,
   },
 ]);
+
+// Navigation to next exercise when completed
+const leafExercises = computed(() => {
+  const out: CourseTreeNode[] = [];
+  function collect(nodes: CourseTreeNode[] | undefined) {
+    if (!nodes) return;
+    for (const n of nodes) {
+      if (n.children && n.children.length > 0) collect(n.children);
+      else out.push(n);
+    }
+  }
+  collect(course.nodes as unknown as CourseTreeNode[]);
+  return out;
+});
+
+const currentExerciseIndex = computed(() =>
+  leafExercises.value.findIndex(
+    (n) => n.path === exercisePath.value || n.key === exercisePath.value
+  )
+);
+const nextExercisePath = computed(() => {
+  const i = currentExerciseIndex.value;
+  if (i >= 0 && i < leafExercises.value.length - 1) return leafExercises.value[i + 1].path;
+  return '';
+});
+const hasNextExercise = computed(() => !!nextExercisePath.value);
+
+function goNext() {
+  if (!hasNextExercise.value) return;
+  router.push({
+    name: 'exercise',
+    params: { slug: slug.value },
+    query: { exercise: nextExercisePath.value },
+  });
+}
 
 function languageFor(f: string) {
   if (f.endsWith('.ts')) return 'typescript';
@@ -484,6 +538,9 @@ function toggleMoreMenu(event: MouseEvent) {
   (moreMenu.value as any)?.toggle(event);
 }
 
+// Keep track of IPC unsubscribers to avoid duplicate listeners on remount
+const ipcOffHandlers: Array<() => void> = [];
+
 // Respond when exercise changes
 watch(
   () => exercisePath.value,
@@ -499,6 +556,7 @@ watch(
     editorValue.value = '';
     originalContent.value = '';
     currentFile.value = '';
+    justCompleted.value = false;
     await loadFiles();
     await refreshCompletedFlag();
   }
@@ -521,10 +579,14 @@ onMounted(async () => {
     const payload = args[0];
     addTerminal(payload.stream, payload.chunk);
   });
+  if (typeof offRunLog === 'function') ipcOffHandlers.push(offRunLog);
+
   const offTestLog = window.electronAPI.on?.('course:test-log' as any, (...args: any[]) => {
     const payload = args[0];
     addTerminal(payload.stream, payload.chunk);
   });
+  if (typeof offTestLog === 'function') ipcOffHandlers.push(offTestLog);
+
   const offRunDone = window.electronAPI.on?.('course:run-done' as any, (...args: any[]) => {
     const payload = args[0];
     if (payload?.code === 0) {
@@ -533,18 +595,32 @@ onMounted(async () => {
       toast.add({ severity: 'warn', summary: 'Run exited with errors', life: 3000 });
     }
   });
+  if (typeof offRunDone === 'function') ipcOffHandlers.push(offRunDone);
+
   const offTestDone = window.electronAPI.on?.('course:test-done' as any, async (...args: any[]) => {
     const payload = args[0];
     if (payload?.code === 0) {
       toast.add({ severity: 'success', summary: 'All tests passed', life: 2500 });
+      justCompleted.value = true;
       await refreshCompletedFlag();
     } else {
       toast.add({ severity: 'error', summary: 'Tests failed', life: 3500 });
     }
   });
+  if (typeof offTestDone === 'function') ipcOffHandlers.push(offTestDone);
 });
 
 onUnmounted(async () => {
+  // Remove event listeners to prevent duplicated logs/toasts on remount
+  try {
+    for (const off of ipcOffHandlers) {
+      try {
+        off();
+      } catch {}
+    }
+  } finally {
+    ipcOffHandlers.length = 0;
+  }
   // Terminate any lingering run/test processes for this exercise on leave
   try {
     if (exercisePath.value) {
