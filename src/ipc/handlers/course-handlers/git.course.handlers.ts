@@ -118,22 +118,57 @@ async function ensureExerciseWorkspace(slug: string, exercisePath: string) {
   const src = resolveRepoExerciseRoot(slug, exercisePath);
   const dst = resolveExerciseWorkspaceRoot(slug, exercisePath);
   if (!existsSync(src)) throw new Error('Exercise not found');
-  if (!existsSync(dst)) {
+  const firstCreate = !existsSync(dst);
+  if (firstCreate) {
     await mkdir(dst, { recursive: true });
-    // Copy visible exercise files
+    // Copy visible exercise files once (don't overwrite user's work later)
     for (const file of listExerciseFiles(src)) {
       const from = path.join(src, file);
       const to = path.join(dst, file);
       writeFileSync(to, readFileSync(from));
     }
-    // Copy _meta if present (tests, overview, etc.)
+    // Initial population of _meta from the repo
     const metaSrc = path.join(src, '_meta');
+    const metaDst = path.join(dst, '_meta');
     if (existsSync(metaSrc)) {
-      await cp(metaSrc, path.join(dst, '_meta'), { recursive: true });
+      await rm(metaDst, { recursive: true, force: true });
+      await cp(metaSrc, metaDst, { recursive: true, force: true });
     }
   }
 }
 
+// After a successful course pull, sync the latest _meta from the repo into any existing workspaces
+async function syncCourseMetaIntoWorkspaces(slug: string): Promise<number> {
+  const wsRoot = path.join(getWorkspaceRoot(), slug);
+  const repoRoot = path.join(getCoursesRoot(), slug);
+  if (!existsSync(wsRoot) || !existsSync(repoRoot)) return 0;
+
+  // Collect relative paths of all directories under the workspace course root
+  const relDirs: string[] = [];
+  function walk(rel: string) {
+    const abs = path.join(wsRoot, rel);
+    const entries = readdirSync(abs, { withFileTypes: true });
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        const childRel = rel ? path.posix.join(rel, e.name) : e.name;
+        relDirs.push(childRel);
+        walk(childRel);
+      }
+    }
+  }
+  walk('');
+
+  let synced = 0;
+  for (const rel of relDirs) {
+    const repoMeta = path.join(repoRoot, rel, '_meta');
+    if (!existsSync(repoMeta)) continue;
+    const wsMeta = path.join(wsRoot, rel, '_meta');
+    await rm(wsMeta, { recursive: true, force: true });
+    await cp(repoMeta, wsMeta, { recursive: true, force: true });
+    synced++;
+  }
+  return synced;
+}
 async function resetExerciseWorkspace(slug: string, exercisePath: string) {
   const dst = resolveExerciseWorkspaceRoot(slug, exercisePath);
   if (existsSync(dst)) {
@@ -412,8 +447,18 @@ export const gitCourseHandlers: IpcHandlersDef = {
       res = forceRes;
     }
 
+    // After pulling, sync latest _meta into any existing workspaces for this course
+    emitter.emit('git-course:progress', {
+      id,
+      slug,
+      op: 'pull',
+      step: 'workspace-meta-sync',
+      percent: 95,
+    });
+    const syncedCount = await syncCourseMetaIntoWorkspaces(slug);
+
     emitter.emit('git-course:done', { id, slug, op: 'pull', success: true });
-    return { id, updated: true, output: res.stdout, forced };
+    return { id, updated: true, output: res.stdout, forced, syncedMetaFor: syncedCount };
   },
 
   async 'git-course:list-tree'(_win, { slug }) {
@@ -449,16 +494,25 @@ export const gitCourseHandlers: IpcHandlersDef = {
   },
 
   async 'course:read-markdown'(_win, { slug, exercisePath }) {
+    // Keep workspace prepared (for user files), but prefer reading docs from the repo clone
     await ensureExerciseWorkspace(slug, exercisePath);
-    const exerciseRoot = resolveExerciseWorkspaceRoot(slug, exercisePath);
+    const exerciseRootWs = resolveExerciseWorkspaceRoot(slug, exercisePath);
+    const exerciseRootRepo = resolveRepoExerciseRoot(slug, exercisePath);
     const courseRoot = path.join(getCoursesRoot(), slug);
+
+    console.log({ exerciseRootWs, exerciseRootRepo, courseRoot });
+
     const candidates = [
-      // Prefer exercise-specific TODO/description
-      path.join(exerciseRoot, '_meta', 'todo.md'),
-      // Other common exercise-local fallbacks
-      path.join(exerciseRoot, '_meta', 'README.md'),
-      path.join(exerciseRoot, '_meta', 'overview.md'),
-      path.join(exerciseRoot, 'README.md'),
+      // Prefer latest exercise docs from repo
+      path.join(exerciseRootRepo, '_meta', 'todo.md'),
+      path.join(exerciseRootRepo, '_meta', 'README.md'),
+      path.join(exerciseRootRepo, '_meta', 'overview.md'),
+      path.join(exerciseRootRepo, 'README.md'),
+      // Fallback to workspace copies if needed
+      path.join(exerciseRootWs, '_meta', 'todo.md'),
+      path.join(exerciseRootWs, '_meta', 'README.md'),
+      path.join(exerciseRootWs, '_meta', 'overview.md'),
+      path.join(exerciseRootWs, 'README.md'),
       // Legacy/root course overview fallback
       path.join(courseRoot, '_overview', 'overview.md'),
     ];
@@ -467,7 +521,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
         return { markdown: readFileSync(abs, 'utf-8'), baseDir: path.dirname(abs) };
       }
     }
-    return { markdown: '', baseDir: exerciseRoot };
+    return { markdown: '', baseDir: exerciseRootWs };
   },
 
   async 'course:run'(win, { slug, exercisePath, id: _id }) {
@@ -535,6 +589,8 @@ export const gitCourseHandlers: IpcHandlersDef = {
     const id = ensureId(_id);
     const emitter = createEmitter(win!.webContents);
     await ensureExerciseWorkspace(slug, exercisePath);
+    // Make sure meta is fresh from the repo before running tests
+    // (ensureExerciseWorkspace already refreshes _meta, so this is guaranteed)
     const cwd = resolveExerciseWorkspaceRoot(slug, exercisePath);
 
     // Convention: `_meta/meta.json` has a `test` command (present in workspace)
@@ -542,27 +598,29 @@ export const gitCourseHandlers: IpcHandlersDef = {
     let cmd = process.execPath;
     let args: string[] = [];
     if (existsSync(metaPath)) {
-      try {
-        const meta = JSON.parse(readFileSync(metaPath, 'utf-8')) as { test?: string };
-        if (meta.test) {
-          const parts = meta.test.trim().split(/\s+/);
-          cmd = parts.shift() || cmd;
-          args = parts;
-          // If first arg points to non-existing file and an _meta alternative exists, rewrite
-          if (cmd === 'node' && args[0]) {
-            const candidate = path.join(cwd, args[0]);
-            if (!existsSync(candidate)) {
-              const alt = path.join(cwd, '_meta', args[0].replace(/^\.\//, ''));
-              if (existsSync(alt)) {
-                args[0] = './_meta/' + args[0].replace(/^\.\//, '');
-              }
-            }
-          }
-        }
-      } catch {}
+      const metaRaw = JSON.parse(readFileSync(metaPath, 'utf-8')) as
+        | { test?: string; run?: string; title?: string }
+        | { meta?: { test?: string; run?: string; title?: string } };
+      const meta = (metaRaw as any).meta ?? metaRaw;
+      console.log({ meta });
+      if (meta && typeof meta === 'object' && (meta as any).test) {
+        const parts = String((meta as any).test)
+          .split(/\s+/)
+          .filter((p) => p.length > 0);
+        cmd = parts[0]!;
+        args = parts.slice(1);
+      }
     }
 
-    const child = spawn(cmd, args, {
+    console.log({
+      cwd,
+      cmd,
+      args,
+    });
+
+    const normalizedArgs = args.map((a) => a.replace(/\b(?:\.\/)?tests\//g, ''));
+
+    const child = spawn(cmd, normalizedArgs, {
       cwd: path.join(cwd, '_meta', 'tests'),
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env },
