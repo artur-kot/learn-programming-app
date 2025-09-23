@@ -53,8 +53,8 @@
     </div>
 
     <!-- Editor + Description -->
-    <div class="grid flex-1 min-h-0 grid-cols-12 gap-3">
-      <div class="min-h-0 col-span-12 xl:col-span-7 2xl:col-span-8">
+    <div class="grid flex-1 min-w-0 min-h-0 grid-cols-12 gap-3">
+      <div class="min-w-0 min-h-0 col-span-7 2xl:col-span-8">
         <div
           class="h-full overflow-hidden border rounded-lg border-surface-200 dark:border-surface-700"
         >
@@ -74,7 +74,7 @@
           </div>
         </div>
       </div>
-      <div class="col-span-12 xl:col-span-5 2xl:col-span-4">
+      <div class="min-w-0 min-h-0 col-span-5 2xl:col-span-4">
         <div
           class="h-full p-4 overflow-auto border rounded-lg bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700"
         >
