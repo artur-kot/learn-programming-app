@@ -423,8 +423,14 @@ async function doReset() {
   confirmResetVisible.value = false;
   try {
     await window.electronAPI.courseReset({ slug: slug.value, exercisePath: exercisePath.value });
+    // Reset session/editor state so next load re-reads files from disk
+    session.setFiles([]);
+    session.setSelectedFile('');
     editor.clearDirty();
     fileBuffers.value.clear();
+    editorValue.value = '';
+    originalContent.value = '';
+    currentFile.value = '';
     await loadFiles();
   } catch (e: any) {
     toast.add({
@@ -442,8 +448,14 @@ async function applySolution() {
       slug: slug.value,
       exercisePath: exercisePath.value,
     });
+    // Reset session/editor state so next load re-reads files from disk
+    session.setFiles([]);
+    session.setSelectedFile('');
     editor.clearDirty();
     fileBuffers.value.clear();
+    editorValue.value = '';
+    originalContent.value = '';
+    currentFile.value = '';
     await loadFiles();
     toast.add({ severity: 'success', summary: 'Solution applied', life: 2000 });
   } catch (e: any) {
