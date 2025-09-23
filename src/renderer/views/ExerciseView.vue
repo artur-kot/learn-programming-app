@@ -170,7 +170,6 @@ import CodeEditor from '~/renderer/components/CodeEditor.vue';
 import type { CourseTreeNode } from '~/ipc/contracts.js';
 
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
 const course = useCourseStore();
 const editor = useEditorStore();
