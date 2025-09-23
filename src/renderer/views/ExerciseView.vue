@@ -163,6 +163,7 @@
 import { onMounted, ref, watch, computed, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCourseStore, useEditorStore } from '~/renderer/stores';
+import { useExerciseSessionStore } from '~/renderer/stores';
 import { useToast } from 'primevue/usetoast';
 import { marked } from 'marked';
 import CodeEditor from '~/renderer/components/CodeEditor.vue';
@@ -173,12 +174,13 @@ const router = useRouter();
 const toast = useToast();
 const course = useCourseStore();
 const editor = useEditorStore();
+const session = useExerciseSessionStore();
 
 const slug = ref<string>(route.params.slug as string);
-const exercisePath = computed(() => (route.query.exercise as string) || '');
+const exercisePath = computed(() => course.currentExercise || '');
 
-const files = ref<string[]>([]);
-const selectedFile = computed(() => (route.query.file as string) || '');
+const files = computed(() => session.files);
+const selectedFile = computed(() => session.selectedFile || '');
 const currentFile = ref('');
 const dirtyCount = computed(() => editor.dirtyFiles.size);
 
@@ -243,11 +245,7 @@ const hasNextExercise = computed(() => !!nextExercisePath.value);
 
 function goNext() {
   if (!hasNextExercise.value) return;
-  router.push({
-    name: 'exercise',
-    params: { slug: slug.value },
-    query: { exercise: nextExercisePath.value },
-  });
+  course.setExercise(nextExercisePath.value);
 }
 
 function languageFor(f: string) {
@@ -294,23 +292,16 @@ async function loadFiles() {
       slug: slug.value,
       exercisePath: exercisePath.value,
     });
-    files.value = list;
+    session.setFiles(list);
     if (!selectedFile.value || !list.includes(selectedFile.value)) {
       if (list.length) selectFile(list[0]!);
-      else {
-        router.replace({
-          name: 'exercise',
-          params: { slug: slug.value },
-          query: { exercise: exercisePath.value },
-        });
-      }
     } else {
       await loadFileContent(selectedFile.value);
     }
     await loadMarkdown();
     await refreshCompletedFlag();
   } catch {
-    files.value = [];
+    session.setFiles([]);
   }
 }
 
@@ -318,11 +309,7 @@ async function loadFileContent(f: string) {
   if (!f || f === currentFile.value) return;
   const buf = fileBuffers.value.get(f);
   if (buf) {
-    router.replace({
-      name: 'exercise',
-      params: { slug: slug.value },
-      query: { exercise: exercisePath.value, file: f },
-    });
+    session.setSelectedFile(f);
     editorValue.value = buf.value;
     originalContent.value = buf.original;
     currentFile.value = f;
@@ -333,11 +320,7 @@ async function loadFileContent(f: string) {
     exercisePath: exercisePath.value,
     file: f,
   });
-  router.replace({
-    name: 'exercise',
-    params: { slug: slug.value },
-    query: { exercise: exercisePath.value, file: f },
-  });
+  session.setSelectedFile(f);
   editorValue.value = content;
   originalContent.value = content;
   fileBuffers.value.set(f, { value: content, original: content });
@@ -613,4 +596,11 @@ onUnmounted(async () => {
     }
   } catch {}
 });
+
+watch(
+  () => exercisePath.value,
+  () => {
+    clearTerminal();
+  }
+);
 </script>

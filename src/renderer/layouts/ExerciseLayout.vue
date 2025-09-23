@@ -68,20 +68,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { EXT_ICON_MAP } from '~/renderer/constants/fileIcons.js';
-import { useEditorStore } from '~/renderer/stores';
+import { useCourseStore, useEditorStore } from '~/renderer/stores';
+import { useExerciseSessionStore } from '~/renderer/stores';
 
 const route = useRoute();
 const router = useRouter();
 const editor = useEditorStore();
+const course = useCourseStore();
+const session = useExerciseSessionStore();
 
 const slug = computed(() => route.params.slug as string);
-const exercisePath = computed(() => (route.query.exercise as string) || '');
-const selectedFile = computed(() => (route.query.file as string) || '');
-
-const files = ref<string[]>([]);
+const exercisePath = computed(() => course.currentExercise || '');
+const selectedFile = computed(() => session.selectedFile || '');
+const files = computed(() => session.files);
+// Token to prevent race conditions when switching exercises quickly
+let loadToken = 0;
 
 function basename(p: string) {
   const parts = p.split('/');
@@ -122,28 +126,66 @@ function isSelected(f: string) {
   return selectedFile.value === f;
 }
 
-function openFile(f: string) {
-  router.push({
-    name: 'exercise',
-    params: { slug: slug.value },
-    query: { exercise: exercisePath.value, file: f },
-  });
+async function openFile(f: string) {
+  console.log('openFile', { f });
+  session.setSelectedFile(f);
+}
+
+// Try to read preferred entry file from _meta/meta.json
+async function readEntryFileFromMeta(): Promise<string | undefined> {
+  try {
+    const { content } = await window.electronAPI.courseReadFile({
+      slug: slug.value,
+      exercisePath: exercisePath.value,
+      file: '_meta/meta.json',
+    });
+    const metaRaw = JSON.parse(content) as
+      | { entryFile?: string; test?: string; run?: string; title?: string }
+      | { meta?: { entryFile?: string; test?: string; run?: string; title?: string } };
+    const meta: any = (metaRaw as any).meta ?? metaRaw;
+    if (meta && typeof meta.entryFile === 'string' && meta.entryFile.trim().length > 0) {
+      return meta.entryFile.trim();
+    }
+  } catch {
+    // ignore; fallback handled by caller
+  }
+  return undefined;
 }
 
 async function loadFiles() {
   if (!slug.value || !exercisePath.value) return;
+  const myToken = ++loadToken;
   try {
+    // Read meta.json first to prefer entryFile
+    const entry = await readEntryFileFromMeta();
+    if (loadToken !== myToken) return; // stale
+
     const { files: list } = await window.electronAPI.courseListFiles({
       slug: slug.value,
       exercisePath: exercisePath.value,
     });
-    files.value = list;
-    // pick first file if none selected
-    if (!selectedFile.value && list.length) {
-      openFile(list[0]!);
+    if (loadToken !== myToken) return; // stale
+    session.setFiles(list);
+
+    // If no valid selected file in route, pick entryFile or first
+    if (!selectedFile.value || !list.includes(selectedFile.value)) {
+      let initial: string | undefined;
+      if (entry && list.includes(entry)) initial = entry;
+      if (!initial && list.length) initial = list[0]!;
+
+      console.log({
+        entry,
+        initial,
+        selectedFile: selectedFile.value,
+        files: list,
+        meta: await readEntryFileFromMeta(),
+      });
+
+      if (initial) await openFile(initial);
     }
   } catch {
-    files.value = [];
+    if (loadToken !== myToken) return; // stale
+    session.setFiles([]);
   }
 }
 
@@ -154,7 +196,11 @@ function goBackToCourse() {
 
 watch(
   () => exercisePath.value,
-  () => loadFiles(),
+  () => {
+    // Reset session state when exercise changes
+    session.reset();
+    loadFiles();
+  },
   { immediate: true }
 );
 </script>
