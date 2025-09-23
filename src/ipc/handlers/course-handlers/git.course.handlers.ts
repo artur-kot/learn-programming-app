@@ -563,7 +563,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
     }
 
     const child = spawn(cmd, args, {
-      cwd,
+      cwd: path.join(cwd, '_meta', 'tests'),
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env },
     });

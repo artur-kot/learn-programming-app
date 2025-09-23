@@ -166,7 +166,6 @@ import { useCourseStore, useEditorStore } from '~/renderer/stores';
 import { useToast } from 'primevue/usetoast';
 import { marked } from 'marked';
 import CodeEditor from '~/renderer/components/CodeEditor.vue';
-import { EXT_ICON_MAP } from '~/renderer/constants/fileIcons.js';
 import type { CourseTreeNode } from '~/ipc/contracts.js';
 
 const route = useRoute();
@@ -177,8 +176,6 @@ const editor = useEditorStore();
 
 const slug = ref<string>(route.params.slug as string);
 const exercisePath = computed(() => (route.query.exercise as string) || '');
-const hasCourse = ref<boolean | null>(null);
-const busy = ref(false);
 
 const files = ref<string[]>([]);
 const selectedFile = computed(() => (route.query.file as string) || '');
@@ -261,21 +258,6 @@ function languageFor(f: string) {
   if (f.endsWith('.css')) return 'css';
   if (f.endsWith('.html')) return 'html';
   return 'plaintext';
-}
-
-function fileIconClass(f: string) {
-  const name = f.split('/').pop() || f;
-  const lastDot = name.lastIndexOf('.');
-  const ext = lastDot >= 0 ? name.slice(lastDot + 1).toLowerCase() : '';
-  const parts = name.toLowerCase().split('.');
-  if (parts.length > 2) {
-    const lastTwo = parts.slice(-2).join('.');
-    if ((EXT_ICON_MAP as any)[lastTwo]) return (EXT_ICON_MAP as any)[lastTwo];
-  }
-  if ((EXT_ICON_MAP as any)[ext]) return (EXT_ICON_MAP as any)[ext];
-  if (/test|spec|\.test\.|\.spec\./i.test(name)) return 'pi pi-check-square';
-  if (/config|rc|\.config\./i.test(name)) return 'pi pi-sliders-h';
-  return 'pi pi-file';
 }
 
 function addTerminal(type: 'stdout' | 'stderr', text: string) {

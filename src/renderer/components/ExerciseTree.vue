@@ -14,9 +14,9 @@
           <button
             v-if="node.children?.length"
             class="shrink-0 text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200"
-            @click.stop="expand(node)"
+            @click.stop="toggle(node)"
             aria-label="Toggle"
-            title="Expand"
+            :title="isExpanded(node) ? 'Collapse' : 'Expand'"
           >
             <i :class="isExpanded(node) ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"></i>
           </button>
@@ -29,7 +29,7 @@
         />
       </div>
 
-      <div v-if="node.children?.length && isExpanded(node)" class="ml-4">
+      <div v-if="node.children?.length && isExpanded(node)" class="pl-6">
         <!-- recursive -->
         <ExerciseTree
           :nodes="node.children!"
@@ -37,6 +37,7 @@
           :expandedKeys="expandedKeys"
           @update:selectionKeys="(v) => emit('update:selectionKeys', v)"
           @node-expand="(e) => emit('node-expand', e)"
+          @node-collapse="(e) => emit('node-collapse', e)"
         />
       </div>
     </li>
@@ -57,6 +58,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:selectionKeys', value: Record<string, boolean>): void;
   (e: 'node-expand', payload: { node: CourseTreeNode }): void;
+  (e: 'node-collapse', payload: { node: CourseTreeNode }): void;
 }>();
 
 function isLeaf(n: CourseTreeNode) {
@@ -76,12 +78,13 @@ function onRowClick(n: CourseTreeNode) {
   if (isLeaf(n)) {
     emit('update:selectionKeys', { [n.key]: true });
   } else {
-    // expand groups on label click
-    expand(n);
+    // toggle groups on label click
+    toggle(n);
   }
 }
 
-function expand(n: CourseTreeNode) {
-  if (!isExpanded(n)) emit('node-expand', { node: n });
+function toggle(n: CourseTreeNode) {
+  if (isExpanded(n)) emit('node-collapse', { node: n });
+  else emit('node-expand', { node: n });
 }
 </script>

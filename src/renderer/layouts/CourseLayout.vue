@@ -39,6 +39,7 @@
             :expandedKeys="expandedKeys"
             @update:selectionKeys="onSelectionUpdate"
             @node-expand="onNodeExpand"
+            @node-collapse="onNodeCollapse"
           />
         </div>
       </div>
@@ -148,11 +149,17 @@ function onNodeExpand(e: any) {
   if (e?.node?.key) expandedKeys.value[e.node.key] = true;
 }
 
+function onNodeCollapse(e: any) {
+  if (e?.node?.key) delete expandedKeys.value[e.node.key];
+}
+
 watch(
   () => slug.value,
   async (s) => {
     if (s) {
       await course.loadTree(s);
+      // expand all groups initially
+      expandAll(nodes.value);
       await checkUpdates();
     }
     // if we navigated with exercise in query, reflect it into selection
@@ -188,8 +195,23 @@ watch(
 
 onMounted(async () => {
   if (slug.value) await course.loadTree(slug.value);
+  // expand all groups initially when layout mounts
+  expandAll(nodes.value);
   await checkUpdates();
 });
+
+function expandAll(n: any[]) {
+  if (!Array.isArray(n)) return;
+  const stack = [...n];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node) continue;
+    if (node.children && node.children.length) {
+      expandedKeys.value[node.key] = true;
+      for (const c of node.children) stack.push(c);
+    }
+  }
+}
 </script>
 
 <style scoped>
