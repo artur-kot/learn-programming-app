@@ -500,8 +500,6 @@ export const gitCourseHandlers: IpcHandlersDef = {
     const exerciseRootRepo = resolveRepoExerciseRoot(slug, exercisePath);
     const courseRoot = path.join(getCoursesRoot(), slug);
 
-    console.log({ exerciseRootWs, exerciseRootRepo, courseRoot });
-
     const candidates = [
       // Prefer latest exercise docs from repo
       path.join(exerciseRootRepo, '_meta', 'todo.md'),
@@ -602,7 +600,6 @@ export const gitCourseHandlers: IpcHandlersDef = {
         | { test?: string; run?: string; title?: string }
         | { meta?: { test?: string; run?: string; title?: string } };
       const meta = (metaRaw as any).meta ?? metaRaw;
-      console.log({ meta });
       if (meta && typeof meta === 'object' && (meta as any).test) {
         const parts = String((meta as any).test)
           .split(/\s+/)
@@ -611,12 +608,6 @@ export const gitCourseHandlers: IpcHandlersDef = {
         args = parts.slice(1);
       }
     }
-
-    console.log({
-      cwd,
-      cmd,
-      args,
-    });
 
     const normalizedArgs = args.map((a) => a.replace(/\b(?:\.\/)?tests\//g, ''));
 

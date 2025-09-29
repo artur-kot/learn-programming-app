@@ -127,7 +127,6 @@ function isSelected(f: string) {
 }
 
 async function openFile(f: string) {
-  console.log('openFile', { f });
   session.setSelectedFile(f);
 }
 
@@ -172,14 +171,6 @@ async function loadFiles() {
       let initial: string | undefined;
       if (entry && list.includes(entry)) initial = entry;
       if (!initial && list.length) initial = list[0]!;
-
-      console.log({
-        entry,
-        initial,
-        selectedFile: selectedFile.value,
-        files: list,
-        meta: await readEntryFileFromMeta(),
-      });
 
       if (initial) await openFile(initial);
     }
