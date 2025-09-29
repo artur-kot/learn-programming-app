@@ -10,7 +10,13 @@
         <div class="text-surface-600 dark:text-surface-300">
           You need to download this course to get started.
         </div>
-        <Button label="Download course" icon="pi pi-download" :loading="busy" @click="download" />
+        <Button
+          label="Download course"
+          icon="pi pi-download"
+          variant="outlined"
+          :busy="busy"
+          @click="download"
+        />
       </div>
     </div>
 
