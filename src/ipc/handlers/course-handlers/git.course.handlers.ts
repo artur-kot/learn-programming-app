@@ -45,6 +45,21 @@ function getWorkspaceRoot(): string {
   return path.join(app.getPath('userData'), 'courses-workspace');
 }
 
+function getExerciseMeta(slug: string, exercisePath: string) {
+  const root = path.join(getCoursesRoot(), slug, exercisePath);
+  const metaPath = path.join(root, '_meta', 'meta.json');
+  if (existsSync(metaPath)) {
+    try {
+      const raw = readFileSync(metaPath, 'utf-8');
+      const parsed = JSON.parse(raw) as { [key: string]: any };
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function ensureId(id?: string) {
   return id ?? Math.random().toString(36).slice(2);
 }
@@ -528,12 +543,14 @@ export const gitCourseHandlers: IpcHandlersDef = {
     const emitter = createEmitter(win!.webContents);
     await ensureExerciseWorkspace(slug, exercisePath);
     const cwd = resolveExerciseWorkspaceRoot(slug, exercisePath);
-    // Find a default runnable file (first .js file) if exists
-    const files = listExerciseFiles(cwd);
-    const mainFile = files.find((f) => f.endsWith('.js')) || files[0];
-    if (!mainFile) throw new Error('No runnable file found');
+    const runCommandParts =
+      getExerciseMeta(slug, exercisePath)?.run?.toString().split(/\s+/).filter(Boolean) || [];
+    const runCommand = runCommandParts[0];
+    if (!runCommand) {
+      throw new Error('No run command defined for this exercise');
+    }
 
-    const child = spawn('node', [mainFile], {
+    const child = spawn(runCommand, runCommandParts.slice(1), {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env },
