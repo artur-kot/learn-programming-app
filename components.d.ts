@@ -8,31 +8,14 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    Avatar: typeof import('primevue/avatar')['default']
-    Badge: typeof import('primevue/badge')['default']
     Button: typeof import('primevue/button')['default']
     Dialog: typeof import('primevue/dialog')['default']
     Divider: typeof import('primevue/divider')['default']
-    FileUpload: typeof import('primevue/fileupload')['default']
-    Form: typeof import('@primevue/forms/form')['default']
-    InputGroup: typeof import('primevue/inputgroup')['default']
-    InputGroupAddon: typeof import('primevue/inputgroupaddon')['default']
-    InputIcon: typeof import('primevue/inputicon')['default']
-    InputText: typeof import('primevue/inputtext')['default']
-    MainLayoutLink: typeof import('./src/components/MainLayoutLink.vue')['default']
-    MainSidebar: typeof import('./src/components/MainSidebar.vue')['default']
     Menu: typeof import('primevue/menu')['default']
-    Message: typeof import('primevue/message')['default']
-    MonacoEditor: typeof import('@guolao/vue-monaco-editor')['MonacoEditor']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SplitButton: typeof import('primevue/splitbutton')['default']
-    Tab: typeof import('primevue/tab')['default']
-    TabList: typeof import('primevue/tablist')['default']
-    Tabs: typeof import('primevue/tabs')['default']
-    Textarea: typeof import('primevue/textarea')['default']
     Toast: typeof import('primevue/toast')['default']
-    Tree: typeof import('primevue/tree')['default']
   }
   export interface GlobalDirectives {
     StyleClass: typeof import('primevue/styleclass')['default']
