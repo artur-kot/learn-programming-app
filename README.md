@@ -4,3 +4,5 @@
 
 **_NOTE_**: This project, along with courses is in early development.
 Contributions welcome!
+
+![exercise_view](./screenshots/exercise_view.png)
