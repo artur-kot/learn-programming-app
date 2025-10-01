@@ -42,16 +42,6 @@ interface Props {
 
 const props = defineProps<Props>();
 const slots = useSlots();
-
-// Dev-time guard to prevent ambiguous double icon usage
-if (process.env.NODE_ENV !== 'production') {
-  if (props.icon && slots.icon) {
-    throw new Error(
-      '[MainLayoutLink] Provide either the "icon" prop or the <template #icon> slot, not both.'
-    );
-  }
-}
-
 const route = useRoute();
 
 // Centralized styling logic (mirrors existing styles in MainLayout.vue)

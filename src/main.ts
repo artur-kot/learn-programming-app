@@ -1,11 +1,8 @@
-import { app, BrowserWindow, dialog, screen } from 'electron';
-import fs from 'node:fs';
-import fsp from 'node:fs/promises';
+import { app, BrowserWindow, screen } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import url from 'node:url';
-import { registerInvokeHandlers, createEmitter } from './ipc/register-handlers.js';
-import { AppConfig } from './renderer/AppConfig.type.js';
+import { registerInvokeHandlers } from './ipc/register-handlers.js';
 import { ipcHandlers } from './ipc/handlers/index.js';
 
 if (started) {
@@ -37,6 +34,7 @@ const createWindow = () => {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+    // mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
   // Open the DevTools.

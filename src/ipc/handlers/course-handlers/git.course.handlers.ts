@@ -38,6 +38,7 @@ function runGitStreaming(
 }
 
 function getCoursesRoot(): string {
+  console.log('userData path', app.getPath('userData'));
   return path.join(app.getPath('userData'), 'courses');
 }
 function getWorkspaceRoot(): string {
@@ -532,7 +533,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
     const mainFile = files.find((f) => f.endsWith('.js')) || files[0];
     if (!mainFile) throw new Error('No runnable file found');
 
-    const child = spawn(process.execPath, [mainFile], {
+    const child = spawn('node', [mainFile], {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env },
