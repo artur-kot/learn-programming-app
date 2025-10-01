@@ -1,7 +1,7 @@
 {
   "name": "learn-programming-app",
   "productName": "learn-programming-app",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Open source desktop application to learn programming",
   "type": "module",
   "main": ".vite/build/learn-programming-app.js",
