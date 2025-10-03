@@ -106,7 +106,7 @@ async function buildTreeWithCompletion(
       label: labelFromSegment(name),
       path: childRel,
       // Leaf nodes represent exercises; mark completion
-      ...(children.length === 0 ? { completed: await isExerciseCompleted(slug, childRel) } : {}),
+      ...(children.length === 0 ? { completed: isExerciseCompleted(slug, childRel) } : {}),
       children: children.length ? children : undefined,
     };
     nodes.push(node);
@@ -658,7 +658,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
       // Mark as completed in DB on success
       if (success) {
         try {
-          await markExerciseCompleted(slug, exercisePath);
+          markExerciseCompleted(slug, exercisePath);
         } catch (e) {
           // swallow DB errors to not break UX; logs can be added if needed
         }
@@ -688,7 +688,7 @@ export const gitCourseHandlers: IpcHandlersDef = {
   },
 
   async 'course:is-completed'(_win, { slug, exercisePath }) {
-    return { completed: await isExerciseCompleted(slug, exercisePath) } as const;
+    return { completed: isExerciseCompleted(slug, exercisePath) } as const;
   },
 
   async 'course:reset'(_win, { slug, exercisePath }) {

@@ -10,9 +10,8 @@ export default defineConfig({
       name: 'main',
       formats: ['es'],
     },
-    // Avoid bundling native/CJS modules that rely on __filename/require (e.g., sqlite3)
     rollupOptions: {
-      external: ['sqlite3', 'bindings'],
+      external: ['better-sqlite3', 'bindings'],
     },
   },
 });
