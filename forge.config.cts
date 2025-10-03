@@ -12,9 +12,14 @@ const isProd = process.env.NODE_ENV === 'production';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: {
+      unpack: '**/node_modules/better-sqlite3/**/*',
+    },
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+    force: true,
+    onlyModules: ['better-sqlite3'],
+  },
   makers: [
     new MakerSquirrel({}),
     new MakerDMG({
@@ -45,6 +50,10 @@ const config: ForgeConfig = {
         },
       ],
     }),
+    {
+      name: '@electron-forge/plugin-auto-unpack-natives',
+      config: {},
+    },
     ...(isProd
       ? [
           new FusesPlugin({
@@ -54,7 +63,7 @@ const config: ForgeConfig = {
             [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
             [FuseV1Options.EnableNodeCliInspectArguments]: false,
             [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
-            [FuseV1Options.OnlyLoadAppFromAsar]: true,
+            [FuseV1Options.OnlyLoadAppFromAsar]: false,
           }),
         ]
       : []),
