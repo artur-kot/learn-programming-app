@@ -26,6 +26,7 @@ pub fn run() {
             courses::get_all_courses,
             courses::get_course,
             courses::clone_course,
+            courses::check_course_update_available,
             courses::update_course,
             courses::get_course_structure,
             // Exercise commands

@@ -70,6 +70,56 @@ pub async fn clone_course(
 }
 
 #[tauri::command]
+pub async fn check_course_update_available(
+    pool: State<'_, SqlitePool>,
+    slug: String,
+) -> Result<bool, String> {
+    let course = db::get_course(&pool, &slug)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Course not found".to_string())?;
+
+    let repo_path = course
+        .repo_path
+        .as_ref()
+        .ok_or_else(|| "Course repo path not found".to_string())?
+        .clone();
+
+    // Perform git operations in blocking task
+    tokio::task::spawn_blocking(move || {
+        let repo = Repository::open(&repo_path)
+            .map_err(|e| format!("Failed to open repository: {}", e))?;
+
+        // Fetch from remote
+        let mut remote = repo
+            .find_remote("origin")
+            .map_err(|e| format!("Failed to find remote: {}", e))?;
+
+        remote
+            .fetch(&["main"], None, None)
+            .map_err(|e| format!("Failed to fetch: {}", e))?;
+
+        // Check if update is available
+        let fetch_head = repo
+            .find_reference("FETCH_HEAD")
+            .map_err(|e| format!("Failed to find FETCH_HEAD: {}", e))?;
+
+        let fetch_commit = repo
+            .reference_to_annotated_commit(&fetch_head)
+            .map_err(|e| format!("Failed to get commit: {}", e))?;
+
+        let (analysis, _) = repo
+            .merge_analysis(&[&fetch_commit])
+            .map_err(|e| format!("Failed to analyze merge: {}", e))?;
+
+        // Return true if update is available (not up to date)
+        Ok::<bool, String>(!analysis.is_up_to_date())
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+}
+
+#[tauri::command]
 pub async fn update_course(pool: State<'_, SqlitePool>, slug: String) -> Result<Course, String> {
     let course = db::get_course(&pool, &slug)
         .await

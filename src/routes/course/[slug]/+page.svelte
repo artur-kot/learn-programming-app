@@ -12,10 +12,14 @@
   let loading = $state(true);
   let error = $state<string | null>(null);
   let isTreeCollapsed = $state(false);
+  let updateAvailable = $state(false);
+  let checkingUpdate = $state(false);
+  let updating = $state(false);
 
   onMount(async () => {
     if (slug) {
       await loadCourse();
+      await checkForUpdate();
     }
   });
 
@@ -31,6 +35,37 @@
       error = String(e);
     } finally {
       loading = false;
+    }
+  }
+
+  async function checkForUpdate() {
+    if (!slug) return;
+
+    try {
+      checkingUpdate = true;
+      updateAvailable = await invoke<boolean>("check_course_update_available", { slug });
+    } catch (e) {
+      console.error("Failed to check for updates:", e);
+      // Silently fail - don't show error to user for update check
+    } finally {
+      checkingUpdate = false;
+    }
+  }
+
+  async function handleUpdateCourse() {
+    if (!slug) return;
+
+    try {
+      updating = true;
+      await invoke("update_course", { slug });
+      updateAvailable = false;
+      // Reload the course structure after update
+      await loadCourse();
+    } catch (e) {
+      console.error("Failed to update course:", e);
+      error = String(e);
+    } finally {
+      updating = false;
     }
   }
 
@@ -53,6 +88,19 @@
       <h1 class="text-xl font-semibold">
         {slug.charAt(0).toUpperCase() + slug.slice(1)} Course
       </h1>
+    </div>
+    <div class="flex items-center gap-2">
+      {#if checkingUpdate}
+        <span class="text-sm text-muted-foreground">Checking for updates...</span>
+      {:else if updateAvailable}
+        <button
+          onclick={handleUpdateCourse}
+          disabled={updating}
+          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+        >
+          {updating ? "Updating..." : "Update Course"}
+        </button>
+      {/if}
     </div>
   </header>
 
