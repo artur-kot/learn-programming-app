@@ -2,7 +2,6 @@ use crate::models::CommandResult;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use tauri::State;
 
 #[tauri::command]
 pub async fn read_exercise_file(
