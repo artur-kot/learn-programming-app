@@ -138,12 +138,18 @@
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 	import type { ComponentProps } from "svelte";
 
-	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
+	let {
+		ref = $bindable(null),
+		...restProps
+	}: ComponentProps<typeof Sidebar.Root> = $props();
 </script>
 
 <Sidebar.Root {...restProps} bind:ref>
 	<Sidebar.Header>
-		<VersionSwitcher versions={data.versions} defaultVersion={data.versions[0]} />
+		<VersionSwitcher
+			versions={data.versions}
+			defaultVersion={data.versions[0]}
+		/>
 		<SearchForm />
 	</Sidebar.Header>
 	<Sidebar.Content>
@@ -156,7 +162,7 @@
 						{#each group.items as item (item.title)}
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton isActive={item.isActive}>
-									{#snippet child({ props })}
+									{#snippet child({ props }: { props: any })}
 										<a href={item.url} {...props}>{item.title}</a>
 									{/snippet}
 								</Sidebar.MenuButton>
