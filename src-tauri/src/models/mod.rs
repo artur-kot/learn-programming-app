@@ -45,9 +45,16 @@ pub struct Exercise {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CourseConfig {
+    #[serde(rename = "ignoreExerciseFiles")]
+    pub ignore_exercise_files: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CourseStructure {
     pub overview: String,
     pub exercises: Vec<Exercise>,
+    pub config: Option<CourseConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

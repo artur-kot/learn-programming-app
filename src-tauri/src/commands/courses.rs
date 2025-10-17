@@ -1,8 +1,9 @@
 use crate::{
     db,
-    models::{Course, CourseStructure, CourseWithProgress, Exercise, ExerciseMeta},
+    models::{Course, CourseConfig, CourseStructure, CourseWithProgress, Exercise, ExerciseMeta},
 };
 use git2::Repository;
+use glob::Pattern;
 use sqlx::SqlitePool;
 use std::fs;
 use std::path::Path;
@@ -215,11 +216,28 @@ pub async fn get_course_structure(
     let overview =
         fs::read_to_string(&overview_path).unwrap_or_else(|_| "No overview available".to_string());
 
-    let exercises = scan_exercises(repo_path, &slug, &pool).await?;
+    // Read root meta.json if it exists
+    let meta_path = Path::new(repo_path).join("course.json");
+    let config = if meta_path.exists() {
+        fs::read_to_string(&meta_path)
+            .ok()
+            .and_then(|content| serde_json::from_str::<CourseConfig>(&content).ok())
+    } else {
+        None
+    };
+
+    let ignore_patterns = config
+        .as_ref()
+        .and_then(|c| c.ignore_exercise_files.as_ref())
+        .map(|patterns| patterns.as_slice())
+        .unwrap_or(&[]);
+
+    let exercises = scan_exercises(repo_path, &slug, &pool, ignore_patterns).await?;
 
     Ok(CourseStructure {
         overview,
         exercises,
+        config,
     })
 }
 
@@ -227,6 +245,7 @@ async fn scan_exercises(
     repo_path: &str,
     course_slug: &str,
     pool: &SqlitePool,
+    ignore_patterns: &[String],
 ) -> Result<Vec<Exercise>, String> {
     let path = Path::new(repo_path);
     let mut exercises = Vec::new();
@@ -244,7 +263,14 @@ async fn scan_exercises(
                 .starts_with('.')
         {
             // Check if it contains subdirectories (chapters)
-            scan_chapter(&entry_path, course_slug, pool, &mut exercises).await?;
+            scan_chapter(
+                &entry_path,
+                course_slug,
+                pool,
+                &mut exercises,
+                ignore_patterns,
+            )
+            .await?;
         }
     }
 
@@ -259,6 +285,7 @@ async fn scan_chapter(
     course_slug: &str,
     pool: &SqlitePool,
     exercises: &mut Vec<Exercise>,
+    ignore_patterns: &[String],
 ) -> Result<(), String> {
     let entries = fs::read_dir(chapter_path).map_err(|e| e.to_string())?;
 
@@ -274,7 +301,8 @@ async fn scan_chapter(
         {
             let meta_dir = entry_path.join("_meta");
             if meta_dir.exists() {
-                let exercise = parse_exercise(&entry_path, course_slug, pool).await?;
+                let exercise =
+                    parse_exercise(&entry_path, course_slug, pool, ignore_patterns).await?;
                 exercises.push(exercise);
             }
         }
@@ -287,6 +315,7 @@ async fn parse_exercise(
     exercise_path: &Path,
     course_slug: &str,
     pool: &SqlitePool,
+    ignore_patterns: &[String],
 ) -> Result<Exercise, String> {
     let meta_dir = exercise_path.join("_meta");
     let meta_json_path = meta_dir.join("meta.json");
@@ -316,13 +345,23 @@ async fn parse_exercise(
         meta.id = format!("{}_{}", course_slug, name);
     }
 
-    // Get files in exercise (excluding _meta)
+    // Compile glob patterns
+    let patterns: Vec<Pattern> = ignore_patterns
+        .iter()
+        .filter_map(|p| Pattern::new(p).ok())
+        .collect();
+
+    // Get files in exercise (excluding _meta and ignored files)
     let mut files = Vec::new();
     let entries = fs::read_dir(exercise_path).map_err(|e| e.to_string())?;
     for entry in entries.filter_map(Result::ok) {
         let file_name = entry.file_name().to_string_lossy().to_string();
         if file_name != "_meta" {
-            files.push(file_name);
+            // Check if file matches any ignore pattern
+            let should_ignore = patterns.iter().any(|pattern| pattern.matches(&file_name));
+            if !should_ignore {
+                files.push(file_name);
+            }
         }
     }
 

@@ -3,6 +3,10 @@
   import { onMount, onDestroy } from "svelte";
   import type { Exercise, CommandResult } from "$lib/types";
   import MonacoEditor from "$lib/components/MonacoEditor.svelte";
+  import Markdown from "$lib/components/Markdown.svelte";
+  import { Button } from "$lib/components/ui/button";
+  import { Badge } from "$lib/components/ui/badge";
+  import * as Tabs from "$lib/components/ui/tabs";
 
   interface Props {
     exercise: Exercise;
@@ -43,8 +47,8 @@
   }
 
   async function handleCodeChange(content: string) {
+    // Update the map without triggering reactivity
     fileContents.set(currentFile, content);
-    fileContents = new Map(fileContents);
 
     // Auto-save with debounce
     if (saveTimeout) {
@@ -147,58 +151,48 @@
 <div class="h-full flex flex-col">
   <!-- Exercise Header -->
   <div class="border-b p-4">
-    <div class="flex items-center justify-between mb-2">
+    <div class="flex items-center justify-between mb-4">
       <h2 class="text-2xl font-bold capitalize">
         {exercise.name.replace(/^\d+_/, "").replace(/_/g, " ")}
       </h2>
       {#if exercise.completed}
-        <span class="text-green-500 text-sm">✓ Completed</span>
+        <Badge variant="default" class="bg-green-600 hover:bg-green-700">✓ Completed</Badge>
       {/if}
     </div>
 
     <!-- File Tabs -->
-    <div class="flex gap-2 overflow-x-auto">
-      {#each exercise.files as fileName}
-        <button
-          onclick={() => (currentFile = fileName)}
-          class="px-3 py-1 rounded-t-md text-sm transition-colors whitespace-nowrap {currentFile === fileName ? 'bg-accent' : 'hover:bg-accent/50'}"
-        >
-          {fileName}
-        </button>
-      {/each}
-    </div>
+    <Tabs.Root value={currentFile} onValueChange={(v) => v && (currentFile = v)}>
+      <Tabs.List class="w-full justify-start">
+        {#each exercise.files as fileName}
+          <Tabs.Trigger value={fileName}>{fileName}</Tabs.Trigger>
+        {/each}
+      </Tabs.List>
+    </Tabs.Root>
   </div>
 
   <!-- Main Content - 2 columns -->
   <div class="flex-1 flex overflow-hidden">
     <!-- Left: Description -->
     <div class="w-1/3 border-r p-4 overflow-y-auto">
-      <div class="prose prose-sm max-w-none">
-        <div class="text-foreground">
-          {@html exercise.description}
-        </div>
-      </div>
+      <Markdown content={exercise.description} />
 
       <!-- Action Buttons -->
-      <div class="mt-6 space-y-2">
-        {#if exercise.meta.initCmd}
-          <button
-            onclick={initializeExercise}
-            disabled={isInitializing}
-            class="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors disabled:opacity-50"
-          >
-            {isInitializing ? "Initializing..." : "Initialize Exercise"}
-          </button>
+      <div class="mt-6 space-y-3">
+        {#if isInitializing}
+          <div class="w-full px-4 py-2 bg-muted text-muted-foreground rounded-md text-center text-sm">
+            Initializing exercise...
+          </div>
         {/if}
 
         {#if exercise.meta.testCmd}
-          <button
+          <Button
             onclick={runTests}
             disabled={isTesting}
-            class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+            class="w-full"
+            size="lg"
           >
             {isTesting ? "Running Tests..." : "Check Solution"}
-          </button>
+          </Button>
         {/if}
       </div>
 
@@ -225,11 +219,13 @@
     <!-- Right: Code Editor -->
     <div class="flex-1 flex flex-col overflow-hidden">
       {#if currentFile && fileContents.has(currentFile)}
-        <MonacoEditor
-          value={fileContents.get(currentFile) || ""}
-          language={getFileLanguage(currentFile)}
-          onChange={handleCodeChange}
-        />
+        {#key `${exercise.id}-${currentFile}`}
+          <MonacoEditor
+            value={fileContents.get(currentFile) || ""}
+            language={getFileLanguage(currentFile)}
+            onChange={handleCodeChange}
+          />
+        {/key}
       {:else}
         <div class="flex-1 flex items-center justify-center text-muted-foreground">
           Select a file to edit

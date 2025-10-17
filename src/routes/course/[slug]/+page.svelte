@@ -5,6 +5,8 @@
   import type { CourseStructure, Exercise } from "$lib/types";
   import ExerciseTree from "$lib/components/ExerciseTree.svelte";
   import ExerciseView from "$lib/components/ExerciseView.svelte";
+  import Markdown from "$lib/components/Markdown.svelte";
+  import { Button } from "$lib/components/ui/button";
 
   let slug = $derived($page.params.slug ?? "");
   let courseStructure = $state<CourseStructure | null>(null);
@@ -93,13 +95,13 @@
       {#if checkingUpdate}
         <span class="text-sm text-muted-foreground">Checking for updates...</span>
       {:else if updateAvailable}
-        <button
+        <Button
           onclick={handleUpdateCourse}
           disabled={updating}
-          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+          size="sm"
         >
           {updating ? "Updating..." : "Update Course"}
-        </button>
+        </Button>
       {/if}
     </div>
   </header>
@@ -150,12 +152,8 @@
           />
         {:else}
           <div class="p-8 overflow-y-auto h-full">
-            <div class="prose max-w-none">
-              <h2 class="text-2xl font-bold mb-4">Course Overview</h2>
-              <div class="text-foreground">
-                {@html courseStructure.overview}
-              </div>
-            </div>
+            <h2 class="text-2xl font-bold mb-4">Course Overview</h2>
+            <Markdown content={courseStructure.overview} />
           </div>
         {/if}
       </div>

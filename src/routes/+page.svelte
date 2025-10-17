@@ -3,6 +3,9 @@
   import { onMount } from "svelte";
   import type { CourseWithProgress } from "$lib/types";
   import { AVAILABLE_COURSES } from "$lib/types";
+  import * as Card from "$lib/components/ui/card";
+  import { Button } from "$lib/components/ui/button";
+  import { Progress } from "$lib/components/ui/progress";
 
   let courses = $state<CourseWithProgress[]>([]);
   let loading = $state(true);
@@ -61,46 +64,46 @@
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {#each AVAILABLE_COURSES as availableCourse}
           {@const courseStatus = getCourseStatus(availableCourse.slug)}
-          <div class="border rounded-lg p-6 hover:shadow-lg transition-shadow">
-            <h2 class="text-2xl font-semibold mb-2">{availableCourse.name}</h2>
-            <p class="text-muted-foreground mb-4">{availableCourse.description}</p>
-
-            {#if courseStatus}
-              <div class="mb-4">
-                <div class="flex justify-between text-sm mb-2">
-                  <span>Progress</span>
-                  <span>{Math.round(courseStatus.progress_percentage)}%</span>
+          <Card.Root class="hover:shadow-lg transition-shadow">
+            <Card.Header>
+              <Card.Title>{availableCourse.name}</Card.Title>
+              <Card.Description>{availableCourse.description}</Card.Description>
+            </Card.Header>
+            <Card.Content>
+              {#if courseStatus}
+                <div class="space-y-3">
+                  <div class="flex justify-between text-sm">
+                    <span>Progress</span>
+                    <span class="font-medium">{Math.round(courseStatus.progress_percentage)}%</span>
+                  </div>
+                  <Progress value={courseStatus.progress_percentage} class="h-2" />
+                  <div class="text-sm text-muted-foreground">
+                    {courseStatus.completed_exercises} / {courseStatus.total_exercises} exercises completed
+                  </div>
                 </div>
-                <div class="w-full bg-secondary rounded-full h-2">
-                  <div
-                    class="bg-primary h-2 rounded-full transition-all"
-                    style="width: {courseStatus.progress_percentage}%"
-                  ></div>
-                </div>
-                <div class="text-sm text-muted-foreground mt-2">
-                  {courseStatus.completed_exercises} / {courseStatus.total_exercises} exercises completed
-                </div>
-              </div>
-              <a
-                href="/course/{availableCourse.slug}"
-                class="inline-block w-full text-center bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-              >
-                Continue Learning
-              </a>
-            {:else}
-              <button
-                onclick={() =>
-                  cloneCourse(
-                    availableCourse.slug,
-                    availableCourse.name,
-                    availableCourse.repo_url
-                  )}
-                class="w-full bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/80 transition-colors"
-              >
-                Start Course
-              </button>
-            {/if}
-          </div>
+              {/if}
+            </Card.Content>
+            <Card.Footer>
+              {#if courseStatus}
+                <Button href="/course/{availableCourse.slug}" class="w-full">
+                  Continue Learning
+                </Button>
+              {:else}
+                <Button
+                  variant="secondary"
+                  class="w-full"
+                  onclick={() =>
+                    cloneCourse(
+                      availableCourse.slug,
+                      availableCourse.name,
+                      availableCourse.repo_url
+                    )}
+                >
+                  Start Course
+                </Button>
+              {/if}
+            </Card.Footer>
+          </Card.Root>
         {/each}
       </div>
     {/if}

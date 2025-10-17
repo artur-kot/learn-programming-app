@@ -35,9 +35,14 @@ export interface Exercise {
   completed: boolean;
 }
 
+export interface CourseConfig {
+  ignoreExerciseFiles?: string[];
+}
+
 export interface CourseStructure {
   overview: string;
   exercises: Exercise[];
+  config?: CourseConfig;
 }
 
 export interface CourseWithProgress {

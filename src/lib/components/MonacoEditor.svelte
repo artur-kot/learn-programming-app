@@ -36,7 +36,12 @@
       // Listen for content changes
       editor.onDidChangeModelContent(() => {
         if (editor && onChange) {
+          isUserTyping = true;
           onChange(editor.getValue());
+          // Reset the flag after a short delay
+          setTimeout(() => {
+            isUserTyping = false;
+          }, 100);
         }
       });
     } catch (error) {
@@ -45,8 +50,10 @@
   });
 
   // Update editor when value prop changes externally
+  let isUserTyping = false;
+
   $effect(() => {
-    if (editor && value !== editor.getValue()) {
+    if (editor && !isUserTyping && value !== editor.getValue()) {
       const position = editor.getPosition();
       editor.setValue(value);
       if (position) {

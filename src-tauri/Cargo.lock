@@ -2032,6 +2032,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "git2",
+ "glob",
  "serde",
  "serde_json",
  "sqlx",
