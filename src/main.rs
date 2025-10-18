@@ -1,3 +1,4 @@
+mod config;
 mod course;
 mod database;
 mod test_runner;

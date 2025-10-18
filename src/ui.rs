@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::course::{Course, Exercise};
 use crate::database::Database;
 use crate::test_runner::{TestResult, TestRunner};
@@ -22,6 +23,8 @@ use tokio::sync::mpsc;
 pub enum DisplayMode {
     Readme,
     TestOutput,
+    Hint,
+    ModelSelection,
 }
 
 pub struct App {
@@ -42,6 +45,13 @@ pub struct App {
     running_exercise_id: Option<String>,
     blink_toggle: bool,
     blink_counter: u8,
+    hint_text: Option<String>,
+    is_generating_hint: bool,
+    hint_receiver: Option<mpsc::Receiver<String>>,
+    config: Config,
+    available_models: Vec<String>,
+    model_list_state: ListState,
+    models_receiver: Option<mpsc::Receiver<Vec<String>>>,
 }
 
 impl App {
@@ -76,6 +86,8 @@ impl App {
             list_state.select(Some(initial_index));
         }
 
+        let config = Config::load().unwrap_or_default();
+
         Ok(Self {
             course,
             exercises,
@@ -94,6 +106,13 @@ impl App {
             running_exercise_id: None,
             blink_toggle: false,
             blink_counter: 0,
+            hint_text: None,
+            is_generating_hint: false,
+            hint_receiver: None,
+            config,
+            available_models: Vec::new(),
+            model_list_state: ListState::default(),
+            models_receiver: None,
         })
     }
 
@@ -284,7 +303,7 @@ impl App {
                             self.status_message = format!("✓ {} completed! Press 'r' or Esc to show README, Enter to run again", title);
                         }
                         TestResult::Failed => {
-                            self.status_message = format!("✗ Tests failed for {}. Press 'r' or Esc to show README, Enter to run again", title);
+                            self.status_message = format!("✗ Tests failed for {}. Press 'r' or Esc to show README, Enter to run again, 'h' for hint", title);
                         }
                         TestResult::Error(err) => {
                             self.status_message = format!("Error: {}. Press 'r' or Esc to show README, Enter to try again", err);
@@ -293,6 +312,12 @@ impl App {
                 }
             }
         }
+
+        // Check for hint generation
+        self.check_hint_generation();
+
+        // Check for models loaded
+        self.check_models_loaded();
     }
 
     fn show_readme(&mut self) {
@@ -305,6 +330,227 @@ impl App {
         self.last_test_result = None;
         self.running_exercise_id = None;
         self.status_message = String::from("Press Enter to run tests, 'r' to show README, 'q' to quit");
+    }
+
+
+    fn check_hint_generation(&mut self) {
+        if let Some(ref mut rx) = self.hint_receiver {
+            if let Ok(hint) = rx.try_recv() {
+                self.hint_text = Some(hint);
+                self.is_generating_hint = false;
+                self.hint_receiver = None;
+                self.status_message = String::from("Hint ready! Press Esc to return to test output");
+            }
+        }
+    }
+
+    fn show_test_output(&mut self) {
+        self.display_mode = DisplayMode::TestOutput;
+        self.scroll_position = 0;
+        if let Some(exercise) = self.get_selected_exercise() {
+            let title = &exercise.metadata.title;
+            if self.last_test_result.is_some() {
+                self.status_message = format!("Test output for {}. Press 'r' or Esc to show README, 'h' for hint", title);
+            } else {
+                self.status_message = format!("Press Enter to run tests, 'r' to show README");
+            }
+        }
+    }
+
+    async fn fetch_available_models(&mut self) {
+        self.display_mode = DisplayMode::ModelSelection;
+        self.status_message = String::from("Loading available models from Ollama...");
+        self.available_models = vec![String::from("Loading...")];
+        self.model_list_state.select(Some(0));
+
+        // Create channel for models
+        let (models_tx, models_rx) = mpsc::channel(1);
+        self.models_receiver = Some(models_rx);
+
+        // Spawn model fetching in background
+        tokio::spawn(async move {
+            use ollama_rs::Ollama;
+
+            let ollama = Ollama::default();
+            match ollama.list_local_models().await {
+                Ok(models) => {
+                    let model_names: Vec<String> = models
+                        .iter()
+                        .map(|m| m.name.clone())
+                        .collect();
+
+                    if model_names.is_empty() {
+                        let _ = models_tx.send(vec![String::from("No models found. Please install a model with 'ollama pull <model-name>'")]).await;
+                    } else {
+                        let _ = models_tx.send(model_names).await;
+                    }
+                }
+                Err(_) => {
+                    let _ = models_tx.send(vec![String::from("Error: Cannot connect to Ollama. Make sure Ollama is running.")]).await;
+                }
+            }
+        });
+    }
+
+    fn check_models_loaded(&mut self) {
+        if let Some(ref mut rx) = self.models_receiver {
+            if let Ok(models) = rx.try_recv() {
+                self.available_models = models;
+                self.models_receiver = None;
+
+                if self.available_models.len() == 1 &&
+                   (self.available_models[0].contains("No models found") ||
+                    self.available_models[0].contains("Error:")) {
+                    // Error or no models
+                    self.status_message = String::from("Press Esc to go back");
+                } else {
+                    self.status_message = String::from("Select a model (↑/↓ to navigate, Enter to select, Esc to cancel, 'm' to refresh)");
+                    self.model_list_state.select(Some(0));
+                }
+            }
+        }
+    }
+
+    fn select_next_model(&mut self) {
+        if self.available_models.is_empty() {
+            return;
+        }
+        let current = self.model_list_state.selected().unwrap_or(0);
+        let next = (current + 1) % self.available_models.len();
+        self.model_list_state.select(Some(next));
+    }
+
+    fn select_previous_model(&mut self) {
+        if self.available_models.is_empty() {
+            return;
+        }
+        let current = self.model_list_state.selected().unwrap_or(0);
+        let previous = if current == 0 {
+            self.available_models.len() - 1
+        } else {
+            current - 1
+        };
+        self.model_list_state.select(Some(previous));
+    }
+
+    fn confirm_model_selection(&mut self) -> Result<()> {
+        if let Some(selected_idx) = self.model_list_state.selected() {
+            if let Some(model) = self.available_models.get(selected_idx) {
+                // Don't select if it's an error message
+                if !model.contains("No models found") && !model.contains("Error:") {
+                    self.config.set_model(model.clone())?;
+                    self.status_message = format!("Model '{}' selected and saved!", model);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn check_model_and_generate_hint(&mut self) -> Result<()> {
+        // Check if model is configured
+        if let Some(model) = self.config.get_model() {
+            // Check if the configured model is still available
+            self.display_mode = DisplayMode::ModelSelection;
+            self.status_message = String::from("Checking if configured model is available...");
+            self.available_models = vec![String::from("Checking...")];
+
+            let model_clone = model.to_string();
+            let (check_tx, mut check_rx) = mpsc::channel(1);
+
+            tokio::spawn(async move {
+                use ollama_rs::Ollama;
+                let ollama = Ollama::default();
+                match ollama.list_local_models().await {
+                    Ok(models) => {
+                        let model_exists = models.iter().any(|m| m.name == model_clone);
+                        let _ = check_tx.send(model_exists).await;
+                    }
+                    Err(_) => {
+                        let _ = check_tx.send(false).await;
+                    }
+                }
+            });
+
+            // Wait for check result
+            if let Some(exists) = check_rx.recv().await {
+                if exists {
+                    // Model exists, generate hint
+                    self.generate_hint_with_model(model.to_string()).await?;
+                } else {
+                    // Model doesn't exist, show model selection
+                    self.fetch_available_models().await;
+                }
+            } else {
+                self.fetch_available_models().await;
+            }
+        } else {
+            // No model configured, show model selection
+            self.fetch_available_models().await;
+        }
+        Ok(())
+    }
+
+    async fn generate_hint_with_model(&mut self, model: String) -> Result<()> {
+        if let Some(exercise) = self.get_selected_exercise() {
+            let exercise_title = exercise.metadata.title.clone();
+            let exercise_description = exercise.metadata.description.clone();
+            let test_output = self.test_output_lines.join("\n");
+            let exercise_code = std::fs::read_to_string(&exercise.exercise_file)
+                .unwrap_or_else(|_| String::from("Could not read exercise file"));
+
+            self.is_generating_hint = true;
+            self.display_mode = DisplayMode::Hint;
+            self.hint_text = Some(String::from("Generating hint..."));
+            self.scroll_position = 0;
+            self.status_message = format!("Generating hint with {} model... (Esc to return to test output)", model);
+
+            let (hint_tx, hint_rx) = mpsc::channel(1);
+            self.hint_receiver = Some(hint_rx);
+
+            tokio::spawn(async move {
+                use ollama_rs::Ollama;
+                use ollama_rs::generation::completion::request::GenerationRequest;
+
+                let prompt = format!(
+                    r#"You are a helpful programming tutor. A student is working on the following exercise:
+
+Exercise: {}
+Description: {}
+
+Their current code:
+```javascript
+{}
+```
+
+Test output showing failures:
+```
+{}
+```
+
+Provide a helpful hint (not the full solution) to guide them toward fixing the issue. Be encouraging and educational.
+
+Hint:"#,
+                    exercise_title,
+                    exercise_description,
+                    exercise_code,
+                    test_output
+                );
+
+                let ollama = Ollama::default();
+                let request = GenerationRequest::new(model.clone(), prompt);
+
+                match ollama.generate(request).await {
+                    Ok(response) => {
+                        let _ = hint_tx.send(response.response).await;
+                    }
+                    Err(e) => {
+                        let error_msg = format!("Failed to generate hint: {}. Make sure Ollama is running and the '{}' model is available.", e, model);
+                        let _ = hint_tx.send(error_msg).await;
+                    }
+                }
+            });
+        }
+        Ok(())
     }
 
     fn scroll_up(&mut self) {
@@ -334,7 +580,15 @@ impl App {
     }
 
     fn apply_scroll_delta(&mut self, delta: i32) {
-        let max_scroll = self.test_output_lines.len().saturating_sub(1);
+        let max_scroll = match self.display_mode {
+            DisplayMode::Hint => {
+                self.hint_text.as_ref()
+                    .map(|h| h.lines().count() + 4) // +4 for header lines
+                    .unwrap_or(0)
+                    .saturating_sub(1)
+            }
+            _ => self.test_output_lines.len().saturating_sub(1)
+        };
 
         if delta > 0 {
             // Scrolling down
@@ -394,23 +648,30 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 should_quit = true;
                                 break;
                             }
-                            KeyCode::Down if !matches!(app.display_mode, DisplayMode::TestOutput) => {
+                            KeyCode::Down if matches!(app.display_mode, DisplayMode::Readme) => {
                                 app.select_next();
                             }
-                            KeyCode::Up if !matches!(app.display_mode, DisplayMode::TestOutput) => {
+                            KeyCode::Up if matches!(app.display_mode, DisplayMode::Readme) => {
                                 app.select_previous();
                             }
-                            KeyCode::Char('j') if !matches!(app.display_mode, DisplayMode::TestOutput) => {
+                            KeyCode::Char('j') if matches!(app.display_mode, DisplayMode::Readme) => {
                                 app.select_next();
                             }
-                            KeyCode::Char('k') if !matches!(app.display_mode, DisplayMode::TestOutput) => {
+                            KeyCode::Char('k') if matches!(app.display_mode, DisplayMode::Readme) => {
                                 app.select_previous();
                             }
-                            // Batch scrolling in test output mode
-                            KeyCode::Down if matches!(app.display_mode, DisplayMode::TestOutput) => {
+                            // Model selection navigation
+                            KeyCode::Down if matches!(app.display_mode, DisplayMode::ModelSelection) => {
+                                app.select_next_model();
+                            }
+                            KeyCode::Up if matches!(app.display_mode, DisplayMode::ModelSelection) => {
+                                app.select_previous_model();
+                            }
+                            // Batch scrolling in test output and hint modes
+                            KeyCode::Down if matches!(app.display_mode, DisplayMode::TestOutput | DisplayMode::Hint) => {
                                 scroll_delta += 1;
                             }
-                            KeyCode::Up if matches!(app.display_mode, DisplayMode::TestOutput) => {
+                            KeyCode::Up if matches!(app.display_mode, DisplayMode::TestOutput | DisplayMode::Hint) => {
                                 scroll_delta -= 1;
                             }
                             KeyCode::PageDown => {
@@ -428,13 +689,26 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 scroll_delta = 0;
                             }
                             KeyCode::Esc => {
-                                if matches!(app.display_mode, DisplayMode::TestOutput) {
+                                if matches!(app.display_mode, DisplayMode::Hint) {
+                                    app.show_test_output();
+                                    scroll_delta = 0;
+                                } else if matches!(app.display_mode, DisplayMode::ModelSelection) {
+                                    app.show_test_output();
+                                    scroll_delta = 0;
+                                } else if matches!(app.display_mode, DisplayMode::TestOutput) {
                                     app.show_readme();
                                     scroll_delta = 0;
                                 }
                             }
                             KeyCode::Enter => {
-                                if !app.is_running_test {
+                                if matches!(app.display_mode, DisplayMode::ModelSelection) {
+                                    // Confirm model selection and generate hint
+                                    app.confirm_model_selection()?;
+                                    if let Some(model) = app.config.get_model() {
+                                        app.generate_hint_with_model(model.to_string()).await?;
+                                    }
+                                    scroll_delta = 0;
+                                } else if !app.is_running_test {
                                     app.run_current_test().await?;
                                     scroll_delta = 0;
                                 }
@@ -442,6 +716,26 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Char('r') => {
                                 app.show_readme();
                                 scroll_delta = 0;
+                            }
+                            KeyCode::Char('h') => {
+                                // Generate hint if tests have failed
+                                if matches!(app.display_mode, DisplayMode::TestOutput)
+                                    && matches!(app.last_test_result, Some(TestResult::Failed))
+                                    && !app.is_generating_hint {
+                                    app.check_model_and_generate_hint().await?;
+                                    scroll_delta = 0;
+                                }
+                            }
+                            KeyCode::Char('m') => {
+                                // Manual model selection from hint or test output mode
+                                if matches!(app.display_mode, DisplayMode::Hint | DisplayMode::TestOutput) {
+                                    app.fetch_available_models().await;
+                                    scroll_delta = 0;
+                                } else if matches!(app.display_mode, DisplayMode::ModelSelection) {
+                                    // Refresh model list
+                                    app.fetch_available_models().await;
+                                    scroll_delta = 0;
+                                }
                             }
                             _ => {}
                         }
@@ -454,7 +748,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
             }
 
             // Apply batched scroll changes once
-            if scroll_delta != 0 && matches!(app.display_mode, DisplayMode::TestOutput) {
+            if scroll_delta != 0 && matches!(app.display_mode, DisplayMode::TestOutput | DisplayMode::Hint) {
                 app.apply_scroll_delta(scroll_delta);
             }
         }
@@ -643,6 +937,76 @@ fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
                 .collect();
 
             (Text::from(visible_lines), "Test Output")
+        }
+        DisplayMode::Hint => {
+            let mut all_lines = Vec::new();
+
+            // Show hint header
+            all_lines.push(Line::from(Span::styled(
+                "💡 AI HINT",
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            )));
+            all_lines.push(Line::from(""));
+            all_lines.push(Line::from(Span::styled(
+                "─".repeat(50),
+                Style::default().fg(Color::DarkGray),
+            )));
+            all_lines.push(Line::from(""));
+
+            // Show hint text
+            if let Some(hint) = &app.hint_text {
+                for line in hint.lines() {
+                    all_lines.push(Line::from(line.to_string()));
+                }
+            } else {
+                all_lines.push(Line::from("Generating hint..."));
+            }
+
+            // Apply manual scrolling by slicing the lines
+            let visible_lines: Vec<Line> = all_lines
+                .into_iter()
+                .skip(app.scroll_position)
+                .collect();
+
+            (Text::from(visible_lines), "Hint")
+        }
+        DisplayMode::ModelSelection => {
+            // Use List widget for model selection
+            let items: Vec<ListItem> = app
+                .available_models
+                .iter()
+                .map(|model| {
+                    let is_current = app.config.get_model() == Some(model);
+                    let content = if is_current {
+                        format!("✓ {} (current)", model)
+                    } else {
+                        model.clone()
+                    };
+
+                    let style = if model.contains("Error:") || model.contains("No models") {
+                        Style::default().fg(Color::Red)
+                    } else if is_current {
+                        Style::default().fg(Color::Green)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
+
+                    ListItem::new(content).style(style)
+                })
+                .collect();
+
+            let list = List::new(items)
+                .block(Block::default().borders(Borders::ALL).title("Select Ollama Model"))
+                .highlight_style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .highlight_symbol(">> ");
+
+            let mut state = app.model_list_state.clone();
+            f.render_stateful_widget(list, area, &mut state);
+            return;
         }
     };
 

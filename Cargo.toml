@@ -17,3 +17,4 @@ tokio = { version = "1.40", features = ["full"] }
 anyhow = "1.0"
 directories = "5.0"
 chrono = "0.4"
+ollama-rs = "0.3.2"
