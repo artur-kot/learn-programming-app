@@ -169,14 +169,22 @@ jobs:
       - name: Build deb package
         run: cargo deb
 
+      - name: Find deb file
+        id: find_deb
+        run: |
+          DEB_FILE=$(ls target/debian/*.deb | head -1)
+          DEB_NAME=$(basename "$DEB_FILE")
+          echo "path=$DEB_FILE" >> $GITHUB_OUTPUT
+          echo "name=$DEB_NAME" >> $GITHUB_OUTPUT
+
       - name: Upload Debian Package
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./target/debian/learnp_${{ needs.create-release.outputs.version }}_amd64.deb
-          asset_name: learnp_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_path: ${{ steps.find_deb.outputs.path }}
+          asset_name: ${{ steps.find_deb.outputs.name }}
           asset_content_type: application/vnd.debian.binary-package
 
   build-rpm:
@@ -199,14 +207,22 @@ jobs:
       - name: Generate RPM
         run: cargo generate-rpm
 
+      - name: Find RPM file
+        id: find_rpm
+        run: |
+          RPM_FILE=$(ls target/generate-rpm/*.rpm | head -1)
+          RPM_NAME=$(basename "$RPM_FILE")
+          echo "path=$RPM_FILE" >> $GITHUB_OUTPUT
+          echo "name=$RPM_NAME" >> $GITHUB_OUTPUT
+
       - name: Upload RPM Package
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./target/generate-rpm/learnp-${{ needs.create-release.outputs.version }}-1.x86_64.rpm
-          asset_name: learnp-${{ needs.create-release.outputs.version }}-1.x86_64.rpm
+          asset_path: ${{ steps.find_rpm.outputs.path }}
+          asset_name: ${{ steps.find_rpm.outputs.name }}
           asset_content_type: application/x-rpm
 
   build-appimage:
@@ -333,14 +349,23 @@ jobs:
       - name: Create WiX installer
         run: cargo wix --nocapture
 
+      - name: Find MSI file
+        id: find_msi
+        shell: pwsh
+        run: |
+          $MSI_FILE = Get-ChildItem -Path target/wix/*.msi | Select-Object -First 1
+          $MSI_NAME = $MSI_FILE.Name
+          echo "path=$($MSI_FILE.FullName)" >> $env:GITHUB_OUTPUT
+          echo "name=$MSI_NAME" >> $env:GITHUB_OUTPUT
+
       - name: Upload Windows Installer (MSI)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./target/wix/learnp-${{ needs.create-release.outputs.version }}-x86_64.msi
-          asset_name: learnp-${{ needs.create-release.outputs.version }}-x86_64.msi
+          asset_path: ${{ steps.find_msi.outputs.path }}
+          asset_name: ${{ steps.find_msi.outputs.name }}
           asset_content_type: application/x-msi
 
   build-macos:
