@@ -1,6 +1,7 @@
 mod config;
 mod course;
 mod database;
+mod git;
 mod test_runner;
 mod ui;
 
@@ -39,7 +40,13 @@ async fn main() -> Result<()> {
     }
 
     println!("Loading course from: {:?}", course_path);
-    println!("Starting Learn Programming TUI...\n");
+
+    // Check for course updates before starting TUI
+    if let Err(e) = git::check_and_prompt_for_updates(&course_path) {
+        eprintln!("Warning: Could not check for updates: {}", e);
+    }
+
+    println!("\nStarting Learn Programming TUI...\n");
 
     ui::run_app(course_path)
         .await
