@@ -48,6 +48,7 @@ pub struct App {
     hint_text: Option<String>,
     is_generating_hint: bool,
     hint_receiver: Option<mpsc::Receiver<String>>,
+    hint_complete_receiver: Option<mpsc::Receiver<()>>,
     config: Config,
     available_models: Vec<String>,
     model_list_state: ListState,
@@ -98,7 +99,9 @@ impl App {
             display_mode: DisplayMode::Readme,
             last_test_result: None,
             test_output_lines: Vec::new(),
-            status_message: String::from("Press Enter to run tests, 'r' to show README, 'q' to quit"),
+            status_message: String::from(
+                "Press Enter to run tests, 'r' to show README, 'q' to quit",
+            ),
             is_running_test: false,
             scroll_position: 0,
             output_receiver: None,
@@ -109,6 +112,7 @@ impl App {
             hint_text: None,
             is_generating_hint: false,
             hint_receiver: None,
+            hint_complete_receiver: None,
             config,
             available_models: Vec::new(),
             model_list_state: ListState::default(),
@@ -223,12 +227,12 @@ impl App {
 
             self.is_running_test = true;
             self.running_exercise_id = Some(exercise_id.clone());
-            self.status_message = format!("Running tests for {}... (↑/↓ to scroll, Esc to exit)", title);
+            self.status_message = format!(
+                "Running tests for {}... (↑/↓ to scroll, Esc to exit)",
+                title
+            );
             self.display_mode = DisplayMode::TestOutput;
-            self.test_output_lines = vec![
-                String::from("Running tests..."),
-                String::new(),
-            ];
+            self.test_output_lines = vec![String::from("Running tests..."), String::new()];
             self.scroll_position = 0;
 
             // Create channels for streaming output and result
@@ -243,7 +247,10 @@ impl App {
             let db = self.database.clone();
 
             tokio::spawn(async move {
-                let result = match test_runner.run_test_streaming(&exercise_id_clone, output_tx).await {
+                let result = match test_runner
+                    .run_test_streaming(&exercise_id_clone, output_tx)
+                    .await
+                {
                     Ok(result) => {
                         // Update database based on result
                         match &result {
@@ -257,7 +264,7 @@ impl App {
                         }
                         result
                     }
-                    Err(_) => TestResult::Error("Failed to run test".to_string())
+                    Err(_) => TestResult::Error("Failed to run test".to_string()),
                 };
 
                 // Send result back to main thread
@@ -280,7 +287,12 @@ impl App {
             while let Ok(line) = rx.try_recv() {
                 // Remove trailing newline if present and add as separate line
                 let line = line.trim_end_matches('\n').trim_end_matches('\r');
-                if !line.is_empty() || self.test_output_lines.last().map_or(false, |l| !l.is_empty()) {
+                if !line.is_empty()
+                    || self
+                        .test_output_lines
+                        .last()
+                        .map_or(false, |l| !l.is_empty())
+                {
                     self.test_output_lines.push(line.to_string());
                 }
             }
@@ -300,13 +312,19 @@ impl App {
                     let title = &exercise.metadata.title;
                     match result {
                         TestResult::Passed => {
-                            self.status_message = format!("✓ {} completed! Press 'r' or Esc to show README, Enter to run again", title);
+                            self.status_message = format!(
+                                "✓ {} completed! Press Esc to show README, Enter to run again",
+                                title
+                            );
                         }
                         TestResult::Failed => {
-                            self.status_message = format!("✗ Tests failed for {}. Press 'r' or Esc to show README, Enter to run again, 'h' for hint", title);
+                            self.status_message = format!("✗ Tests failed for {}. Press Esc to show README, Enter to run again, 'h' for hint", title);
                         }
                         TestResult::Error(err) => {
-                            self.status_message = format!("Error: {}. Press 'r' or Esc to show README, Enter to try again", err);
+                            self.status_message = format!(
+                                "Error: {}. Press Esc to show README, Enter to try again",
+                                err
+                            );
                         }
                     }
                 }
@@ -329,17 +347,31 @@ impl App {
         self.result_receiver = None;
         self.last_test_result = None;
         self.running_exercise_id = None;
-        self.status_message = String::from("Press Enter to run tests, 'r' to show README, 'q' to quit");
+        self.status_message =
+            String::from("Press Enter to run tests, 'r' to show README, 'q' to quit");
     }
 
-
     fn check_hint_generation(&mut self) {
+        // Check for new tokens
         if let Some(ref mut rx) = self.hint_receiver {
-            if let Ok(hint) = rx.try_recv() {
-                self.hint_text = Some(hint);
+            while let Ok(token) = rx.try_recv() {
+                // Append token to hint text (streaming)
+                if let Some(ref mut hint) = self.hint_text {
+                    hint.push_str(&token);
+                } else {
+                    self.hint_text = Some(token);
+                }
+            }
+        }
+
+        // Check if generation is complete
+        if let Some(ref mut complete_rx) = self.hint_complete_receiver {
+            if let Ok(_) = complete_rx.try_recv() {
                 self.is_generating_hint = false;
-                self.hint_receiver = None;
-                self.status_message = String::from("Hint ready! Press Esc to return to test output");
+                self.hint_complete_receiver = None;
+                self.status_message = String::from(
+                    "Hint ready! Press Esc to return to test output, 'm' to change model",
+                );
             }
         }
     }
@@ -350,9 +382,12 @@ impl App {
         if let Some(exercise) = self.get_selected_exercise() {
             let title = &exercise.metadata.title;
             if self.last_test_result.is_some() {
-                self.status_message = format!("Test output for {}. Press 'r' or Esc to show README, 'h' for hint", title);
+                self.status_message = format!(
+                    "Test output for {}. Press Esc to show README, 'h' for hint",
+                    title
+                );
             } else {
-                self.status_message = format!("Press Enter to run tests, 'r' to show README");
+                self.status_message = format!("Press Enter to run tests, Esc to show README");
             }
         }
     }
@@ -374,10 +409,7 @@ impl App {
             let ollama = Ollama::default();
             match ollama.list_local_models().await {
                 Ok(models) => {
-                    let model_names: Vec<String> = models
-                        .iter()
-                        .map(|m| m.name.clone())
-                        .collect();
+                    let model_names: Vec<String> = models.iter().map(|m| m.name.clone()).collect();
 
                     if model_names.is_empty() {
                         let _ = models_tx.send(vec![String::from("No models found. Please install a model with 'ollama pull <model-name>'")]).await;
@@ -386,7 +418,11 @@ impl App {
                     }
                 }
                 Err(_) => {
-                    let _ = models_tx.send(vec![String::from("Error: Cannot connect to Ollama. Make sure Ollama is running.")]).await;
+                    let _ = models_tx
+                        .send(vec![String::from(
+                            "Error: Cannot connect to Ollama. Make sure Ollama is running.",
+                        )])
+                        .await;
                 }
             }
         });
@@ -398,9 +434,10 @@ impl App {
                 self.available_models = models;
                 self.models_receiver = None;
 
-                if self.available_models.len() == 1 &&
-                   (self.available_models[0].contains("No models found") ||
-                    self.available_models[0].contains("Error:")) {
+                if self.available_models.len() == 1
+                    && (self.available_models[0].contains("No models found")
+                        || self.available_models[0].contains("Error:"))
+                {
                     // Error or no models
                     self.status_message = String::from("Press Esc to go back");
                 } else {
@@ -500,16 +537,18 @@ impl App {
 
             self.is_generating_hint = true;
             self.display_mode = DisplayMode::Hint;
-            self.hint_text = Some(String::from("Generating hint..."));
+            self.hint_text = Some(String::new());
             self.scroll_position = 0;
-            self.status_message = format!("Generating hint with {} model... (Esc to return to test output)", model);
+            self.status_message = format!("Generating hint with {} model... (Esc to return to test output, 'm' to change model)", model);
 
-            let (hint_tx, hint_rx) = mpsc::channel(1);
+            let (hint_tx, hint_rx) = mpsc::channel(100);
+            let (complete_tx, complete_rx) = mpsc::channel(1);
             self.hint_receiver = Some(hint_rx);
+            self.hint_complete_receiver = Some(complete_rx);
 
             tokio::spawn(async move {
-                use ollama_rs::Ollama;
                 use ollama_rs::generation::completion::request::GenerationRequest;
+                use ollama_rs::Ollama;
 
                 let prompt = format!(
                     r#"You are a helpful programming tutor. A student is working on the following exercise:
@@ -530,22 +569,30 @@ Test output showing failures:
 Provide a helpful hint (not the full solution) to guide them toward fixing the issue. Be encouraging and educational.
 
 Hint:"#,
-                    exercise_title,
-                    exercise_description,
-                    exercise_code,
-                    test_output
+                    exercise_title, exercise_description, exercise_code, test_output
                 );
 
                 let ollama = Ollama::default();
                 let request = GenerationRequest::new(model.clone(), prompt);
 
+                // Use the generate method and send response in chunks (simulating streaming)
                 match ollama.generate(request).await {
                     Ok(response) => {
-                        let _ = hint_tx.send(response.response).await;
+                        // Simulate streaming by sending words one at a time
+                        for word in response.response.split_whitespace() {
+                            if let Err(_) = hint_tx.send(format!("{} ", word)).await {
+                                break;
+                            }
+                            // Small delay to simulate streaming
+                            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                        }
+                        // Signal completion
+                        let _ = complete_tx.send(()).await;
                     }
                     Err(e) => {
                         let error_msg = format!("Failed to generate hint: {}. Make sure Ollama is running and the '{}' model is available.", e, model);
                         let _ = hint_tx.send(error_msg).await;
+                        let _ = complete_tx.send(()).await;
                     }
                 }
             });
@@ -582,23 +629,24 @@ Hint:"#,
     fn apply_scroll_delta(&mut self, delta: i32) {
         let max_scroll = match self.display_mode {
             DisplayMode::Hint => {
-                self.hint_text.as_ref()
+                self.hint_text
+                    .as_ref()
                     .map(|h| h.lines().count() + 4) // +4 for header lines
                     .unwrap_or(0)
                     .saturating_sub(1)
             }
-            _ => self.test_output_lines.len().saturating_sub(1)
+            _ => self.test_output_lines.len().saturating_sub(1),
         };
 
         if delta > 0 {
             // Scrolling down
-            self.scroll_position = self.scroll_position
+            self.scroll_position = self
+                .scroll_position
                 .saturating_add(delta as usize)
                 .min(max_scroll);
         } else if delta < 0 {
             // Scrolling up
-            self.scroll_position = self.scroll_position
-                .saturating_sub((-delta) as usize);
+            self.scroll_position = self.scroll_position.saturating_sub((-delta) as usize);
         }
     }
 }
@@ -654,24 +702,42 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Up if matches!(app.display_mode, DisplayMode::Readme) => {
                                 app.select_previous();
                             }
-                            KeyCode::Char('j') if matches!(app.display_mode, DisplayMode::Readme) => {
+                            KeyCode::Char('j')
+                                if matches!(app.display_mode, DisplayMode::Readme) =>
+                            {
                                 app.select_next();
                             }
-                            KeyCode::Char('k') if matches!(app.display_mode, DisplayMode::Readme) => {
+                            KeyCode::Char('k')
+                                if matches!(app.display_mode, DisplayMode::Readme) =>
+                            {
                                 app.select_previous();
                             }
                             // Model selection navigation
-                            KeyCode::Down if matches!(app.display_mode, DisplayMode::ModelSelection) => {
+                            KeyCode::Down
+                                if matches!(app.display_mode, DisplayMode::ModelSelection) =>
+                            {
                                 app.select_next_model();
                             }
-                            KeyCode::Up if matches!(app.display_mode, DisplayMode::ModelSelection) => {
+                            KeyCode::Up
+                                if matches!(app.display_mode, DisplayMode::ModelSelection) =>
+                            {
                                 app.select_previous_model();
                             }
                             // Batch scrolling in test output and hint modes
-                            KeyCode::Down if matches!(app.display_mode, DisplayMode::TestOutput | DisplayMode::Hint) => {
+                            KeyCode::Down
+                                if matches!(
+                                    app.display_mode,
+                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                ) =>
+                            {
                                 scroll_delta += 1;
                             }
-                            KeyCode::Up if matches!(app.display_mode, DisplayMode::TestOutput | DisplayMode::Hint) => {
+                            KeyCode::Up
+                                if matches!(
+                                    app.display_mode,
+                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                ) =>
+                            {
                                 scroll_delta -= 1;
                             }
                             KeyCode::PageDown => {
@@ -714,21 +780,28 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 }
                             }
                             KeyCode::Char('r') => {
-                                app.show_readme();
-                                scroll_delta = 0;
+                                // Only allow 'r' from Readme mode to show readme
+                                if matches!(app.display_mode, DisplayMode::Readme) {
+                                    app.show_readme();
+                                    scroll_delta = 0;
+                                }
                             }
                             KeyCode::Char('h') => {
                                 // Generate hint if tests have failed
                                 if matches!(app.display_mode, DisplayMode::TestOutput)
                                     && matches!(app.last_test_result, Some(TestResult::Failed))
-                                    && !app.is_generating_hint {
+                                    && !app.is_generating_hint
+                                {
                                     app.check_model_and_generate_hint().await?;
                                     scroll_delta = 0;
                                 }
                             }
                             KeyCode::Char('m') => {
                                 // Manual model selection from hint or test output mode
-                                if matches!(app.display_mode, DisplayMode::Hint | DisplayMode::TestOutput) {
+                                if matches!(
+                                    app.display_mode,
+                                    DisplayMode::Hint | DisplayMode::TestOutput
+                                ) {
                                     app.fetch_available_models().await;
                                     scroll_delta = 0;
                                 } else if matches!(app.display_mode, DisplayMode::ModelSelection) {
@@ -748,7 +821,12 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
             }
 
             // Apply batched scroll changes once
-            if scroll_delta != 0 && matches!(app.display_mode, DisplayMode::TestOutput | DisplayMode::Hint) {
+            if scroll_delta != 0
+                && matches!(
+                    app.display_mode,
+                    DisplayMode::TestOutput | DisplayMode::Hint
+                )
+            {
                 app.apply_scroll_delta(scroll_delta);
             }
         }
@@ -767,7 +845,11 @@ fn ui<B: Backend>(f: &mut Frame, app: &App) {
 
     // Title
     let title = Paragraph::new(app.course.name.clone())
-        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(title, chunks[0]);
@@ -817,7 +899,11 @@ fn render_exercise_list<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
             let status_icon = if is_completed {
                 "✓"
             } else if is_running {
-                if app.blink_toggle { "●" } else { " " }
+                if app.blink_toggle {
+                    "●"
+                } else {
+                    " "
+                }
             } else {
                 " "
             };
@@ -866,7 +952,10 @@ fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
                         Span::raw(&exercise.metadata.title),
                     ]),
                     Line::from(vec![
-                        Span::styled("Description: ", Style::default().add_modifier(Modifier::BOLD)),
+                        Span::styled(
+                            "Description: ",
+                            Style::default().add_modifier(Modifier::BOLD),
+                        ),
                         Span::raw(&exercise.metadata.description),
                     ]),
                     Line::from(""),
@@ -901,7 +990,9 @@ fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
                     TestResult::Passed => {
                         all_lines.push(Line::from(Span::styled(
                             "✓ ALL TESTS PASSED!",
-                            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                            Style::default()
+                                .fg(Color::Green)
+                                .add_modifier(Modifier::BOLD),
                         )));
                     }
                     TestResult::Failed => {
@@ -931,10 +1022,8 @@ fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
             }
 
             // Apply manual scrolling by slicing the lines
-            let visible_lines: Vec<Line> = all_lines
-                .into_iter()
-                .skip(app.scroll_position)
-                .collect();
+            let visible_lines: Vec<Line> =
+                all_lines.into_iter().skip(app.scroll_position).collect();
 
             (Text::from(visible_lines), "Test Output")
         }
@@ -944,7 +1033,9 @@ fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
             // Show hint header
             all_lines.push(Line::from(Span::styled(
                 "💡 AI HINT",
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             )));
             all_lines.push(Line::from(""));
             all_lines.push(Line::from(Span::styled(
@@ -963,10 +1054,8 @@ fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
             }
 
             // Apply manual scrolling by slicing the lines
-            let visible_lines: Vec<Line> = all_lines
-                .into_iter()
-                .skip(app.scroll_position)
-                .collect();
+            let visible_lines: Vec<Line> =
+                all_lines.into_iter().skip(app.scroll_position).collect();
 
             (Text::from(visible_lines), "Hint")
         }
@@ -996,7 +1085,11 @@ fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
                 .collect();
 
             let list = List::new(items)
-                .block(Block::default().borders(Borders::ALL).title("Select Ollama Model"))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Select Ollama Model"),
+                )
                 .highlight_style(
                     Style::default()
                         .bg(Color::DarkGray)
