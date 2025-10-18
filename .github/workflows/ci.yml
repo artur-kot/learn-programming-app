@@ -115,7 +115,7 @@ jobs:
           key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Test Debian package build
-        run: cargo deb --no-build
+        run: cargo deb
 
   security-audit:
     name: Security Audit
