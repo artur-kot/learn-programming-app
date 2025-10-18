@@ -33,10 +33,10 @@ pub struct App {
     list_state: ListState,
     display_mode: DisplayMode,
     last_test_result: Option<TestResult>,
-    test_output: String,
+    test_output_lines: Vec<String>,
     status_message: String,
     is_running_test: bool,
-    scroll_position: u16,
+    scroll_position: usize,
     output_receiver: Option<mpsc::Receiver<String>>,
     result_receiver: Option<mpsc::Receiver<TestResult>>,
 }
@@ -61,7 +61,7 @@ impl App {
             list_state,
             display_mode: DisplayMode::Readme,
             last_test_result: None,
-            test_output: String::new(),
+            test_output_lines: Vec::new(),
             status_message: String::from("Press Enter to run tests, 'r' to show README, 'q' to quit"),
             is_running_test: false,
             scroll_position: 0,
@@ -79,7 +79,7 @@ impl App {
 
         // Reset to readme when changing exercises
         self.display_mode = DisplayMode::Readme;
-        self.test_output.clear();
+        self.test_output_lines.clear();
         self.last_test_result = None;
         self.scroll_position = 0;
         self.is_running_test = false;
@@ -100,7 +100,7 @@ impl App {
 
         // Reset to readme when changing exercises
         self.display_mode = DisplayMode::Readme;
-        self.test_output.clear();
+        self.test_output_lines.clear();
         self.last_test_result = None;
         self.scroll_position = 0;
         self.is_running_test = false;
@@ -120,7 +120,10 @@ impl App {
             self.is_running_test = true;
             self.status_message = format!("Running tests for {}... (↑/↓ to scroll, Esc to exit)", title);
             self.display_mode = DisplayMode::TestOutput;
-            self.test_output = String::from("Running tests...\n\n");
+            self.test_output_lines = vec![
+                String::from("Running tests..."),
+                String::new(),
+            ];
             self.scroll_position = 0;
 
             // Create channels for streaming output and result
@@ -164,7 +167,11 @@ impl App {
         if let Some(ref mut rx) = self.output_receiver {
             // Try to receive all available messages
             while let Ok(line) = rx.try_recv() {
-                self.test_output.push_str(&line);
+                // Remove trailing newline if present and add as separate line
+                let line = line.trim_end_matches('\n').trim_end_matches('\r');
+                if !line.is_empty() || self.test_output_lines.last().map_or(false, |l| !l.is_empty()) {
+                    self.test_output_lines.push(line.to_string());
+                }
             }
         }
 
@@ -197,7 +204,7 @@ impl App {
 
     fn show_readme(&mut self) {
         self.display_mode = DisplayMode::Readme;
-        self.test_output.clear();
+        self.test_output_lines.clear();
         self.scroll_position = 0;
         self.is_running_test = false;
         self.output_receiver = None;
@@ -211,7 +218,8 @@ impl App {
     }
 
     fn scroll_down(&mut self) {
-        self.scroll_position = self.scroll_position.saturating_add(1);
+        let max_scroll = self.test_output_lines.len().saturating_sub(1);
+        self.scroll_position = self.scroll_position.saturating_add(1).min(max_scroll);
     }
 
     fn scroll_to_top(&mut self) {
@@ -219,8 +227,7 @@ impl App {
     }
 
     fn scroll_to_bottom(&mut self) {
-        // Set to a large value, will be clamped by rendering
-        self.scroll_position = u16::MAX;
+        self.scroll_position = self.test_output_lines.len().saturating_sub(1);
     }
 
     fn page_up(&mut self) {
@@ -228,7 +235,23 @@ impl App {
     }
 
     fn page_down(&mut self) {
-        self.scroll_position = self.scroll_position.saturating_add(10);
+        let max_scroll = self.test_output_lines.len().saturating_sub(1);
+        self.scroll_position = self.scroll_position.saturating_add(10).min(max_scroll);
+    }
+
+    fn apply_scroll_delta(&mut self, delta: i32) {
+        let max_scroll = self.test_output_lines.len().saturating_sub(1);
+
+        if delta > 0 {
+            // Scrolling down
+            self.scroll_position = self.scroll_position
+                .saturating_add(delta as usize)
+                .min(max_scroll);
+        } else if delta < 0 {
+            // Scrolling up
+            self.scroll_position = self.scroll_position
+                .saturating_sub((-delta) as usize);
+        }
     }
 }
 
@@ -264,57 +287,81 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
 
         // Poll for events with timeout
         if event::poll(std::time::Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Down if !matches!(app.display_mode, DisplayMode::TestOutput) => {
-                            app.select_next();
-                        }
-                        KeyCode::Up if !matches!(app.display_mode, DisplayMode::TestOutput) => {
-                            app.select_previous();
-                        }
-                        KeyCode::Char('j') if !matches!(app.display_mode, DisplayMode::TestOutput) => {
-                            app.select_next();
-                        }
-                        KeyCode::Char('k') if !matches!(app.display_mode, DisplayMode::TestOutput) => {
-                            app.select_previous();
-                        }
-                        // Scrolling in test output mode
-                        KeyCode::Down if matches!(app.display_mode, DisplayMode::TestOutput) => {
-                            app.scroll_down();
-                        }
-                        KeyCode::Up if matches!(app.display_mode, DisplayMode::TestOutput) => {
-                            app.scroll_up();
-                        }
-                        KeyCode::PageDown => {
-                            app.page_down();
-                        }
-                        KeyCode::PageUp => {
-                            app.page_up();
-                        }
-                        KeyCode::Home => {
-                            app.scroll_to_top();
-                        }
-                        KeyCode::End => {
-                            app.scroll_to_bottom();
-                        }
-                        KeyCode::Esc => {
-                            if matches!(app.display_mode, DisplayMode::TestOutput) {
+            // Batch process all available events to prevent scroll artifacts
+            let mut scroll_delta: i32 = 0;
+            let mut should_quit = false;
+
+            // Read all available events
+            while event::poll(std::time::Duration::from_millis(0))? {
+                if let Event::Key(key) = event::read()? {
+                    if key.kind == KeyEventKind::Press {
+                        match key.code {
+                            KeyCode::Char('q') => {
+                                should_quit = true;
+                                break;
+                            }
+                            KeyCode::Down if !matches!(app.display_mode, DisplayMode::TestOutput) => {
+                                app.select_next();
+                            }
+                            KeyCode::Up if !matches!(app.display_mode, DisplayMode::TestOutput) => {
+                                app.select_previous();
+                            }
+                            KeyCode::Char('j') if !matches!(app.display_mode, DisplayMode::TestOutput) => {
+                                app.select_next();
+                            }
+                            KeyCode::Char('k') if !matches!(app.display_mode, DisplayMode::TestOutput) => {
+                                app.select_previous();
+                            }
+                            // Batch scrolling in test output mode
+                            KeyCode::Down if matches!(app.display_mode, DisplayMode::TestOutput) => {
+                                scroll_delta += 1;
+                            }
+                            KeyCode::Up if matches!(app.display_mode, DisplayMode::TestOutput) => {
+                                scroll_delta -= 1;
+                            }
+                            KeyCode::PageDown => {
+                                scroll_delta += 10;
+                            }
+                            KeyCode::PageUp => {
+                                scroll_delta -= 10;
+                            }
+                            KeyCode::Home => {
+                                app.scroll_to_top();
+                                scroll_delta = 0;
+                            }
+                            KeyCode::End => {
+                                app.scroll_to_bottom();
+                                scroll_delta = 0;
+                            }
+                            KeyCode::Esc => {
+                                if matches!(app.display_mode, DisplayMode::TestOutput) {
+                                    app.show_readme();
+                                    scroll_delta = 0;
+                                }
+                            }
+                            KeyCode::Enter => {
+                                if !app.is_running_test {
+                                    app.run_current_test().await?;
+                                    scroll_delta = 0;
+                                }
+                            }
+                            KeyCode::Char('r') => {
                                 app.show_readme();
+                                scroll_delta = 0;
                             }
+                            _ => {}
                         }
-                        KeyCode::Enter => {
-                            if !app.is_running_test {
-                                app.run_current_test().await?;
-                            }
-                        }
-                        KeyCode::Char('r') => {
-                            app.show_readme();
-                        }
-                        _ => {}
                     }
                 }
+            }
+
+            if should_quit {
+                return Ok(());
+            }
+
+            // Apply batched scroll changes once
+            if scroll_delta != 0 && matches!(app.display_mode, DisplayMode::TestOutput) {
+                app.apply_scroll_delta(scroll_delta);
             }
         }
     }
@@ -472,16 +519,15 @@ fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
                 all_lines.push(Line::from(""));
             }
 
-            // Show test output
-            for line in app.test_output.lines() {
-                all_lines.push(Line::from(line.to_string()));
+            // Show test output - each line is already stored separately
+            for line in &app.test_output_lines {
+                all_lines.push(Line::from(line.as_str()));
             }
 
             // Apply manual scrolling by slicing the lines
-            let scroll_offset = app.scroll_position as usize;
             let visible_lines: Vec<Line> = all_lines
                 .into_iter()
-                .skip(scroll_offset)
+                .skip(app.scroll_position)
                 .collect();
 
             (Text::from(visible_lines), "Test Output")
