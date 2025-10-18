@@ -1,15 +1,17 @@
-# JS Learner - Interactive JavaScript Learning TUI
+# Learn Programming - Interactive Programming Learning TUI
 
-A beautiful Terminal User Interface (TUI) application built in Rust for learning JavaScript through interactive exercises. The app watches your code changes in real-time, runs tests automatically, and tracks your progress.
+A beautiful Terminal User Interface (TUI) application built in Rust for learning programming through interactive exercises. The app runs tests on demand, displays output in real-time, and tracks your progress.
 
 ## Features
 
 - **Interactive TUI Interface**: Beautiful terminal interface built with `ratatui`
-- **Real-time File Watching**: Automatically detects changes to your exercise files
-- **Automatic Test Running**: Runs tests in the background when files change
+- **On-Demand Test Running**: Run tests with a single keypress
+- **Real-time Streaming Output**: Watch test results appear as they run, just like in a terminal
+- **Scrollable Output**: Full navigation support for long test outputs
 - **Progress Tracking**: Saves your progress in a local SQLite database
-- **Course Management**: Load and manage multiple JavaScript courses
+- **Course Management**: Load and manage multiple programming courses
 - **Exercise Completion**: Visual indicators showing which exercises are completed
+- **Dual-Panel View**: Exercise details on the left, test output on the right
 
 ## Prerequisites
 
@@ -18,61 +20,84 @@ A beautiful Terminal User Interface (TUI) application built in Rust for learning
 
 ## Installation
 
-### Build from source
+### Install from source
 
 ```bash
-# Clone the repository
+# Clone or navigate to the repository
 cd learn-programming-app
 
-# Build the application
-cargo build --release
+# Install the application
+cargo install --path .
 
-# The binary will be available at ./target/release/js-learner
+# The binary will be installed to ~/.cargo/bin/learnp
 ```
 
 ## Getting Started
 
-### 1. Prepare the Course
+### 1. Install Dependencies
 
-First, install the npm dependencies for the example course:
+**Important**: Before running the application, you must install the course dependencies (Jest and testing tools):
 
 ```bash
 cd example-js-course
 npm install
-cd ..
 ```
+
+This step is required only once per course. The application will show an error if `node_modules` is missing.
 
 ### 2. Run the Application
 
 ```bash
-# Run with the example course (default)
-cargo run --release
+# Run from within the course directory (recommended)
+learnp
 
-# Or specify a course directory
-cargo run --release -- /path/to/course
+# Or specify a course directory path from anywhere
+learnp /path/to/course
+```
+
+**First-time setup summary:**
+```bash
+# 1. Install the learnp tool
+cargo install --path .
+
+# 2. Navigate to a course
+cd example-js-course
+
+# 3. Install course dependencies (one-time setup)
+npm install
+
+# 4. Start learning!
+learnp
 ```
 
 ### 3. Using the Interface
 
-**List Mode:**
-- `↓` or `j` - Move down
-- `↑` or `k` - Move up
-- `w` or `Enter` - Start watching selected exercise
+**Exercise Navigation (when viewing README):**
+- `↓` or `j` - Move to next exercise
+- `↑` or `k` - Move to previous exercise
+- `Enter` - Run tests for selected exercise
+- `r` - Show README (exercise details)
 - `q` - Quit
 
-**Watch Mode:**
-- `Esc` - Stop watching and return to list
-- `r` - Run tests manually
-- `q` - Quit
+**Scrolling (when viewing test output):**
+- `↓` / `↑` - Scroll down/up one line
+- `Page Down` / `Page Up` - Scroll down/up 10 lines
+- `Home` - Scroll to top
+- `End` - Scroll to bottom
+- `Esc` - Exit scrolling mode and return to README
 
 ### 4. Complete Exercises
 
 1. Select an exercise from the list
-2. Press `w` or `Enter` to start watching
-3. Open the exercise file in your favorite editor
+2. The right panel shows the exercise README
+3. Open the exercise file in your favorite editor (e.g., VS Code, Vim)
 4. Edit the file to solve the exercise
-5. Save the file - tests run automatically!
-6. When all tests pass, the exercise is marked as complete ✓
+5. Press `Enter` in the TUI to run tests
+6. The right panel switches to show **real-time streaming test output**
+7. Watch the test results appear as they run
+8. Use arrow keys to scroll through the output if needed
+9. When all tests pass, the exercise is marked as complete ✓
+10. Press `r` to go back to README view
 
 ## Course Structure
 
@@ -126,9 +151,9 @@ The repository includes a complete example course with 4 exercises covering:
 
 The application stores progress data in your system's standard configuration directory:
 
-- **Windows**: `%APPDATA%\js-learner\data\`
-- **macOS**: `~/Library/Application Support/com.js-learner.js-learner/`
-- **Linux**: `~/.local/share/js-learner/`
+- **Windows**: `%APPDATA%\learnp\Learn Programming\data\`
+- **macOS**: `~/Library/Application Support/com.learnp.Learn Programming/`
+- **Linux**: `~/.local/share/learnp/`
 
 Each course has its own SQLite database file to track exercise completion.
 
@@ -138,9 +163,8 @@ The application is structured into several modules:
 
 - `course.rs` - Course and exercise metadata parsing
 - `database.rs` - SQLite progress tracking
-- `watcher.rs` - File system watching with `notify`
-- `test_runner.rs` - Jest test execution
-- `ui.rs` - TUI interface with `ratatui`
+- `test_runner.rs` - Jest test execution and output capture
+- `ui.rs` - TUI interface with `ratatui` (dual-panel display)
 - `main.rs` - Application entry point
 
 ## Technologies Used
@@ -148,10 +172,9 @@ The application is structured into several modules:
 - **Rust** - Safe, fast systems programming language
 - **ratatui** - Terminal UI framework
 - **crossterm** - Cross-platform terminal manipulation
-- **notify** - File system watcher
 - **rusqlite** - SQLite database bindings
 - **tokio** - Async runtime
-- **Jest** - JavaScript testing framework
+- **Jest** - JavaScript testing framework (for exercises)
 
 ## Creating Your Own Course
 
@@ -164,7 +187,7 @@ The application is structured into several modules:
    - `exercise.test.js` - Jest tests
    - `README.md` - Exercise description
 6. Run `npm install` in your course directory
-7. Run `js-learner /path/to/your-course`
+7. Navigate to your course directory and run `learnp`
 
 ## Contributing
 

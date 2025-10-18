@@ -3,9 +3,11 @@ use chrono::{DateTime, Utc};
 use directories::ProjectDirs;
 use rusqlite::{params, Connection};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
+#[derive(Clone)]
 pub struct Database {
-    conn: Connection,
+    conn: Arc<Mutex<Connection>>,
 }
 
 #[derive(Debug, Clone)]
@@ -28,13 +30,15 @@ impl Database {
         let conn = Connection::open(&db_path)
             .context(format!("Failed to open database at {:?}", db_path))?;
 
-        let db = Database { conn };
+        let db = Database {
+            conn: Arc::new(Mutex::new(conn)),
+        };
         db.init_schema()?;
         Ok(db)
     }
 
     fn get_db_path(course_name: &str) -> Result<PathBuf> {
-        let proj_dirs = ProjectDirs::from("com", "js-learner", "js-learner")
+        let proj_dirs = ProjectDirs::from("com", "learnp", "Learn Programming")
             .context("Failed to determine project directories")?;
 
         let data_dir = proj_dirs.data_dir();
@@ -47,7 +51,8 @@ impl Database {
     }
 
     fn init_schema(&self) -> Result<()> {
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "CREATE TABLE IF NOT EXISTS exercise_progress (
                 exercise_id TEXT PRIMARY KEY,
                 completed INTEGER NOT NULL DEFAULT 0,
@@ -60,7 +65,8 @@ impl Database {
     }
 
     pub fn get_progress(&self, exercise_id: &str) -> Result<ExerciseProgress> {
-        let mut stmt = self.conn.prepare(
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
             "SELECT exercise_id, completed, last_attempt, completed_at
              FROM exercise_progress
              WHERE exercise_id = ?1"
@@ -87,7 +93,8 @@ impl Database {
 
     pub fn mark_completed(&self, exercise_id: &str) -> Result<()> {
         let now = Utc::now().to_rfc3339();
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "INSERT OR REPLACE INTO exercise_progress (exercise_id, completed, last_attempt, completed_at)
              VALUES (?1, 1, ?2, ?2)",
             params![exercise_id, now],
@@ -97,7 +104,8 @@ impl Database {
 
     pub fn mark_attempted(&self, exercise_id: &str) -> Result<()> {
         let now = Utc::now().to_rfc3339();
-        self.conn.execute(
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
             "INSERT OR REPLACE INTO exercise_progress (exercise_id, completed, last_attempt, completed_at)
              VALUES (
                  ?1,
@@ -111,7 +119,8 @@ impl Database {
     }
 
     pub fn get_all_progress(&self) -> Result<Vec<ExerciseProgress>> {
-        let mut stmt = self.conn.prepare(
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
             "SELECT exercise_id, completed, last_attempt, completed_at FROM exercise_progress"
         )?;
 
