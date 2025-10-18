@@ -1,0 +1,202 @@
+name: Nightly Release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  nightly-release:
+    name: Create Nightly Release
+    runs-on: ubuntu-latest
+    # Only run if CI succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version and date
+        id: get_version
+        run: |
+          # Get version from Cargo.toml
+          VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          DATE=$(date +%Y%m%d)
+          COMMIT=$(git rev-parse --short HEAD)
+          echo "version=${VERSION}-nightly.${DATE}.${COMMIT}" >> $GITHUB_OUTPUT
+          echo "date=${DATE}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get commits since last nightly or last 24 hours
+          YESTERDAY=$(date -u -d '24 hours ago' +%Y-%m-%d)
+          CHANGELOG=$(git log --since="$YESTERDAY" --pretty=format:"- %s (%h)" --no-merges)
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- No new commits in the last 24 hours"
+          fi
+
+          # Save to file
+          echo "## Nightly Build" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "This is an automated nightly build from the main branch." >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**⚠️ Warning:** Nightly builds may be unstable. Use at your own risk." >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "### Recent Changes" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "$CHANGELOG" >> CHANGELOG.md
+
+      - name: Delete old nightly release and tag
+        run: |
+          # Delete old nightly release if it exists
+          gh release delete nightly --yes || true
+          git push origin :refs/tags/nightly || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create nightly tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -f nightly
+          git push -f origin nightly
+
+      - name: Create Nightly Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: nightly
+          release_name: Nightly Build (${{ steps.get_version.outputs.date }})
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: true
+
+  build-linux:
+    name: Build Linux
+    needs: nightly-release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip binary
+        run: strip target/${{ matrix.target }}/release/learnp
+
+      - name: Create tarball
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf learnp-nightly-${{ matrix.target }}.tar.gz learnp
+          mv learnp-nightly-${{ matrix.target }}.tar.gz ../../../
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.nightly-release.outputs.upload_url }}
+          asset_path: ./learnp-nightly-${{ matrix.target }}.tar.gz
+          asset_name: learnp-nightly-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
+
+  build-windows:
+    name: Build Windows
+    needs: nightly-release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Create ZIP archive
+        run: |
+          cd target/x86_64-pc-windows-msvc/release
+          7z a ../../../learnp-nightly-x86_64-windows.zip learnp.exe
+
+      - name: Upload Windows Binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.nightly-release.outputs.upload_url }}
+          asset_path: ./learnp-nightly-x86_64-windows.zip
+          asset_name: learnp-nightly-x86_64-windows.zip
+          asset_content_type: application/zip
+
+  build-macos:
+    name: Build macOS
+    needs: nightly-release
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip binary
+        run: strip target/${{ matrix.target }}/release/learnp
+
+      - name: Create tarball
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf learnp-nightly-${{ matrix.target }}.tar.gz learnp
+          mv learnp-nightly-${{ matrix.target }}.tar.gz ../../../
+
+      - name: Upload macOS Binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.nightly-release.outputs.upload_url }}
+          asset_path: ./learnp-nightly-${{ matrix.target }}.tar.gz
+          asset_name: learnp-nightly-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
