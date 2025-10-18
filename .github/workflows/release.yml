@@ -225,61 +225,6 @@ jobs:
           asset_name: ${{ steps.find_rpm.outputs.name }}
           asset_content_type: application/x-rpm
 
-  build-appimage:
-    name: Build AppImage
-    needs: create-release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build release binary
-        run: cargo build --release
-
-      - name: Download AppImage tools
-        run: |
-          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          chmod +x linuxdeploy-x86_64.AppImage
-
-      - name: Create AppDir structure
-        run: |
-          mkdir -p AppDir/usr/bin
-          cp target/release/learnp AppDir/usr/bin/
-
-          # Create desktop file
-          mkdir -p AppDir/usr/share/applications
-          cat > AppDir/usr/share/applications/learnp.desktop << EOF
-          [Desktop Entry]
-          Name=Learn Programming
-          Exec=learnp
-          Icon=learnp
-          Type=Application
-          Categories=Development;Education;
-          Terminal=true
-          EOF
-
-          # Create icon (placeholder - you should provide actual icon)
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          # TODO: Add actual icon file here
-
-      - name: Build AppImage
-        run: |
-          ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
-          mv Learn_Programming-*.AppImage learnp-${{ needs.create-release.outputs.version }}-x86_64.AppImage
-
-      - name: Upload AppImage
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./learnp-${{ needs.create-release.outputs.version }}-x86_64.AppImage
-          asset_name: learnp-${{ needs.create-release.outputs.version }}-x86_64.AppImage
-          asset_content_type: application/x-executable
-
   build-windows:
     name: Build Windows
     needs: create-release

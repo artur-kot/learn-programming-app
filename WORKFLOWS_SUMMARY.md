@@ -40,7 +40,6 @@ git push origin v0.1.0
 - ✅ Linux binaries (gnu + musl)
 - ✅ Debian package (.deb)
 - ✅ RPM package (.rpm)
-- ✅ AppImage
 - ✅ Windows binary + MSI installer
 - ✅ macOS binaries (Intel + ARM + Universal)
 

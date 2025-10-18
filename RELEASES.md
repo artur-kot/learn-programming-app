@@ -96,7 +96,6 @@ curl -fsSL https://raw.githubusercontent.com/user/repo/main/install.sh | VERSION
 | **Trigger** | Push tag | Manual button | Auto on main CI |
 | **Platforms** | All | All | All |
 | **Packages** | Yes (.deb, .rpm, .msi) | Yes | No |
-| **AppImage** | Yes | Yes | No |
 | **Binaries** | Yes | Yes | Yes |
 | **Pre-release** | Auto-detect | User choice | Always |
 | **Changelog** | Full history | Full history | Last 24h |
@@ -136,7 +135,6 @@ Examples:
 - `learnp-{version}-x86_64-unknown-linux-musl.tar.gz` - Static binary
 - `learnp_{version}_amd64.deb` - Debian/Ubuntu package
 - `learnp-{version}-1.x86_64.rpm` - Fedora/RHEL package
-- `learnp-{version}-x86_64.AppImage` - Universal Linux app
 
 **Windows:**
 - `learnp-{version}-x86_64-windows.zip` - Portable binary
