@@ -39,6 +39,9 @@ pub struct App {
     scroll_position: usize,
     output_receiver: Option<mpsc::Receiver<String>>,
     result_receiver: Option<mpsc::Receiver<TestResult>>,
+    running_exercise_id: Option<String>,
+    blink_toggle: bool,
+    blink_counter: u8,
 }
 
 impl App {
@@ -47,9 +50,30 @@ impl App {
         let database = Database::new(&course.name)?;
         let test_runner = TestRunner::new(&course_path);
 
+        // Find first incomplete exercise to select on startup
+        let progress_map: std::collections::HashMap<String, bool> = database
+            .get_all_progress()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| (p.exercise_id, p.completed))
+            .collect();
+
+        let mut initial_index = 0;
+        for (index, exercise) in exercises.iter().enumerate() {
+            let is_completed = progress_map
+                .get(&exercise.metadata.id)
+                .copied()
+                .unwrap_or(false);
+
+            if !is_completed {
+                initial_index = index;
+                break;
+            }
+        }
+
         let mut list_state = ListState::default();
         if !exercises.is_empty() {
-            list_state.select(Some(0));
+            list_state.select(Some(initial_index));
         }
 
         Ok(Self {
@@ -57,7 +81,7 @@ impl App {
             exercises,
             database,
             test_runner,
-            selected_index: 0,
+            selected_index: initial_index,
             list_state,
             display_mode: DisplayMode::Readme,
             last_test_result: None,
@@ -67,45 +91,106 @@ impl App {
             scroll_position: 0,
             output_receiver: None,
             result_receiver: None,
+            running_exercise_id: None,
+            blink_toggle: false,
+            blink_counter: 0,
         })
+    }
+
+    fn get_first_incomplete_index(&self) -> Option<usize> {
+        let progress_map: std::collections::HashMap<String, bool> = self
+            .database
+            .get_all_progress()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| (p.exercise_id, p.completed))
+            .collect();
+
+        for (index, exercise) in self.exercises.iter().enumerate() {
+            let is_completed = progress_map
+                .get(&exercise.metadata.id)
+                .copied()
+                .unwrap_or(false);
+
+            if !is_completed {
+                return Some(index);
+            }
+        }
+
+        None
+    }
+
+    fn is_exercise_unlocked(&self, index: usize) -> bool {
+        if let Some(first_incomplete) = self.get_first_incomplete_index() {
+            // Allow navigation to completed exercises and the current (first incomplete) exercise
+            index <= first_incomplete
+        } else {
+            // All exercises completed - allow navigation to all
+            true
+        }
     }
 
     fn select_next(&mut self) {
         if self.exercises.is_empty() {
             return;
         }
-        self.selected_index = (self.selected_index + 1) % self.exercises.len();
-        self.list_state.select(Some(self.selected_index));
 
-        // Reset to readme when changing exercises
-        self.display_mode = DisplayMode::Readme;
-        self.test_output_lines.clear();
-        self.last_test_result = None;
-        self.scroll_position = 0;
-        self.is_running_test = false;
-        self.output_receiver = None;
-        self.result_receiver = None;
+        let first_incomplete = self.get_first_incomplete_index();
+        let max_index = first_incomplete.unwrap_or(self.exercises.len() - 1);
+
+        // Find next unlocked exercise
+        let mut next_index = self.selected_index + 1;
+        while next_index <= max_index {
+            if self.is_exercise_unlocked(next_index) {
+                self.selected_index = next_index;
+                self.list_state.select(Some(self.selected_index));
+
+                // Reset to readme when changing exercises
+                self.display_mode = DisplayMode::Readme;
+                self.test_output_lines.clear();
+                self.last_test_result = None;
+                self.scroll_position = 0;
+                self.is_running_test = false;
+                self.output_receiver = None;
+                self.result_receiver = None;
+                return;
+            }
+            next_index += 1;
+        }
+        // If no unlocked exercise found forward, don't move
     }
 
     fn select_previous(&mut self) {
         if self.exercises.is_empty() {
             return;
         }
-        if self.selected_index == 0 {
-            self.selected_index = self.exercises.len() - 1;
-        } else {
-            self.selected_index -= 1;
-        }
-        self.list_state.select(Some(self.selected_index));
 
-        // Reset to readme when changing exercises
-        self.display_mode = DisplayMode::Readme;
-        self.test_output_lines.clear();
-        self.last_test_result = None;
-        self.scroll_position = 0;
-        self.is_running_test = false;
-        self.output_receiver = None;
-        self.result_receiver = None;
+        // Find previous unlocked exercise
+        if self.selected_index > 0 {
+            let mut prev_index = self.selected_index - 1;
+            loop {
+                if self.is_exercise_unlocked(prev_index) {
+                    self.selected_index = prev_index;
+                    self.list_state.select(Some(self.selected_index));
+
+                    // Reset to readme when changing exercises
+                    self.display_mode = DisplayMode::Readme;
+                    self.test_output_lines.clear();
+                    self.last_test_result = None;
+                    self.scroll_position = 0;
+                    self.is_running_test = false;
+                    self.output_receiver = None;
+                    self.result_receiver = None;
+                    return;
+                }
+
+                if prev_index == 0 {
+                    break;
+                }
+                prev_index -= 1;
+            }
+        }
+        // If no unlocked exercise found backward, don't move
     }
 
     fn get_selected_exercise(&self) -> Option<&Exercise> {
@@ -118,6 +203,7 @@ impl App {
             let title = exercise.metadata.title.clone();
 
             self.is_running_test = true;
+            self.running_exercise_id = Some(exercise_id.clone());
             self.status_message = format!("Running tests for {}... (↑/↓ to scroll, Esc to exit)", title);
             self.display_mode = DisplayMode::TestOutput;
             self.test_output_lines = vec![
@@ -163,6 +249,12 @@ impl App {
     }
 
     fn check_test_output(&mut self) {
+        // Toggle blink state for running indicator every 10 cycles (500ms)
+        self.blink_counter = (self.blink_counter + 1) % 10;
+        if self.blink_counter == 0 {
+            self.blink_toggle = !self.blink_toggle;
+        }
+
         // Check for streaming output
         if let Some(ref mut rx) = self.output_receiver {
             // Try to receive all available messages
@@ -182,6 +274,7 @@ impl App {
                 self.last_test_result = Some(result.clone());
                 self.is_running_test = false;
                 self.result_receiver = None;
+                self.running_exercise_id = None;
 
                 // Update status message based on result
                 if let Some(exercise) = self.get_selected_exercise() {
@@ -210,6 +303,7 @@ impl App {
         self.output_receiver = None;
         self.result_receiver = None;
         self.last_test_result = None;
+        self.running_exercise_id = None;
         self.status_message = String::from("Press Enter to run tests, 'r' to show README, 'q' to quit");
     }
 
@@ -415,20 +509,38 @@ fn render_exercise_list<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
     let items: Vec<ListItem> = app
         .exercises
         .iter()
-        .map(|exercise| {
+        .enumerate()
+        .map(|(index, exercise)| {
             let is_completed = progress_map
                 .get(&exercise.metadata.id)
                 .copied()
                 .unwrap_or(false);
 
-            let status_icon = if is_completed { "✓" } else { " " };
+            let is_running = app.running_exercise_id.as_ref() == Some(&exercise.metadata.id);
+            let is_locked = !app.is_exercise_unlocked(index);
+
+            // Status icon: checkmark if completed, blinking dot if running, space otherwise
+            let status_icon = if is_completed {
+                "✓"
+            } else if is_running {
+                if app.blink_toggle { "●" } else { " " }
+            } else {
+                " "
+            };
+
             let content = format!(
                 "{} {} - {}",
                 status_icon, exercise.metadata.order, exercise.metadata.title
             );
 
-            let style = if is_completed {
+            // Determine style based on state
+            let style = if is_locked {
+                // Locked exercises are dimmed
+                Style::default().fg(Color::Rgb(128, 128, 128))
+            } else if is_completed {
                 Style::default().fg(Color::Green)
+            } else if is_running {
+                Style::default().fg(Color::Yellow)
             } else {
                 Style::default().fg(Color::White)
             };
