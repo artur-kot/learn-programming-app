@@ -4,7 +4,9 @@ use crate::database::Database;
 use crate::test_runner::{TestResult, TestRunner};
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -227,10 +229,8 @@ impl App {
 
             self.is_running_test = true;
             self.running_exercise_id = Some(exercise_id.clone());
-            self.status_message = format!(
-                "Running tests for {}... (↑/↓ to scroll, Esc to exit)",
-                title
-            );
+            self.status_message =
+                String::from("Running tests... | ↑/↓ PgUp/PgDn Home/End - scroll, Esc - back");
             self.display_mode = DisplayMode::TestOutput;
             self.test_output_lines = vec![String::from("Running tests..."), String::new()];
             self.scroll_position = 0;
@@ -313,18 +313,16 @@ impl App {
                     match result {
                         TestResult::Passed => {
                             self.status_message = format!(
-                                "✓ {} completed! Press Esc to show README, Enter to run again",
+                                "✓ {} passed! | ↑/↓ PgUp/PgDn Home/End - scroll, Enter - run again, Esc - back",
                                 title
                             );
                         }
                         TestResult::Failed => {
-                            self.status_message = format!("✗ Tests failed for {}. Press Esc to show README, Enter to run again, 'h' for hint", title);
+                            self.status_message = format!("✗ {} failed | ↑/↓ PgUp/PgDn Home/End - scroll, Enter - run again, h - hint, Esc - back", title);
                         }
                         TestResult::Error(err) => {
-                            self.status_message = format!(
-                                "Error: {}. Press Esc to show README, Enter to try again",
-                                err
-                            );
+                            self.status_message =
+                                format!("Error: {} | Enter - retry, Esc - back", err);
                         }
                     }
                 }
@@ -370,7 +368,7 @@ impl App {
                 self.is_generating_hint = false;
                 self.hint_complete_receiver = None;
                 self.status_message = String::from(
-                    "Hint ready! Press Esc to return to test output, 'm' to change model",
+                    "Hint ready! | ↑/↓ PgUp/PgDn Home/End - scroll, m - change model, Esc - back",
                 );
             }
         }
@@ -380,14 +378,11 @@ impl App {
         self.display_mode = DisplayMode::TestOutput;
         self.scroll_position = 0;
         if let Some(exercise) = self.get_selected_exercise() {
-            let title = &exercise.metadata.title;
             if self.last_test_result.is_some() {
-                self.status_message = format!(
-                    "Test output for {}. Press Esc to show README, 'h' for hint",
-                    title
-                );
+                self.status_message =
+                    String::from("↑/↓ PgUp/PgDn Home/End - scroll, h - hint, Esc - back");
             } else {
-                self.status_message = format!("Press Enter to run tests, Esc to show README");
+                self.status_message = String::from("Enter - run tests, Esc - back");
             }
         }
     }
@@ -539,7 +534,7 @@ impl App {
             self.display_mode = DisplayMode::Hint;
             self.hint_text = Some(String::new());
             self.scroll_position = 0;
-            self.status_message = format!("Generating hint with {} model... (Esc to return to test output, 'm' to change model)", model);
+            self.status_message = format!("Generating hint with {}... | ↑/↓ PgUp/PgDn Home/End - scroll, m - change model, Esc - back", model);
 
             let (hint_tx, hint_rx) = mpsc::channel(100);
             let (complete_tx, complete_rx) = mpsc::channel(1);
@@ -578,13 +573,17 @@ Hint:"#,
                 // Use the generate method and send response in chunks (simulating streaming)
                 match ollama.generate(request).await {
                     Ok(response) => {
-                        // Simulate streaming by sending words one at a time
-                        for word in response.response.split_whitespace() {
-                            if let Err(_) = hint_tx.send(format!("{} ", word)).await {
+                        // Simulate streaming by sending character chunks to preserve formatting
+                        let chars: Vec<char> = response.response.chars().collect();
+                        let chunk_size = 3; // Send 3 characters at a time (simulates token streaming)
+
+                        for chunk in chars.chunks(chunk_size) {
+                            let chunk_str: String = chunk.iter().collect();
+                            if let Err(_) = hint_tx.send(chunk_str).await {
                                 break;
                             }
-                            // Small delay to simulate streaming
-                            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                            // Small delay to simulate streaming (adjust for smoother/faster streaming)
+                            tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
                         }
                         // Signal completion
                         let _ = complete_tx.send(()).await;
@@ -614,7 +613,17 @@ Hint:"#,
     }
 
     fn scroll_to_bottom(&mut self) {
-        self.scroll_position = self.test_output_lines.len().saturating_sub(1);
+        let max_scroll = match self.display_mode {
+            DisplayMode::Hint => {
+                self.hint_text
+                    .as_ref()
+                    .map(|h| h.lines().count() + 4) // +4 for header lines
+                    .unwrap_or(0)
+                    .saturating_sub(1)
+            }
+            _ => self.test_output_lines.len().saturating_sub(1),
+        };
+        self.scroll_position = max_scroll;
     }
 
     fn page_up(&mut self) {
@@ -745,6 +754,49 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             }
                             KeyCode::PageUp => {
                                 scroll_delta -= 10;
+                            }
+                            // Vim-style scrolling (j/k for down/up in test/hint modes)
+                            KeyCode::Char('j')
+                                if matches!(
+                                    app.display_mode,
+                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                ) =>
+                            {
+                                scroll_delta += 1;
+                            }
+                            KeyCode::Char('k')
+                                if matches!(
+                                    app.display_mode,
+                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                ) =>
+                            {
+                                scroll_delta -= 1;
+                            }
+                            // Vim-style page scrolling (Ctrl+d/u for page down/up)
+                            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                scroll_delta += 10;
+                            }
+                            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                                scroll_delta -= 10;
+                            }
+                            // Vim-style top/bottom (g/G for top/bottom)
+                            KeyCode::Char('g')
+                                if matches!(
+                                    app.display_mode,
+                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                ) =>
+                            {
+                                app.scroll_to_top();
+                                scroll_delta = 0;
+                            }
+                            KeyCode::Char('G')
+                                if matches!(
+                                    app.display_mode,
+                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                ) =>
+                            {
+                                app.scroll_to_bottom();
+                                scroll_delta = 0;
                             }
                             KeyCode::Home => {
                                 app.scroll_to_top();
@@ -1044,10 +1096,27 @@ fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
             )));
             all_lines.push(Line::from(""));
 
-            // Show hint text
+            // Show hint text or loading indicator
             if let Some(hint) = &app.hint_text {
-                for line in hint.lines() {
-                    all_lines.push(Line::from(line.to_string()));
+                if hint.is_empty() {
+                    // Show animated loader while waiting for first token
+                    let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+                    let spinner =
+                        spinner_frames[(app.blink_counter as usize) % spinner_frames.len()];
+                    all_lines.push(Line::from(vec![
+                        Span::styled(
+                            spinner,
+                            Style::default()
+                                .fg(Color::Cyan)
+                                .add_modifier(Modifier::BOLD),
+                        ),
+                        Span::raw("  Waiting for response..."),
+                    ]));
+                } else {
+                    // Show actual hint content as it streams in
+                    for line in hint.lines() {
+                        all_lines.push(Line::from(line.to_string()));
+                    }
                 }
             } else {
                 all_lines.push(Line::from("Generating hint..."));
