@@ -527,8 +527,35 @@ impl App {
             let exercise_title = exercise.metadata.title.clone();
             let exercise_description = exercise.metadata.description.clone();
             let test_output = self.test_output_lines.join("\n");
-            let exercise_code = std::fs::read_to_string(&exercise.exercise_file)
-                .unwrap_or_else(|_| String::from("Could not read exercise file"));
+
+            // Collect all context files (auto-discover or from metadata)
+            let context_files = exercise.collect_context_files()
+                .unwrap_or_else(|_| Vec::new());
+
+            // Build context section with all files
+            let mut context_section = String::new();
+            if context_files.is_empty() {
+                // Fallback to just the exercise file if collection failed
+                let exercise_code = std::fs::read_to_string(&exercise.exercise_file)
+                    .unwrap_or_else(|_| String::from("Could not read exercise file"));
+                context_section.push_str("Current code:\n```javascript\n");
+                context_section.push_str(&exercise_code);
+                context_section.push_str("\n```\n");
+            } else if context_files.len() == 1 {
+                // Single file - simple format
+                context_section.push_str("Current code:\n```javascript\n");
+                context_section.push_str(&context_files[0].1);
+                context_section.push_str("\n```\n");
+            } else {
+                // Multiple files - show each with filename
+                context_section.push_str("Current code files:\n\n");
+                for (path, content) in &context_files {
+                    let filename = path.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown");
+                    context_section.push_str(&format!("File: {}\n```javascript\n{}\n```\n\n", filename, content));
+                }
+            }
 
             self.is_generating_hint = true;
             self.display_mode = DisplayMode::Hint;
@@ -551,10 +578,7 @@ impl App {
 Exercise: {}
 Description: {}
 
-Their current code:
-```javascript
 {}
-```
 
 Test output showing failures:
 ```
@@ -564,7 +588,7 @@ Test output showing failures:
 Provide a helpful hint (not the full solution) to guide them toward fixing the issue. Be encouraging and educational.
 
 Hint:"#,
-                    exercise_title, exercise_description, exercise_code, test_output
+                    exercise_title, exercise_description, context_section, test_output
                 );
 
                 let ollama = Ollama::default();
