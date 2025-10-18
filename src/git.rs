@@ -26,7 +26,9 @@ impl GitRepo {
 
     /// Check if there's a remote configured
     pub fn has_remote(&self) -> bool {
-        self.run_git_command(&["remote"]).map(|o| !o.trim().is_empty()).unwrap_or(false)
+        self.run_git_command(&["remote"])
+            .map(|o| !o.trim().is_empty())
+            .unwrap_or(false)
     }
 
     /// Fetch from remote without merging
@@ -43,7 +45,9 @@ impl GitRepo {
         let remote_branch = format!("origin/{}", current_branch);
 
         // Check if remote branch exists
-        let branch_exists = self.run_git_command(&["rev-parse", "--verify", &remote_branch]).is_ok();
+        let branch_exists = self
+            .run_git_command(&["rev-parse", "--verify", &remote_branch])
+            .is_ok();
 
         if !branch_exists {
             // No remote branch to compare
@@ -51,7 +55,8 @@ impl GitRepo {
         }
 
         // Compare local and remote
-        let output = self.run_git_command(&["rev-list", "--count", &format!("HEAD..{}", remote_branch)])?;
+        let output =
+            self.run_git_command(&["rev-list", "--count", &format!("HEAD..{}", remote_branch)])?;
         let behind_count: usize = output.trim().parse().unwrap_or(0);
 
         Ok(behind_count > 0)
@@ -62,7 +67,8 @@ impl GitRepo {
         let current_branch = self.get_current_branch()?;
         let remote_branch = format!("origin/{}", current_branch);
 
-        let output = self.run_git_command(&["rev-list", "--count", &format!("HEAD..{}", remote_branch)])?;
+        let output =
+            self.run_git_command(&["rev-list", "--count", &format!("HEAD..{}", remote_branch)])?;
         let count: usize = output.trim().parse().unwrap_or(0);
 
         Ok(count)
@@ -142,7 +148,10 @@ pub fn check_and_prompt_for_updates<P: AsRef<Path>>(course_path: P) -> Result<()
     println!("║           COURSE UPDATES AVAILABLE                        ║");
     println!("╚═══════════════════════════════════════════════════════════╝");
     println!();
-    println!("Your course is {} commit(s) behind origin/{}", commits_behind, current_branch);
+    println!(
+        "Your course is {} commit(s) behind origin/{}",
+        commits_behind, current_branch
+    );
 
     if repo.has_uncommitted_changes() {
         println!();

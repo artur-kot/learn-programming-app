@@ -14,7 +14,9 @@ pub struct Database {
 pub struct ExerciseProgress {
     pub exercise_id: String,
     pub completed: bool,
+    #[allow(dead_code)]
     pub last_attempt: Option<DateTime<Utc>>,
+    #[allow(dead_code)]
     pub completed_at: Option<DateTime<Utc>>,
 }
 
@@ -70,6 +72,7 @@ impl Database {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_progress(&self, exercise_id: &str) -> Result<ExerciseProgress> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(

@@ -24,6 +24,7 @@ impl TestRunner {
         }
     }
 
+    #[allow(dead_code)]
     fn create_npm_command(&self, args: &[&str]) -> Command {
         let mut cmd = if cfg!(target_os = "windows") {
             let mut c = Command::new("cmd");
@@ -42,6 +43,7 @@ impl TestRunner {
         cmd
     }
 
+    #[allow(dead_code)]
     pub async fn run_test(&self, exercise_id: &str) -> Result<TestResult> {
         let test_pattern = format!("exercises/{}.*\\.test\\.js$", exercise_id);
 
@@ -49,11 +51,13 @@ impl TestRunner {
         let node_modules = self.course_path.join("node_modules");
         if !node_modules.exists() {
             return Ok(TestResult::Error(
-                "node_modules not found. Please run 'npm install' in the course directory.".to_string()
+                "node_modules not found. Please run 'npm install' in the course directory."
+                    .to_string(),
             ));
         }
 
-        let output = self.create_npm_command(&["test", "--", "--testPathPattern", &test_pattern, "--silent"])
+        let output = self
+            .create_npm_command(&["test", "--", "--testPathPattern", &test_pattern, "--silent"])
             .output()
             .context("Failed to execute npm test")?;
 
@@ -75,17 +79,21 @@ impl TestRunner {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn run_test_with_output(&self, exercise_id: &str) -> Result<(TestResult, String)> {
         let test_pattern = format!("exercises/{}.*\\.test\\.js$", exercise_id);
 
         // Check if node_modules exists, if not suggest running npm install
         let node_modules = self.course_path.join("node_modules");
         if !node_modules.exists() {
-            let error_msg = "node_modules not found. Please run 'npm install' in the course directory.".to_string();
+            let error_msg =
+                "node_modules not found. Please run 'npm install' in the course directory."
+                    .to_string();
             return Ok((TestResult::Error(error_msg.clone()), error_msg));
         }
 
-        let output = self.create_npm_command(&["test", "--", "--testPathPattern", &test_pattern])
+        let output = self
+            .create_npm_command(&["test", "--", "--testPathPattern", &test_pattern])
             .output()
             .context("Failed to execute npm test")?;
 
@@ -110,13 +118,19 @@ impl TestRunner {
         Ok((result, combined_output))
     }
 
-    pub async fn run_test_streaming(&self, exercise_id: &str, tx: mpsc::Sender<String>) -> Result<TestResult> {
+    pub async fn run_test_streaming(
+        &self,
+        exercise_id: &str,
+        tx: mpsc::Sender<String>,
+    ) -> Result<TestResult> {
         let test_pattern = format!("exercises/{}.*\\.test\\.js$", exercise_id);
 
         // Check if node_modules exists
         let node_modules = self.course_path.join("node_modules");
         if !node_modules.exists() {
-            let error_msg = "node_modules not found. Please run 'npm install' in the course directory.".to_string();
+            let error_msg =
+                "node_modules not found. Please run 'npm install' in the course directory."
+                    .to_string();
             let _ = tx.send(error_msg.clone()).await;
             return Ok(TestResult::Error(error_msg));
         }
@@ -188,8 +202,10 @@ impl TestRunner {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn run_all_tests(&self) -> Result<bool> {
-        let output = self.create_npm_command(&["test", "--", "--silent"])
+        let output = self
+            .create_npm_command(&["test", "--", "--silent"])
             .output()
             .context("Failed to execute npm test")?;
 

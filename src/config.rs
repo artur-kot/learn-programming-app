@@ -3,17 +3,9 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     pub ollama_model: Option<String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            ollama_model: None,
-        }
-    }
 }
 
 impl Config {
@@ -21,10 +13,10 @@ impl Config {
         let config_path = Self::get_config_path()?;
 
         if config_path.exists() {
-            let content = std::fs::read_to_string(&config_path)
-                .context("Failed to read config file")?;
-            let config: Config = serde_json::from_str(&content)
-                .context("Failed to parse config file")?;
+            let content =
+                std::fs::read_to_string(&config_path).context("Failed to read config file")?;
+            let config: Config =
+                serde_json::from_str(&content).context("Failed to parse config file")?;
             Ok(config)
         } else {
             Ok(Config::default())
@@ -39,10 +31,8 @@ impl Config {
             std::fs::create_dir_all(parent)?;
         }
 
-        let content = serde_json::to_string_pretty(self)
-            .context("Failed to serialize config")?;
-        std::fs::write(&config_path, content)
-            .context("Failed to write config file")?;
+        let content = serde_json::to_string_pretty(self).context("Failed to serialize config")?;
+        std::fs::write(&config_path, content).context("Failed to write config file")?;
 
         Ok(())
     }

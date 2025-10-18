@@ -28,6 +28,7 @@ pub struct Exercise {
     pub metadata: ExerciseMetadata,
     pub path: PathBuf,
     pub exercise_file: PathBuf,
+    #[allow(dead_code)]
     pub test_file: PathBuf,
     pub readme_file: PathBuf,
 }
@@ -72,7 +73,9 @@ impl Exercise {
                             if context_files.len() >= MAX_FILES {
                                 break;
                             }
-                            if let Ok((path, content)) = Self::read_file_with_limit(&entry, MAX_FILE_SIZE) {
+                            if let Ok((path, content)) =
+                                Self::read_file_with_limit(&entry, MAX_FILE_SIZE)
+                            {
                                 let content_size = content.len() as u64;
                                 if total_size + content_size <= MAX_TOTAL_SIZE {
                                     total_size += content_size;
@@ -85,18 +88,25 @@ impl Exercise {
             }
         } else {
             // Auto-discover relevant files
-            context_files = self.auto_discover_context_files(MAX_FILES, MAX_FILE_SIZE, MAX_TOTAL_SIZE)?;
+            context_files =
+                self.auto_discover_context_files(MAX_FILES, MAX_FILE_SIZE, MAX_TOTAL_SIZE)?;
         }
 
         Ok(context_files)
     }
 
-    fn auto_discover_context_files(&self, max_files: usize, max_file_size: u64, max_total_size: u64) -> Result<Vec<(PathBuf, String)>> {
+    fn auto_discover_context_files(
+        &self,
+        max_files: usize,
+        max_file_size: u64,
+        max_total_size: u64,
+    ) -> Result<Vec<(PathBuf, String)>> {
         let mut context_files = Vec::new();
         let mut total_size = 0u64;
 
         // Include the main exercise file first
-        if let Ok((path, content)) = Self::read_file_with_limit(&self.exercise_file, max_file_size) {
+        if let Ok((path, content)) = Self::read_file_with_limit(&self.exercise_file, max_file_size)
+        {
             total_size += content.len() as u64;
             context_files.push((path, content));
         }
@@ -125,7 +135,9 @@ impl Exercise {
                             }
                             let sub_path = sub_entry.path();
                             if sub_path.is_file() && Self::is_relevant_file(&sub_path) {
-                                if let Ok((p, content)) = Self::read_file_with_limit(&sub_path, max_file_size) {
+                                if let Ok((p, content)) =
+                                    Self::read_file_with_limit(&sub_path, max_file_size)
+                                {
                                     let content_size = content.len() as u64;
                                     if total_size + content_size <= max_total_size {
                                         // Skip if it's the main exercise file (already added)
@@ -168,10 +180,18 @@ impl Exercise {
         // Exclude config and non-source files
         matches!(
             file_name,
-            "package.json" | "package-lock.json" | "tsconfig.json" |
-            "jest.config.js" | "webpack.config.js" | "vite.config.js" |
-            ".eslintrc.js" | ".eslintrc.json" | ".prettierrc" |
-            ".gitignore" | "README.md" | "exercise.test.js"
+            "package.json"
+                | "package-lock.json"
+                | "tsconfig.json"
+                | "jest.config.js"
+                | "webpack.config.js"
+                | "vite.config.js"
+                | ".eslintrc.js"
+                | ".eslintrc.json"
+                | ".prettierrc"
+                | ".gitignore"
+                | "README.md"
+                | "exercise.test.js"
         )
     }
 
@@ -201,11 +221,13 @@ impl Course {
         let course_path = course_path.as_ref();
         let course_json_path = course_path.join("course.json");
 
-        let course_json = std::fs::read_to_string(&course_json_path)
-            .context(format!("Failed to read course.json at {:?}", course_json_path))?;
+        let course_json = std::fs::read_to_string(&course_json_path).context(format!(
+            "Failed to read course.json at {:?}",
+            course_json_path
+        ))?;
 
-        let course: Course = serde_json::from_str(&course_json)
-            .context("Failed to parse course.json")?;
+        let course: Course =
+            serde_json::from_str(&course_json).context("Failed to parse course.json")?;
 
         let exercises_dir = course_path.join("exercises");
         let mut exercises = Vec::new();

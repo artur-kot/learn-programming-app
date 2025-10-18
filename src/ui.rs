@@ -225,7 +225,6 @@ impl App {
     async fn run_current_test(&mut self) -> Result<()> {
         if let Some(exercise) = self.get_selected_exercise() {
             let exercise_id = exercise.metadata.id.clone();
-            let title = exercise.metadata.title.clone();
 
             self.is_running_test = true;
             self.running_exercise_id = Some(exercise_id.clone());
@@ -287,11 +286,7 @@ impl App {
             while let Ok(line) = rx.try_recv() {
                 // Remove trailing newline if present and add as separate line
                 let line = line.trim_end_matches('\n').trim_end_matches('\r');
-                if !line.is_empty()
-                    || self
-                        .test_output_lines
-                        .last()
-                        .map_or(false, |l| !l.is_empty())
+                if !line.is_empty() || self.test_output_lines.last().is_some_and(|l| !l.is_empty())
                 {
                     self.test_output_lines.push(line.to_string());
                 }
@@ -364,7 +359,7 @@ impl App {
 
         // Check if generation is complete
         if let Some(ref mut complete_rx) = self.hint_complete_receiver {
-            if let Ok(_) = complete_rx.try_recv() {
+            if complete_rx.try_recv().is_ok() {
                 self.is_generating_hint = false;
                 self.hint_complete_receiver = None;
                 self.status_message = String::from(
@@ -377,7 +372,7 @@ impl App {
     fn show_test_output(&mut self) {
         self.display_mode = DisplayMode::TestOutput;
         self.scroll_position = 0;
-        if let Some(exercise) = self.get_selected_exercise() {
+        if let Some(_exercise) = self.get_selected_exercise() {
             if self.last_test_result.is_some() {
                 self.status_message =
                     String::from("↑/↓ PgUp/PgDn Home/End - scroll, h - hint, Esc - back");
@@ -529,7 +524,8 @@ impl App {
             let test_output = self.test_output_lines.join("\n");
 
             // Collect all context files (auto-discover or from metadata)
-            let context_files = exercise.collect_context_files()
+            let context_files = exercise
+                .collect_context_files()
                 .unwrap_or_else(|_| Vec::new());
 
             // Build context section with all files
@@ -550,10 +546,14 @@ impl App {
                 // Multiple files - show each with filename
                 context_section.push_str("Current code files:\n\n");
                 for (path, content) in &context_files {
-                    let filename = path.file_name()
+                    let filename = path
+                        .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("unknown");
-                    context_section.push_str(&format!("File: {}\n```javascript\n{}\n```\n\n", filename, content));
+                    context_section.push_str(&format!(
+                        "File: {}\n```javascript\n{}\n```\n\n",
+                        filename, content
+                    ));
                 }
             }
 
@@ -603,7 +603,7 @@ Hint:"#,
 
                         for chunk in chars.chunks(chunk_size) {
                             let chunk_str: String = chunk.iter().collect();
-                            if let Err(_) = hint_tx.send(chunk_str).await {
+                            if (hint_tx.send(chunk_str).await).is_err() {
                                 break;
                             }
                             // Small delay to simulate streaming (adjust for smoother/faster streaming)
@@ -623,10 +623,12 @@ Hint:"#,
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn scroll_up(&mut self) {
         self.scroll_position = self.scroll_position.saturating_sub(1);
     }
 
+    #[allow(dead_code)]
     fn scroll_down(&mut self) {
         let max_scroll = self.test_output_lines.len().saturating_sub(1);
         self.scroll_position = self.scroll_position.saturating_add(1).min(max_scroll);
@@ -650,10 +652,12 @@ Hint:"#,
         self.scroll_position = max_scroll;
     }
 
+    #[allow(dead_code)]
     fn page_up(&mut self) {
         self.scroll_position = self.scroll_position.saturating_sub(10);
     }
 
+    #[allow(dead_code)]
     fn page_down(&mut self) {
         let max_scroll = self.test_output_lines.len().saturating_sub(1);
         self.scroll_position = self.scroll_position.saturating_add(10).min(max_scroll);
@@ -712,7 +716,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
         // Check for test output
         app.check_test_output();
 
-        terminal.draw(|f| ui::<B>(f, app))?;
+        terminal.draw(|f| ui(f, app))?;
 
         // Poll for events with timeout
         if event::poll(std::time::Duration::from_millis(50))? {
@@ -831,10 +835,10 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 scroll_delta = 0;
                             }
                             KeyCode::Esc => {
-                                if matches!(app.display_mode, DisplayMode::Hint) {
-                                    app.show_test_output();
-                                    scroll_delta = 0;
-                                } else if matches!(app.display_mode, DisplayMode::ModelSelection) {
+                                if matches!(
+                                    app.display_mode,
+                                    DisplayMode::Hint | DisplayMode::ModelSelection
+                                ) {
                                     app.show_test_output();
                                     scroll_delta = 0;
                                 } else if matches!(app.display_mode, DisplayMode::TestOutput) {
@@ -909,7 +913,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame, app: &App) {
+fn ui(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -937,10 +941,10 @@ fn ui<B: Backend>(f: &mut Frame, app: &App) {
         .split(chunks[1]);
 
     // Exercise list
-    render_exercise_list::<B>(f, app, main_chunks[0]);
+    render_exercise_list(f, app, main_chunks[0]);
 
     // Exercise details
-    render_exercise_details::<B>(f, app, main_chunks[1]);
+    render_exercise_details(f, app, main_chunks[1]);
 
     // Status bar
     let status = Paragraph::new(app.status_message.clone())
@@ -949,7 +953,7 @@ fn ui<B: Backend>(f: &mut Frame, app: &App) {
     f.render_widget(status, chunks[2]);
 }
 
-fn render_exercise_list<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
+fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) {
     let progress_map: std::collections::HashMap<String, bool> = app
         .database
         .get_all_progress()
@@ -1018,7 +1022,7 @@ fn render_exercise_list<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
     f.render_stateful_widget(list, area, &mut state);
 }
 
-fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
+fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
     let (content, title) = match app.display_mode {
         DisplayMode::Readme => {
             if let Some(exercise) = app.get_selected_exercise() {
@@ -1104,21 +1108,21 @@ fn render_exercise_details<B: Backend>(f: &mut Frame, app: &App, area: Rect) {
             (Text::from(visible_lines), "Test Output")
         }
         DisplayMode::Hint => {
-            let mut all_lines = Vec::new();
-
             // Show hint header
-            all_lines.push(Line::from(Span::styled(
-                "💡 AI HINT",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )));
-            all_lines.push(Line::from(""));
-            all_lines.push(Line::from(Span::styled(
-                "─".repeat(50),
-                Style::default().fg(Color::DarkGray),
-            )));
-            all_lines.push(Line::from(""));
+            let mut all_lines = vec![
+                Line::from(Span::styled(
+                    "💡 AI HINT",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "─".repeat(50),
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Line::from(""),
+            ];
 
             // Show hint text or loading indicator
             if let Some(hint) = &app.hint_text {

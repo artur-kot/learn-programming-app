@@ -3,7 +3,10 @@
     "allow": [
       "Bash(cargo init:*)",
       "Bash(cargo check:*)",
-      "Bash(cargo build --release)"
+      "Bash(cargo build --release)",
+      "Bash(cargo fmt --all)",
+      "Bash(cargo fmt --all -- --check)",
+      "Bash(cargo clippy --all-targets --all-features -- -D warnings)"
     ],
     "deny": [],
     "ask": []
