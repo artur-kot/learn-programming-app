@@ -44,7 +44,13 @@ impl Database {
         let data_dir = proj_dirs.data_dir();
         let sanitized_name = course_name
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect::<String>();
 
         Ok(data_dir.join(format!("{}.db", sanitized_name)))
@@ -69,24 +75,28 @@ impl Database {
         let mut stmt = conn.prepare(
             "SELECT exercise_id, completed, last_attempt, completed_at
              FROM exercise_progress
-             WHERE exercise_id = ?1"
+             WHERE exercise_id = ?1",
         )?;
 
-        let progress = stmt.query_row(params![exercise_id], |row| {
-            Ok(ExerciseProgress {
-                exercise_id: row.get(0)?,
-                completed: row.get::<_, i32>(1)? != 0,
-                last_attempt: row.get::<_, Option<String>>(2)?
-                    .and_then(|s| s.parse::<DateTime<Utc>>().ok()),
-                completed_at: row.get::<_, Option<String>>(3)?
-                    .and_then(|s| s.parse::<DateTime<Utc>>().ok()),
+        let progress = stmt
+            .query_row(params![exercise_id], |row| {
+                Ok(ExerciseProgress {
+                    exercise_id: row.get(0)?,
+                    completed: row.get::<_, i32>(1)? != 0,
+                    last_attempt: row
+                        .get::<_, Option<String>>(2)?
+                        .and_then(|s| s.parse::<DateTime<Utc>>().ok()),
+                    completed_at: row
+                        .get::<_, Option<String>>(3)?
+                        .and_then(|s| s.parse::<DateTime<Utc>>().ok()),
+                })
             })
-        }).unwrap_or_else(|_| ExerciseProgress {
-            exercise_id: exercise_id.to_string(),
-            completed: false,
-            last_attempt: None,
-            completed_at: None,
-        });
+            .unwrap_or_else(|_| ExerciseProgress {
+                exercise_id: exercise_id.to_string(),
+                completed: false,
+                last_attempt: None,
+                completed_at: None,
+            });
 
         Ok(progress)
     }
@@ -121,16 +131,18 @@ impl Database {
     pub fn get_all_progress(&self) -> Result<Vec<ExerciseProgress>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT exercise_id, completed, last_attempt, completed_at FROM exercise_progress"
+            "SELECT exercise_id, completed, last_attempt, completed_at FROM exercise_progress",
         )?;
 
         let progress_iter = stmt.query_map([], |row| {
             Ok(ExerciseProgress {
                 exercise_id: row.get(0)?,
                 completed: row.get::<_, i32>(1)? != 0,
-                last_attempt: row.get::<_, Option<String>>(2)?
+                last_attempt: row
+                    .get::<_, Option<String>>(2)?
                     .and_then(|s| s.parse::<DateTime<Utc>>().ok()),
-                completed_at: row.get::<_, Option<String>>(3)?
+                completed_at: row
+                    .get::<_, Option<String>>(3)?
                     .and_then(|s| s.parse::<DateTime<Utc>>().ok()),
             })
         })?;
