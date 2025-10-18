@@ -1,12 +1,15 @@
 [package]
-name = "js-learner"
+name = "learnp"
 version = "0.1.0"
 edition = "2021"
+
+[[bin]]
+name = "learnp"
+path = "src/main.rs"
 
 [dependencies]
 ratatui = "0.28"
 crossterm = { version = "0.28", features = ["event-stream"] }
-notify = "6.1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

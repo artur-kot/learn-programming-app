@@ -2,7 +2,7 @@
 // TODO: Complete the function below to return "Hello, World!"
 
 function sayHello() {
-  // Your code here
+  return "Hello, World!"
 }
 
 module.exports = { sayHello };
