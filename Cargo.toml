@@ -1,0 +1,58 @@
+[package]
+name = "learnp"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "Interactive TUI application for learning programming through exercises"
+license = "MIT"
+homepage = "https://github.com/yourusername/learn-programming-app"
+repository = "https://github.com/yourusername/learn-programming-app"
+readme = "README.md"
+keywords = ["learning", "programming", "education", "tui", "exercises"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "learnp"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.28"
+crossterm = { version = "0.28", features = ["event-stream"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.40", features = ["full"] }
+anyhow = "1.0"
+directories = "5.0"
+chrono = "0.4"
+ollama-rs = "0.3.2"
+futures-util = "0.3"
+glob = "0.3"
+
+[package.metadata.deb]
+maintainer = "Your Name <your.email@example.com>"
+copyright = "2025, Your Name <your.email@example.com>"
+license-file = ["LICENSE", "4"]
+extended-description = """\
+Learn Programming is an interactive terminal-based application for learning \
+programming through hands-on exercises. It features real-time test execution, \
+AI-powered hints via Ollama, and progress tracking."""
+depends = "$auto"
+section = "education"
+priority = "optional"
+assets = [
+    ["target/release/learnp", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/learnp/", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/learnp", dest = "/usr/bin/learnp", mode = "755" },
+    { source = "README.md", dest = "/usr/share/doc/learnp/README.md", mode = "644" },
+]
+
+[package.metadata.wix]
+upgrade-guid = "12345678-1234-1234-1234-123456789012"
+path-guid = "87654321-4321-4321-4321-210987654321"
+license = false
+eula = false
