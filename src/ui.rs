@@ -27,6 +27,7 @@ pub enum DisplayMode {
     TestOutput,
     Hint,
     ModelSelection,
+    RunAllTests,
 }
 
 pub struct App {
@@ -55,6 +56,13 @@ pub struct App {
     available_models: Vec<String>,
     model_list_state: ListState,
     models_receiver: Option<mpsc::Receiver<Vec<String>>>,
+    // Run all tests state
+    is_running_all_tests: bool,
+    run_all_progress: Vec<(String, Option<TestResult>)>, // (exercise_id, result)
+    run_all_current_index: usize,
+    run_all_output: Vec<String>,
+    run_all_receiver: Option<mpsc::Receiver<(usize, TestResult)>>,
+    run_all_cancel_tx: Option<mpsc::Sender<()>>,
 }
 
 impl App {
@@ -74,7 +82,7 @@ impl App {
         let mut initial_index = 0;
         for (index, exercise) in exercises.iter().enumerate() {
             let is_completed = progress_map
-                .get(&exercise.metadata.id)
+                .get(&exercise.id)
                 .copied()
                 .unwrap_or(false);
 
@@ -102,7 +110,7 @@ impl App {
             last_test_result: None,
             test_output_lines: Vec::new(),
             status_message: String::from(
-                "Press Enter to run tests, 'r' to show README, 'q' to quit",
+                "Enter - run test, Shift+A - run all tests, r - readme, q - quit",
             ),
             is_running_test: false,
             scroll_position: 0,
@@ -119,6 +127,12 @@ impl App {
             available_models: Vec::new(),
             model_list_state: ListState::default(),
             models_receiver: None,
+            is_running_all_tests: false,
+            run_all_progress: Vec::new(),
+            run_all_current_index: 0,
+            run_all_output: Vec::new(),
+            run_all_receiver: None,
+            run_all_cancel_tx: None,
         })
     }
 
@@ -133,7 +147,7 @@ impl App {
 
         for (index, exercise) in self.exercises.iter().enumerate() {
             let is_completed = progress_map
-                .get(&exercise.metadata.id)
+                .get(&exercise.id)
                 .copied()
                 .unwrap_or(false);
 
@@ -224,7 +238,8 @@ impl App {
 
     async fn run_current_test(&mut self) -> Result<()> {
         if let Some(exercise) = self.get_selected_exercise() {
-            let exercise_id = exercise.metadata.id.clone();
+            let exercise_clone = exercise.clone();
+            let exercise_id = exercise_clone.id.clone();
 
             self.is_running_test = true;
             self.running_exercise_id = Some(exercise_id.clone());
@@ -242,22 +257,21 @@ impl App {
 
             // Spawn test runner in background
             let test_runner = self.test_runner.clone();
-            let exercise_id_clone = exercise_id.clone();
             let db = self.database.clone();
 
             tokio::spawn(async move {
                 let result = match test_runner
-                    .run_test_streaming(&exercise_id_clone, output_tx)
+                    .run_test_streaming(&exercise_clone, output_tx)
                     .await
                 {
                     Ok(result) => {
                         // Update database based on result
                         match &result {
                             TestResult::Passed => {
-                                let _ = db.mark_completed(&exercise_id_clone);
+                                let _ = db.mark_completed(&exercise_clone.id);
                             }
                             TestResult::Failed => {
-                                let _ = db.mark_attempted(&exercise_id_clone);
+                                let _ = db.mark_attempted(&exercise_clone.id);
                             }
                             _ => {}
                         }
@@ -304,7 +318,7 @@ impl App {
 
                 // Update status message based on result
                 if let Some(exercise) = self.get_selected_exercise() {
-                    let title = &exercise.metadata.title;
+                    let title = &exercise.title;
                     match result {
                         TestResult::Passed => {
                             self.status_message = format!(
@@ -329,6 +343,9 @@ impl App {
 
         // Check for models loaded
         self.check_models_loaded();
+
+        // Check for run-all progress
+        self.check_run_all_progress();
     }
 
     fn show_readme(&mut self) {
@@ -341,7 +358,7 @@ impl App {
         self.last_test_result = None;
         self.running_exercise_id = None;
         self.status_message =
-            String::from("Press Enter to run tests, 'r' to show README, 'q' to quit");
+            String::from("Enter - run test, Shift+A - run all tests, r - readme, q - quit");
     }
 
     fn check_hint_generation(&mut self) {
@@ -519,8 +536,8 @@ impl App {
 
     async fn generate_hint_with_model(&mut self, model: String) -> Result<()> {
         if let Some(exercise) = self.get_selected_exercise() {
-            let exercise_title = exercise.metadata.title.clone();
-            let exercise_description = exercise.metadata.description.clone();
+            let exercise_title = exercise.title.clone();
+            let exercise_description = exercise.description.clone();
             let test_output = self.test_output_lines.join("\n");
 
             // Collect all context files (auto-discover or from metadata)
@@ -532,7 +549,7 @@ impl App {
             let mut context_section = String::new();
             if context_files.is_empty() {
                 // Fallback to just the exercise file if collection failed
-                let exercise_code = std::fs::read_to_string(&exercise.exercise_file)
+                let exercise_code = std::fs::read_to_string(&exercise.path.join("exercise.js"))
                     .unwrap_or_else(|_| String::from("Could not read exercise file"));
                 context_section.push_str("Current code:\n```javascript\n");
                 context_section.push_str(&exercise_code);
@@ -672,6 +689,7 @@ Hint:"#,
                     .unwrap_or(0)
                     .saturating_sub(1)
             }
+            DisplayMode::RunAllTests => self.run_all_output.len().saturating_sub(1),
             _ => self.test_output_lines.len().saturating_sub(1),
         };
 
@@ -685,6 +703,159 @@ Hint:"#,
             // Scrolling up
             self.scroll_position = self.scroll_position.saturating_sub((-delta) as usize);
         }
+    }
+
+    async fn run_all_tests(&mut self) -> Result<()> {
+        self.is_running_all_tests = true;
+        self.display_mode = DisplayMode::RunAllTests;
+        self.scroll_position = 0;
+
+        // Initialize progress tracking for all exercises
+        self.run_all_progress = self.exercises
+            .iter()
+            .map(|ex| (ex.id.clone(), None))
+            .collect();
+        self.run_all_current_index = 0;
+        self.run_all_output = vec![
+            String::from("Starting all tests..."),
+            String::new(),
+        ];
+
+        self.status_message = String::from("Running all tests... | Esc - cancel");
+
+        // Create channels for progress updates and cancellation
+        let (progress_tx, progress_rx) = mpsc::channel(10);
+        let (cancel_tx, mut cancel_rx) = mpsc::channel::<()>(1);
+
+        self.run_all_receiver = Some(progress_rx);
+        self.run_all_cancel_tx = Some(cancel_tx);
+
+        // Clone data needed for the background task
+        let exercises = self.exercises.clone();
+        let test_runner = self.test_runner.clone();
+        let db = self.database.clone();
+
+        // Spawn background task to run all tests sequentially
+        tokio::spawn(async move {
+            for (index, exercise) in exercises.iter().enumerate() {
+                // Check for cancellation
+                if cancel_rx.try_recv().is_ok() {
+                    break;
+                }
+
+                let exercise_id = exercise.id.clone();
+            let exercise_clone = exercise.clone();
+
+                // Create a channel for this individual test's output
+                let (output_tx, mut output_rx) = mpsc::channel(100);
+
+                // Spawn a task to drain the output channel so it doesn't block
+                let drain_handle = tokio::spawn(async move {
+                    while output_rx.recv().await.is_some() {
+                        // Just drain the output, we don't need to display it
+                    }
+                });
+
+                // Run the test
+                let result = match test_runner.run_test_streaming(&exercise_clone, output_tx).await {
+                    Ok(result) => {
+                        // Update database based on result
+                        match &result {
+                            TestResult::Passed => {
+                                let _ = db.mark_completed(&exercise_id);
+                            }
+                            TestResult::Failed => {
+                                let _ = db.mark_attempted(&exercise_id);
+                            }
+                            _ => {}
+                        }
+                        result
+                    }
+                    Err(_) => TestResult::Error("Failed to run test".to_string()),
+                };
+
+                // Wait for drain task to finish
+                let _ = drain_handle.await;
+
+                // Send progress update
+                if progress_tx.send((index, result)).await.is_err() {
+                    break;
+                }
+            }
+        });
+
+        Ok(())
+    }
+
+    fn check_run_all_progress(&mut self) {
+        let mut should_complete = false;
+
+        if let Some(ref mut rx) = self.run_all_receiver {
+            // Check for progress updates
+            while let Ok((index, result)) = rx.try_recv() {
+                if index < self.run_all_progress.len() {
+                    self.run_all_progress[index].1 = Some(result.clone());
+                    self.run_all_current_index = index + 1;
+
+                    // Add to output
+                    let exercise_id = &self.run_all_progress[index].0;
+                    let exercise = self.exercises.iter().find(|e| &e.id == exercise_id);
+                    let title = exercise.map(|e| e.title.as_str()).unwrap_or(exercise_id);
+
+                    let status_line = match result {
+                        TestResult::Passed => format!("✓ {} - PASSED", title),
+                        TestResult::Failed => format!("✗ {} - FAILED", title),
+                        TestResult::Error(ref err) => format!("✗ {} - ERROR: {}", title, err),
+                    };
+                    self.run_all_output.push(status_line);
+                }
+
+                // Check if all tests completed
+                if self.run_all_current_index >= self.exercises.len() {
+                    should_complete = true;
+                }
+            }
+        }
+
+        // Complete outside of the borrow
+        if should_complete {
+            self.is_running_all_tests = false;
+            self.run_all_receiver = None;
+            self.run_all_cancel_tx = None;
+
+            // Calculate summary
+            let total = self.run_all_progress.len();
+            let passed = self.run_all_progress.iter()
+                .filter(|(_, r)| matches!(r, Some(TestResult::Passed)))
+                .count();
+            let failed = self.run_all_progress.iter()
+                .filter(|(_, r)| matches!(r, Some(TestResult::Failed)))
+                .count();
+            let errors = self.run_all_progress.iter()
+                .filter(|(_, r)| matches!(r, Some(TestResult::Error(_))))
+                .count();
+
+            self.run_all_output.push(String::new());
+            self.run_all_output.push("─".repeat(50));
+            self.run_all_output.push(String::new());
+            self.run_all_output.push(format!("Total: {} | Passed: {} | Failed: {} | Errors: {}",
+                total, passed, failed, errors));
+
+            if passed == total {
+                self.status_message = String::from("✓ All tests passed! | Esc - back");
+            } else {
+                self.status_message = String::from("Some tests failed. | Esc - back");
+            }
+        }
+    }
+
+    fn cancel_run_all_tests(&mut self) {
+        if let Some(cancel_tx) = self.run_all_cancel_tx.take() {
+            let _ = cancel_tx.try_send(());
+        }
+        self.is_running_all_tests = false;
+        self.run_all_receiver = None;
+        self.show_readme();
     }
 }
 
@@ -760,11 +931,11 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             {
                                 app.select_previous_model();
                             }
-                            // Batch scrolling in test output and hint modes
+                            // Batch scrolling in test output, hint, and run-all modes
                             KeyCode::Down
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 scroll_delta += 1;
@@ -772,7 +943,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Up
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 scroll_delta -= 1;
@@ -783,11 +954,11 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::PageUp => {
                                 scroll_delta -= 10;
                             }
-                            // Vim-style scrolling (j/k for down/up in test/hint modes)
+                            // Vim-style scrolling (j/k for down/up in test/hint/run-all modes)
                             KeyCode::Char('j')
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 scroll_delta += 1;
@@ -795,7 +966,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Char('k')
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 scroll_delta -= 1;
@@ -811,7 +982,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Char('g')
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 app.scroll_to_top();
@@ -820,7 +991,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Char('G')
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint
+                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 app.scroll_to_bottom();
@@ -835,7 +1006,15 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 scroll_delta = 0;
                             }
                             KeyCode::Esc => {
-                                if matches!(
+                                if matches!(app.display_mode, DisplayMode::RunAllTests) {
+                                    // Cancel run-all or go back to readme if finished
+                                    if app.is_running_all_tests {
+                                        app.cancel_run_all_tests();
+                                    } else {
+                                        app.show_readme();
+                                    }
+                                    scroll_delta = 0;
+                                } else if matches!(
                                     app.display_mode,
                                     DisplayMode::Hint | DisplayMode::ModelSelection
                                 ) {
@@ -843,6 +1022,13 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     scroll_delta = 0;
                                 } else if matches!(app.display_mode, DisplayMode::TestOutput) {
                                     app.show_readme();
+                                    scroll_delta = 0;
+                                }
+                            }
+                            KeyCode::Char('A') if key.modifiers.contains(KeyModifiers::SHIFT) => {
+                                // Shift+A: Run all tests (only from Readme mode)
+                                if matches!(app.display_mode, DisplayMode::Readme) && !app.is_running_all_tests {
+                                    app.run_all_tests().await?;
                                     scroll_delta = 0;
                                 }
                             }
@@ -904,7 +1090,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
             if scroll_delta != 0
                 && matches!(
                     app.display_mode,
-                    DisplayMode::TestOutput | DisplayMode::Hint
+                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
                 )
             {
                 app.apply_scroll_delta(scroll_delta);
@@ -968,11 +1154,11 @@ fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) {
         .enumerate()
         .map(|(index, exercise)| {
             let is_completed = progress_map
-                .get(&exercise.metadata.id)
+                .get(&exercise.id)
                 .copied()
                 .unwrap_or(false);
 
-            let is_running = app.running_exercise_id.as_ref() == Some(&exercise.metadata.id);
+            let is_running = app.running_exercise_id.as_ref() == Some(&exercise.id);
             let is_locked = !app.is_exercise_unlocked(index);
 
             // Status icon: checkmark if completed, blinking dot if running, space otherwise
@@ -990,7 +1176,7 @@ fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) {
 
             let content = format!(
                 "{} {} - {}",
-                status_icon, exercise.metadata.order, exercise.metadata.title
+                status_icon, exercise.order, exercise.title
             );
 
             // Determine style based on state
@@ -1029,14 +1215,14 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
                 let mut lines = vec![
                     Line::from(vec![
                         Span::styled("Title: ", Style::default().add_modifier(Modifier::BOLD)),
-                        Span::raw(&exercise.metadata.title),
+                        Span::raw(&exercise.title),
                     ]),
                     Line::from(vec![
                         Span::styled(
                             "Description: ",
                             Style::default().add_modifier(Modifier::BOLD),
                         ),
-                        Span::raw(&exercise.metadata.description),
+                        Span::raw(&exercise.description),
                     ]),
                     Line::from(""),
                 ];
@@ -1197,6 +1383,89 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
             let mut state = app.model_list_state.clone();
             f.render_stateful_widget(list, area, &mut state);
             return;
+        }
+        DisplayMode::RunAllTests => {
+            let mut all_lines = Vec::new();
+
+            // Header
+            all_lines.push(Line::from(Span::styled(
+                "🚀 RUNNING ALL TESTS",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            all_lines.push(Line::from(""));
+
+            // Progress bar
+            let total = app.exercises.len();
+            let completed = app.run_all_current_index;
+            let percentage = if total > 0 {
+                (completed * 100) / total
+            } else {
+                0
+            };
+
+            let bar_width = 40;
+            let filled = (completed * bar_width) / total.max(1);
+            let empty = bar_width - filled;
+
+            let progress_bar = format!(
+                "[{}{}] {}/{} ({}%)",
+                "█".repeat(filled),
+                "░".repeat(empty),
+                completed,
+                total,
+                percentage
+            );
+
+            all_lines.push(Line::from(Span::styled(
+                progress_bar,
+                Style::default().fg(Color::Yellow),
+            )));
+            all_lines.push(Line::from(""));
+            all_lines.push(Line::from(Span::styled(
+                "─".repeat(50),
+                Style::default().fg(Color::DarkGray),
+            )));
+            all_lines.push(Line::from(""));
+
+            // Test results
+            for line in &app.run_all_output {
+                let styled_line = if line.starts_with("✓") {
+                    Line::from(Span::styled(line.as_str(), Style::default().fg(Color::Green)))
+                } else if line.starts_with("✗") {
+                    Line::from(Span::styled(line.as_str(), Style::default().fg(Color::Red)))
+                } else if line.starts_with("Total:") {
+                    Line::from(Span::styled(
+                        line.as_str(),
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    ))
+                } else {
+                    Line::from(line.as_str())
+                };
+                all_lines.push(styled_line);
+            }
+
+            // Show currently running test
+            if app.is_running_all_tests && completed < total {
+                if let Some(exercise) = app.exercises.get(completed) {
+                    all_lines.push(Line::from(""));
+                    let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+                    let spinner = spinner_frames[(app.blink_counter as usize) % spinner_frames.len()];
+                    all_lines.push(Line::from(vec![
+                        Span::styled(
+                            spinner,
+                            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                        ),
+                        Span::raw(format!("  Running: {}", exercise.title)),
+                    ]));
+                }
+            }
+
+            // Apply scrolling
+            let visible_lines: Vec<Line> = all_lines.into_iter().skip(app.scroll_position).collect();
+
+            (Text::from(visible_lines), "Run All Tests")
         }
     };
 

@@ -8,32 +8,115 @@ pub struct Course {
     pub description: String,
     pub author: String,
     pub version: String,
-    pub exercises: Vec<ExerciseMetadata>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Optional metadata file for each exercise (exercise.json)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ExerciseMetadata {
-    pub id: String,
-    pub title: String,
-    pub description: String,
-    pub order: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub test_command: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setup_command: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_files: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_patterns: Option<Vec<String>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Language {
+    JavaScript,
+    Python,
+    Rust,
+    Go,
+    Unknown,
+}
+
+impl Language {
+    #[allow(dead_code)]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Language::JavaScript => "javascript",
+            Language::Python => "python",
+            Language::Rust => "rust",
+            Language::Go => "go",
+            Language::Unknown => "unknown",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Exercise {
-    pub metadata: ExerciseMetadata,
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub order: usize,
     pub path: PathBuf,
-    pub exercise_file: PathBuf,
-    #[allow(dead_code)]
-    pub test_file: PathBuf,
+    pub language: Language,
+    pub metadata: ExerciseMetadata,
     pub readme_file: PathBuf,
 }
 
 impl Exercise {
+    /// Detect the language/runtime of the exercise based on files present
+    fn detect_language(path: &Path) -> Language {
+        if path.join("package.json").exists() {
+            Language::JavaScript
+        } else if path.join("requirements.txt").exists() || path.join("pyproject.toml").exists() {
+            Language::Python
+        } else if path.join("Cargo.toml").exists() {
+            Language::Rust
+        } else if path.join("go.mod").exists() {
+            Language::Go
+        } else {
+            Language::Unknown
+        }
+    }
+
+    /// Get the test command for this exercise
+    pub fn get_test_command(&self) -> String {
+        // Use custom test command if specified in metadata
+        if let Some(ref cmd) = self.metadata.test_command {
+            return cmd.clone();
+        }
+
+        // Otherwise, use language-specific defaults
+        match self.language {
+            Language::JavaScript => "pnpm test".to_string(),
+            Language::Python => "python -m pytest".to_string(),
+            Language::Rust => "cargo test".to_string(),
+            Language::Go => "go test".to_string(),
+            Language::Unknown => "echo 'No test command configured'".to_string(),
+        }
+    }
+
+    /// Get the setup command for this exercise (if any)
+    pub fn get_setup_command(&self) -> Option<String> {
+        // Use custom setup command if specified
+        if let Some(ref cmd) = self.metadata.setup_command {
+            return Some(cmd.clone());
+        }
+
+        // Otherwise, use language-specific defaults
+        match self.language {
+            Language::JavaScript => Some("pnpm install".to_string()),
+            Language::Python => {
+                if self.path.join("requirements.txt").exists() {
+                    Some("pip install -r requirements.txt".to_string())
+                } else {
+                    None
+                }
+            }
+            Language::Rust => Some("cargo build".to_string()),
+            Language::Go => Some("go mod download".to_string()),
+            Language::Unknown => None,
+        }
+    }
+
     /// Collect context files for hint generation
     /// Uses metadata-defined files if available, otherwise auto-discovers
     pub fn collect_context_files(&self) -> Result<Vec<(PathBuf, String)>> {
@@ -104,11 +187,26 @@ impl Exercise {
         let mut context_files = Vec::new();
         let mut total_size = 0u64;
 
-        // Include the main exercise file first
-        if let Ok((path, content)) = Self::read_file_with_limit(&self.exercise_file, max_file_size)
-        {
-            total_size += content.len() as u64;
-            context_files.push((path, content));
+        // Include key files based on language
+        let key_files = match self.language {
+            Language::JavaScript => vec!["exercise.js", "index.js", "app.js"],
+            Language::Python => vec!["exercise.py", "main.py", "__init__.py"],
+            Language::Rust => vec!["src/main.rs", "src/lib.rs"],
+            Language::Go => vec!["main.go"],
+            Language::Unknown => vec![],
+        };
+
+        for file_name in key_files {
+            let file_path = self.path.join(file_name);
+            if file_path.exists() {
+                if let Ok((path, content)) = Self::read_file_with_limit(&file_path, max_file_size) {
+                    let content_size = content.len() as u64;
+                    if total_size + content_size <= max_total_size {
+                        total_size += content_size;
+                        context_files.push((path, content));
+                    }
+                }
+            }
         }
 
         // Walk the exercise directory
@@ -140,11 +238,8 @@ impl Exercise {
                                 {
                                     let content_size = content.len() as u64;
                                     if total_size + content_size <= max_total_size {
-                                        // Skip if it's the main exercise file (already added)
-                                        if p != self.exercise_file {
-                                            total_size += content_size;
-                                            context_files.push((p, content));
-                                        }
+                                        total_size += content_size;
+                                        context_files.push((p, content));
                                     }
                                 }
                             }
@@ -154,11 +249,8 @@ impl Exercise {
                     if let Ok((p, content)) = Self::read_file_with_limit(&path, max_file_size) {
                         let content_size = content.len() as u64;
                         if total_size + content_size <= max_total_size {
-                            // Skip if it's the main exercise file (already added)
-                            if p != self.exercise_file {
-                                total_size += content_size;
-                                context_files.push((p, content));
-                            }
+                            total_size += content_size;
+                            context_files.push((p, content));
                         }
                     }
                 }
@@ -230,34 +322,103 @@ impl Course {
             serde_json::from_str(&course_json).context("Failed to parse course.json")?;
 
         let exercises_dir = course_path.join("exercises");
+        if !exercises_dir.exists() {
+            anyhow::bail!("Exercises directory not found at {:?}", exercises_dir);
+        }
+
+        // Auto-discover exercises from the exercises folder
         let mut exercises = Vec::new();
+        let mut entries: Vec<_> = std::fs::read_dir(&exercises_dir)
+            .context("Failed to read exercises directory")?
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.path().is_dir())
+            .collect();
 
-        for exercise_meta in &course.exercises {
-            let exercise_path = exercises_dir.join(&exercise_meta.id);
-            let exercise_file = exercise_path.join("exercise.js");
+        // Sort entries alphabetically by folder name
+        entries.sort_by(|a, b| {
+            a.file_name().cmp(&b.file_name())
+        });
 
-            // Support both naming conventions for test files:
-            // 1. exercise.test.js (old convention)
-            // 2. {exercise-id}.test.js (new convention)
-            let test_file = if exercise_path.join("exercise.test.js").exists() {
-                exercise_path.join("exercise.test.js")
+        for (index, entry) in entries.iter().enumerate() {
+            let exercise_path = entry.path();
+            let folder_name = entry.file_name();
+            let folder_name_str = folder_name.to_string_lossy();
+
+            // Generate ID from folder name (strip leading zeros and numbers if present)
+            let id = Self::generate_exercise_id(&folder_name_str);
+
+            // Detect language
+            let language = Exercise::detect_language(&exercise_path);
+
+            // Try to load exercise.json metadata
+            let metadata_path = exercise_path.join("exercise.json");
+            let metadata: ExerciseMetadata = if metadata_path.exists() {
+                let metadata_json = std::fs::read_to_string(&metadata_path)
+                    .context(format!("Failed to read {:?}", metadata_path))?;
+                serde_json::from_str(&metadata_json)
+                    .context(format!("Failed to parse {:?}", metadata_path))?
             } else {
-                exercise_path.join(format!("{}.test.js", exercise_meta.id))
+                ExerciseMetadata::default()
             };
+
+            // Generate title and description from metadata or folder name
+            let title = metadata
+                .title
+                .clone()
+                .unwrap_or_else(|| Self::humanize_name(&id));
+            let description = metadata
+                .description
+                .clone()
+                .unwrap_or_else(|| format!("Exercise: {}", title));
 
             let readme_file = exercise_path.join("README.md");
 
-            if exercise_file.exists() && test_file.exists() {
-                exercises.push(Exercise {
-                    metadata: exercise_meta.clone(),
-                    path: exercise_path,
-                    exercise_file,
-                    test_file,
-                    readme_file,
-                });
-            }
+            exercises.push(Exercise {
+                id,
+                title,
+                description,
+                order: index + 1,
+                path: exercise_path,
+                language,
+                metadata,
+                readme_file,
+            });
         }
 
         Ok((course, exercises))
+    }
+
+    /// Generate exercise ID from folder name
+    /// Examples: "01-hello-world" -> "hello-world", "hello-world" -> "hello-world"
+    fn generate_exercise_id(folder_name: &str) -> String {
+        // Remove leading digits and hyphens (e.g., "01-" or "001-")
+        let without_prefix = folder_name
+            .trim_start_matches(|c: char| c.is_ascii_digit() || c == '-');
+
+        // If we removed everything, use the original name
+        if without_prefix.is_empty() {
+            folder_name.to_string()
+        } else {
+            without_prefix.to_string()
+        }
+    }
+
+    /// Convert a kebab-case or snake_case name to a human-readable title
+    /// Examples: "hello-world" -> "Hello World", "array_basics" -> "Array Basics"
+    fn humanize_name(name: &str) -> String {
+        name.replace('-', " ")
+            .replace('_', " ")
+            .split_whitespace()
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => {
+                        first.to_uppercase().collect::<String>() + chars.as_str()
+                    }
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
