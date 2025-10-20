@@ -235,7 +235,16 @@ impl Course {
         for exercise_meta in &course.exercises {
             let exercise_path = exercises_dir.join(&exercise_meta.id);
             let exercise_file = exercise_path.join("exercise.js");
-            let test_file = exercise_path.join("exercise.test.js");
+
+            // Support both naming conventions for test files:
+            // 1. exercise.test.js (old convention)
+            // 2. {exercise-id}.test.js (new convention)
+            let test_file = if exercise_path.join("exercise.test.js").exists() {
+                exercise_path.join("exercise.test.js")
+            } else {
+                exercise_path.join(format!("{}.test.js", exercise_meta.id))
+            };
+
             let readme_file = exercise_path.join("README.md");
 
             if exercise_file.exists() && test_file.exists() {

@@ -1,15 +1,11 @@
 {
-  "name": "javascript-fundamentals",
+  "name": "javascript-basics-course",
   "version": "1.0.0",
-  "description": "JavaScript Fundamentals Course",
+  "description": "JavaScript basics course exercises",
   "scripts": {
     "test": "jest"
   },
   "devDependencies": {
     "jest": "^29.7.0"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "testMatch": ["**/exercises/**/*.test.js"]
   }
 }

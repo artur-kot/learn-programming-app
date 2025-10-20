@@ -6,7 +6,8 @@
       "Bash(cargo build --release)",
       "Bash(cargo fmt --all)",
       "Bash(cargo fmt --all -- --check)",
-      "Bash(cargo clippy --all-targets --all-features -- -D warnings)"
+      "Bash(cargo clippy --all-targets --all-features -- -D warnings)",
+      "Bash(cargo build)"
     ],
     "deny": [],
     "ask": []
