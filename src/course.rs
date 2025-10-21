@@ -391,7 +391,9 @@ impl Course {
     /// Convert a kebab-case or snake_case name to a human-readable title
     /// Examples: "hello-world" -> "Hello World", "array_basics" -> "Array Basics"
     fn humanize_name(name: &str) -> String {
-        name.chars().map(|c| if c == '-' || c == '_' { ' ' } else { c }).collect::<String>()
+        name.chars()
+            .map(|c| if c == '-' || c == '_' { ' ' } else { c })
+            .collect::<String>()
             .split_whitespace()
             .map(|word| {
                 let mut chars = word.chars();
