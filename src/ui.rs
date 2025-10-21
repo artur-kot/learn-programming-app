@@ -21,6 +21,7 @@ use ratatui::{
 use std::io;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
+use ansi_to_tui::IntoText;
 
 pub enum DisplayMode {
     Readme,
@@ -63,6 +64,8 @@ pub struct App {
     run_all_output: Vec<String>,
     run_all_receiver: Option<mpsc::Receiver<(usize, TestResult)>>,
     run_all_cancel_tx: Option<mpsc::Sender<()>>,
+    // Setup tracking
+    setup_start_index: Option<usize>, // Track where setup output starts
 }
 
 impl App {
@@ -133,6 +136,7 @@ impl App {
             run_all_output: Vec::new(),
             run_all_receiver: None,
             run_all_cancel_tx: None,
+            setup_start_index: None,
         })
     }
 
@@ -248,6 +252,7 @@ impl App {
             self.display_mode = DisplayMode::TestOutput;
             self.test_output_lines = vec![String::from("Running tests..."), String::new()];
             self.scroll_position = 0;
+            self.setup_start_index = None; // Reset setup tracking for new test run
 
             // Create channels for streaming output and result
             let (output_tx, output_rx) = mpsc::channel(100);
@@ -300,6 +305,25 @@ impl App {
             while let Ok(line) = rx.try_recv() {
                 // Remove trailing newline if present and add as separate line
                 let line = line.trim_end_matches('\n').trim_end_matches('\r');
+
+                // Handle setup markers
+                if line == "__SETUP_START__" {
+                    // Mark the current position as start of setup
+                    self.setup_start_index = Some(self.test_output_lines.len());
+                    continue; // Don't add the marker to output
+                } else if line == "__SETUP_SUCCESS__" {
+                    // Remove all setup lines (from setup_start_index to current)
+                    if let Some(start_idx) = self.setup_start_index {
+                        self.test_output_lines.truncate(start_idx);
+                        self.setup_start_index = None;
+                    }
+                    continue; // Don't add the marker to output
+                } else if line == "__SETUP_FAILED__" {
+                    // Keep setup output visible, just clear the marker tracking
+                    self.setup_start_index = None;
+                    continue; // Don't add the marker to output
+                }
+
                 if !line.is_empty() || self.test_output_lines.last().is_some_and(|l| !l.is_empty())
                 {
                     self.test_output_lines.push(line.to_string());
@@ -1282,9 +1306,21 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
                 all_lines.push(Line::from(""));
             }
 
-            // Show test output - each line is already stored separately
+            // Show test output - parse ANSI codes to prevent rendering artifacts
             for line in &app.test_output_lines {
-                all_lines.push(Line::from(line.as_str()));
+                // Parse ANSI escape sequences into ratatui Text, then extract lines
+                match line.as_str().into_text() {
+                    Ok(parsed_text) => {
+                        // Add each parsed line to all_lines
+                        for parsed_line in parsed_text.lines {
+                            all_lines.push(parsed_line);
+                        }
+                    }
+                    Err(_) => {
+                        // Fallback to plain text if parsing fails
+                        all_lines.push(Line::from(line.as_str()));
+                    }
+                }
             }
 
             // Apply manual scrolling by slicing the lines

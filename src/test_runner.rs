@@ -30,6 +30,8 @@ impl TestRunner {
     /// Returns true if setup was run, false if skipped
     async fn run_setup(&self, exercise: &Exercise, tx: &mpsc::Sender<String>) -> Result<bool> {
         if let Some(setup_cmd) = exercise.get_setup_command() {
+            // Mark the start of setup output
+            let _ = tx.send("__SETUP_START__\n".to_string()).await;
             let _ = tx.send(format!("Running setup: {}\n", setup_cmd)).await;
 
             let mut cmd = self.create_command(&setup_cmd, &exercise.path);
@@ -65,10 +67,13 @@ impl TestRunner {
                 .context("Failed to wait for setup command")?;
 
             if !status.success() {
+                // Mark setup as failed - keep the output visible
+                let _ = tx.send("__SETUP_FAILED__\n".to_string()).await;
                 anyhow::bail!("Setup failed with exit code: {:?}", status.code());
             }
 
-            let _ = tx.send("\nSetup complete!\n\n".to_string()).await;
+            // Mark setup as successful - this signals UI to hide setup output
+            let _ = tx.send("__SETUP_SUCCESS__\n".to_string()).await;
             Ok(true)
         } else {
             Ok(false)
