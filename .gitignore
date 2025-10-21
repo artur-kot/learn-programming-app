@@ -15,9 +15,8 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 
-# Example course dependencies
-example-js-course/node_modules/
-example-js-course/package-lock.json
+test-course/node_modules/
+test-course/**/node_modules/
 
 # Test coverage
 coverage/
