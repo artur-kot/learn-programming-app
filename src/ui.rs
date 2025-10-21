@@ -567,7 +567,7 @@ impl App {
             let mut context_section = String::new();
             if context_files.is_empty() {
                 // Fallback to just the exercise file if collection failed
-                let exercise_code = std::fs::read_to_string(&exercise.path.join("exercise.js"))
+                let exercise_code = std::fs::read_to_string(exercise.path.join("exercise.js"))
                     .unwrap_or_else(|_| String::from("Could not read exercise file"));
                 context_section.push_str("Current code:\n```javascript\n");
                 context_section.push_str(&exercise_code);

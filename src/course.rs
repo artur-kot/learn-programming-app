@@ -322,7 +322,7 @@ impl Course {
             .collect();
 
         // Sort entries alphabetically by folder name
-        entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+        entries.sort_by_key(|a| a.file_name());
 
         for (index, entry) in entries.iter().enumerate() {
             let exercise_path = entry.path();
@@ -391,8 +391,7 @@ impl Course {
     /// Convert a kebab-case or snake_case name to a human-readable title
     /// Examples: "hello-world" -> "Hello World", "array_basics" -> "Array Basics"
     fn humanize_name(name: &str) -> String {
-        name.replace('-', " ")
-            .replace('_', " ")
+        name.chars().map(|c| if c == '-' || c == '_' { ' ' } else { c }).collect::<String>()
             .split_whitespace()
             .map(|word| {
                 let mut chars = word.chars();
