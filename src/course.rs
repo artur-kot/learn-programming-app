@@ -36,19 +36,6 @@ pub enum Language {
     Unknown,
 }
 
-impl Language {
-    #[allow(dead_code)]
-    pub fn as_str(&self) -> &str {
-        match self {
-            Language::JavaScript => "javascript",
-            Language::Python => "python",
-            Language::Rust => "rust",
-            Language::Go => "go",
-            Language::Unknown => "unknown",
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Exercise {
     pub id: String,
@@ -335,9 +322,7 @@ impl Course {
             .collect();
 
         // Sort entries alphabetically by folder name
-        entries.sort_by(|a, b| {
-            a.file_name().cmp(&b.file_name())
-        });
+        entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
 
         for (index, entry) in entries.iter().enumerate() {
             let exercise_path = entry.path();
@@ -392,8 +377,8 @@ impl Course {
     /// Examples: "01-hello-world" -> "hello-world", "hello-world" -> "hello-world"
     fn generate_exercise_id(folder_name: &str) -> String {
         // Remove leading digits and hyphens (e.g., "01-" or "001-")
-        let without_prefix = folder_name
-            .trim_start_matches(|c: char| c.is_ascii_digit() || c == '-');
+        let without_prefix =
+            folder_name.trim_start_matches(|c: char| c.is_ascii_digit() || c == '-');
 
         // If we removed everything, use the original name
         if without_prefix.is_empty() {
@@ -413,9 +398,7 @@ impl Course {
                 let mut chars = word.chars();
                 match chars.next() {
                     None => String::new(),
-                    Some(first) => {
-                        first.to_uppercase().collect::<String>() + chars.as_str()
-                    }
+                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
                 }
             })
             .collect::<Vec<_>>()

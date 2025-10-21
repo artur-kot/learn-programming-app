@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::course::{Course, Exercise};
 use crate::database::Database;
 use crate::test_runner::{TestResult, TestRunner};
+use ansi_to_tui::IntoText;
 use anyhow::Result;
 use crossterm::{
     event::{
@@ -21,7 +22,6 @@ use ratatui::{
 use std::io;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
-use ansi_to_tui::IntoText;
 
 pub enum DisplayMode {
     Readme,
@@ -84,10 +84,7 @@ impl App {
 
         let mut initial_index = 0;
         for (index, exercise) in exercises.iter().enumerate() {
-            let is_completed = progress_map
-                .get(&exercise.id)
-                .copied()
-                .unwrap_or(false);
+            let is_completed = progress_map.get(&exercise.id).copied().unwrap_or(false);
 
             if !is_completed {
                 initial_index = index;
@@ -150,10 +147,7 @@ impl App {
             .collect();
 
         for (index, exercise) in self.exercises.iter().enumerate() {
-            let is_completed = progress_map
-                .get(&exercise.id)
-                .copied()
-                .unwrap_or(false);
+            let is_completed = progress_map.get(&exercise.id).copied().unwrap_or(false);
 
             if !is_completed {
                 return Some(index);
@@ -664,17 +658,6 @@ Hint:"#,
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn scroll_up(&mut self) {
-        self.scroll_position = self.scroll_position.saturating_sub(1);
-    }
-
-    #[allow(dead_code)]
-    fn scroll_down(&mut self) {
-        let max_scroll = self.test_output_lines.len().saturating_sub(1);
-        self.scroll_position = self.scroll_position.saturating_add(1).min(max_scroll);
-    }
-
     fn scroll_to_top(&mut self) {
         self.scroll_position = 0;
     }
@@ -691,17 +674,6 @@ Hint:"#,
             _ => self.test_output_lines.len().saturating_sub(1),
         };
         self.scroll_position = max_scroll;
-    }
-
-    #[allow(dead_code)]
-    fn page_up(&mut self) {
-        self.scroll_position = self.scroll_position.saturating_sub(10);
-    }
-
-    #[allow(dead_code)]
-    fn page_down(&mut self) {
-        let max_scroll = self.test_output_lines.len().saturating_sub(1);
-        self.scroll_position = self.scroll_position.saturating_add(10).min(max_scroll);
     }
 
     fn apply_scroll_delta(&mut self, delta: i32) {
@@ -735,15 +707,13 @@ Hint:"#,
         self.scroll_position = 0;
 
         // Initialize progress tracking for all exercises
-        self.run_all_progress = self.exercises
+        self.run_all_progress = self
+            .exercises
             .iter()
             .map(|ex| (ex.id.clone(), None))
             .collect();
         self.run_all_current_index = 0;
-        self.run_all_output = vec![
-            String::from("Starting all tests..."),
-            String::new(),
-        ];
+        self.run_all_output = vec![String::from("Starting all tests..."), String::new()];
 
         self.status_message = String::from("Running all tests... | Esc - cancel");
 
@@ -768,7 +738,7 @@ Hint:"#,
                 }
 
                 let exercise_id = exercise.id.clone();
-            let exercise_clone = exercise.clone();
+                let exercise_clone = exercise.clone();
 
                 // Create a channel for this individual test's output
                 let (output_tx, mut output_rx) = mpsc::channel(100);
@@ -781,7 +751,10 @@ Hint:"#,
                 });
 
                 // Run the test
-                let result = match test_runner.run_test_streaming(&exercise_clone, output_tx).await {
+                let result = match test_runner
+                    .run_test_streaming(&exercise_clone, output_tx)
+                    .await
+                {
                     Ok(result) => {
                         // Update database based on result
                         match &result {
@@ -849,21 +822,29 @@ Hint:"#,
 
             // Calculate summary
             let total = self.run_all_progress.len();
-            let passed = self.run_all_progress.iter()
+            let passed = self
+                .run_all_progress
+                .iter()
                 .filter(|(_, r)| matches!(r, Some(TestResult::Passed)))
                 .count();
-            let failed = self.run_all_progress.iter()
+            let failed = self
+                .run_all_progress
+                .iter()
                 .filter(|(_, r)| matches!(r, Some(TestResult::Failed)))
                 .count();
-            let errors = self.run_all_progress.iter()
+            let errors = self
+                .run_all_progress
+                .iter()
                 .filter(|(_, r)| matches!(r, Some(TestResult::Error(_))))
                 .count();
 
             self.run_all_output.push(String::new());
             self.run_all_output.push("─".repeat(50));
             self.run_all_output.push(String::new());
-            self.run_all_output.push(format!("Total: {} | Passed: {} | Failed: {} | Errors: {}",
-                total, passed, failed, errors));
+            self.run_all_output.push(format!(
+                "Total: {} | Passed: {} | Failed: {} | Errors: {}",
+                total, passed, failed, errors
+            ));
 
             if passed == total {
                 self.status_message = String::from("✓ All tests passed! | Esc - back");
@@ -959,7 +940,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Down
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
+                                    DisplayMode::TestOutput
+                                        | DisplayMode::Hint
+                                        | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 scroll_delta += 1;
@@ -967,7 +950,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Up
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
+                                    DisplayMode::TestOutput
+                                        | DisplayMode::Hint
+                                        | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 scroll_delta -= 1;
@@ -982,7 +967,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Char('j')
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
+                                    DisplayMode::TestOutput
+                                        | DisplayMode::Hint
+                                        | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 scroll_delta += 1;
@@ -990,7 +977,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Char('k')
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
+                                    DisplayMode::TestOutput
+                                        | DisplayMode::Hint
+                                        | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 scroll_delta -= 1;
@@ -1006,7 +995,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Char('g')
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
+                                    DisplayMode::TestOutput
+                                        | DisplayMode::Hint
+                                        | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 app.scroll_to_top();
@@ -1015,7 +1006,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             KeyCode::Char('G')
                                 if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
+                                    DisplayMode::TestOutput
+                                        | DisplayMode::Hint
+                                        | DisplayMode::RunAllTests
                                 ) =>
                             {
                                 app.scroll_to_bottom();
@@ -1051,7 +1044,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             }
                             KeyCode::Char('A') if key.modifiers.contains(KeyModifiers::SHIFT) => {
                                 // Shift+A: Run all tests (only from Readme mode)
-                                if matches!(app.display_mode, DisplayMode::Readme) && !app.is_running_all_tests {
+                                if matches!(app.display_mode, DisplayMode::Readme)
+                                    && !app.is_running_all_tests
+                                {
                                     app.run_all_tests().await?;
                                     scroll_delta = 0;
                                 }
@@ -1177,10 +1172,7 @@ fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) {
         .iter()
         .enumerate()
         .map(|(index, exercise)| {
-            let is_completed = progress_map
-                .get(&exercise.id)
-                .copied()
-                .unwrap_or(false);
+            let is_completed = progress_map.get(&exercise.id).copied().unwrap_or(false);
 
             let is_running = app.running_exercise_id.as_ref() == Some(&exercise.id);
             let is_locked = !app.is_exercise_unlocked(index);
@@ -1198,10 +1190,7 @@ fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) {
                 " "
             };
 
-            let content = format!(
-                "{} {} - {}",
-                status_icon, exercise.order, exercise.title
-            );
+            let content = format!("{} {} - {}", status_icon, exercise.order, exercise.title);
 
             // Determine style based on state
             let style = if is_locked {
@@ -1468,13 +1457,18 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
             // Test results
             for line in &app.run_all_output {
                 let styled_line = if line.starts_with("✓") {
-                    Line::from(Span::styled(line.as_str(), Style::default().fg(Color::Green)))
+                    Line::from(Span::styled(
+                        line.as_str(),
+                        Style::default().fg(Color::Green),
+                    ))
                 } else if line.starts_with("✗") {
                     Line::from(Span::styled(line.as_str(), Style::default().fg(Color::Red)))
                 } else if line.starts_with("Total:") {
                     Line::from(Span::styled(
                         line.as_str(),
-                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
                     ))
                 } else {
                     Line::from(line.as_str())
@@ -1487,11 +1481,14 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
                 if let Some(exercise) = app.exercises.get(completed) {
                     all_lines.push(Line::from(""));
                     let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-                    let spinner = spinner_frames[(app.blink_counter as usize) % spinner_frames.len()];
+                    let spinner =
+                        spinner_frames[(app.blink_counter as usize) % spinner_frames.len()];
                     all_lines.push(Line::from(vec![
                         Span::styled(
                             spinner,
-                            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                            Style::default()
+                                .fg(Color::Yellow)
+                                .add_modifier(Modifier::BOLD),
                         ),
                         Span::raw(format!("  Running: {}", exercise.title)),
                     ]));
@@ -1499,7 +1496,8 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
             }
 
             // Apply scrolling
-            let visible_lines: Vec<Line> = all_lines.into_iter().skip(app.scroll_position).collect();
+            let visible_lines: Vec<Line> =
+                all_lines.into_iter().skip(app.scroll_position).collect();
 
             (Text::from(visible_lines), "Run All Tests")
         }

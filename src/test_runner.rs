@@ -1,5 +1,5 @@
-use anyhow::{Context, Result};
 use crate::course::Exercise;
+use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -37,7 +37,8 @@ impl TestRunner {
             let mut cmd = self.create_command(&setup_cmd, &exercise.path);
             cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-            let mut child = cmd.spawn()
+            let mut child = cmd
+                .spawn()
                 .context(format!("Failed to spawn setup command: {}", setup_cmd))?;
 
             // Stream setup output
@@ -63,7 +64,9 @@ impl TestRunner {
                 });
             }
 
-            let status = child.wait().await
+            let status = child
+                .wait()
+                .await
                 .context("Failed to wait for setup command")?;
 
             if !status.success() {
@@ -98,61 +101,6 @@ impl TestRunner {
         cmd
     }
 
-    /// Run tests for an exercise
-    pub async fn run_test(&self, exercise: &Exercise) -> Result<TestResult> {
-        let test_cmd = exercise.get_test_command();
-        let mut cmd = self.create_command(&test_cmd, &exercise.path);
-
-        let output = cmd.output().await
-            .context(format!("Failed to execute test command: {}", test_cmd))?;
-
-        if output.status.success() {
-            Ok(TestResult::Passed)
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
-
-            // If tests failed (not an error), return Failed
-            if stderr.contains("FAIL") || stdout.contains("FAIL") || stderr.contains("failed") || stdout.contains("failed") {
-                Ok(TestResult::Failed)
-            } else if stderr.is_empty() && stdout.is_empty() {
-                // Sometimes tests fail silently
-                Ok(TestResult::Failed)
-            } else {
-                Ok(TestResult::Error(format!("{}{}", stdout, stderr)))
-            }
-        }
-    }
-
-    /// Run tests with full output
-    pub async fn run_test_with_output(&self, exercise: &Exercise) -> Result<(TestResult, String)> {
-        let test_cmd = exercise.get_test_command();
-        let mut cmd = self.create_command(&test_cmd, &exercise.path);
-
-        let output = cmd.output().await
-            .context(format!("Failed to execute test command: {}", test_cmd))?;
-
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let combined_output = format!("{}{}", stdout, stderr);
-
-        let result = if output.status.success() {
-            TestResult::Passed
-        } else {
-            // If tests failed (not an error), return Failed
-            if stderr.contains("FAIL") || stdout.contains("FAIL") || stderr.contains("failed") || stdout.contains("failed") {
-                TestResult::Failed
-            } else if stderr.is_empty() && stdout.is_empty() {
-                // Sometimes tests fail silently
-                TestResult::Failed
-            } else {
-                TestResult::Error(combined_output.clone())
-            }
-        };
-
-        Ok((result, combined_output))
-    }
-
     /// Run tests with streaming output
     pub async fn run_test_streaming(
         &self,
@@ -166,7 +114,12 @@ impl TestRunner {
             return Ok(TestResult::Error(error_msg));
         }
 
-        let _ = tx.send(format!("Running tests: {}\n\n", exercise.get_test_command())).await;
+        let _ = tx
+            .send(format!(
+                "Running tests: {}\n\n",
+                exercise.get_test_command()
+            ))
+            .await;
 
         let test_cmd = exercise.get_test_command();
 
@@ -228,5 +181,4 @@ impl TestRunner {
             Ok(TestResult::Failed)
         }
     }
-
 }
