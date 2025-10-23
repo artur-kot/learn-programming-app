@@ -23,11 +23,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  create-release:
-    name: Create Release
+  get-version:
+    name: Get Version
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Checkout code
@@ -46,25 +45,6 @@ jobs:
             echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Generate changelog
-        id: changelog
-        run: |
-          # Get previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-
-          if [ -z "$PREV_TAG" ]; then
-            # First release - get all commits
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
-          else
-            # Get commits since last tag
-            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
-          fi
-
-          # Save to file
-          echo "## What's Changed" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "$CHANGELOG" >> CHANGELOG.md
-
       - name: Create or update tag (manual workflow only)
         if: github.event_name == 'workflow_dispatch'
         run: |
@@ -73,21 +53,9 @@ jobs:
           git tag -a "v${{ steps.get_version.outputs.version }}" -m "Release v${{ steps.get_version.outputs.version }}"
           git push origin "v${{ steps.get_version.outputs.version }}"
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.get_version.outputs.version }}
-          release_name: Release ${{ steps.get_version.outputs.version }}
-          body_path: CHANGELOG.md
-          draft: false
-          prerelease: ${{ (github.event_name == 'workflow_dispatch' && inputs.prerelease) || contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-
   build-linux:
     name: Build Linux
-    needs: create-release
+    needs: get-version
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -139,22 +107,19 @@ jobs:
       - name: Create tarball
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf learnp-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz learnp
-          mv learnp-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz ../../../
+          tar czf learnp-${{ needs.get-version.outputs.version }}-${{ matrix.target }}.tar.gz learnp
+          mv learnp-${{ needs.get-version.outputs.version }}-${{ matrix.target }}.tar.gz ../../../
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./learnp-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz
-          asset_name: learnp-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz
-          asset_content_type: application/gzip
+          name: linux-${{ matrix.target }}
+          path: ./learnp-${{ needs.get-version.outputs.version }}-${{ matrix.target }}.tar.gz
+          retention-days: 1
 
   build-deb:
     name: Build Debian Package
-    needs: create-release
+    needs: get-version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -177,19 +142,16 @@ jobs:
           echo "path=$DEB_FILE" >> $GITHUB_OUTPUT
           echo "name=$DEB_NAME" >> $GITHUB_OUTPUT
 
-      - name: Upload Debian Package
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ${{ steps.find_deb.outputs.path }}
-          asset_name: ${{ steps.find_deb.outputs.name }}
-          asset_content_type: application/vnd.debian.binary-package
+          name: debian-package
+          path: ${{ steps.find_deb.outputs.path }}
+          retention-days: 1
 
   build-rpm:
     name: Build RPM Package
-    needs: create-release
+    needs: get-version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -215,19 +177,16 @@ jobs:
           echo "path=$RPM_FILE" >> $GITHUB_OUTPUT
           echo "name=$RPM_NAME" >> $GITHUB_OUTPUT
 
-      - name: Upload RPM Package
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ${{ steps.find_rpm.outputs.path }}
-          asset_name: ${{ steps.find_rpm.outputs.name }}
-          asset_content_type: application/x-rpm
+          name: rpm-package
+          path: ${{ steps.find_rpm.outputs.path }}
+          retention-days: 1
 
   build-windows:
     name: Build Windows
-    needs: create-release
+    needs: get-version
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -262,21 +221,18 @@ jobs:
       - name: Create ZIP archive
         run: |
           cd target/x86_64-pc-windows-msvc/release
-          7z a ../../../learnp-${{ needs.create-release.outputs.version }}-x86_64-windows.zip learnp.exe
+          7z a ../../../learnp-${{ needs.get-version.outputs.version }}-x86_64-windows.zip learnp.exe
 
-      - name: Upload Windows Binary (ZIP)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./learnp-${{ needs.create-release.outputs.version }}-x86_64-windows.zip
-          asset_name: learnp-${{ needs.create-release.outputs.version }}-x86_64-windows.zip
-          asset_content_type: application/zip
+          name: windows-zip
+          path: ./learnp-${{ needs.get-version.outputs.version }}-x86_64-windows.zip
+          retention-days: 1
 
   build-windows-installer:
     name: Build Windows Installer
-    needs: create-release
+    needs: get-version
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -303,19 +259,16 @@ jobs:
           echo "path=$($MSI_FILE.FullName)" >> $env:GITHUB_OUTPUT
           echo "name=$MSI_NAME" >> $env:GITHUB_OUTPUT
 
-      - name: Upload Windows Installer (MSI)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ${{ steps.find_msi.outputs.path }}
-          asset_name: ${{ steps.find_msi.outputs.name }}
-          asset_content_type: application/x-msi
+          name: windows-installer
+          path: ${{ steps.find_msi.outputs.path }}
+          retention-days: 1
 
   build-macos:
     name: Build macOS
-    needs: create-release
+    needs: get-version
     runs-on: macos-latest
     strategy:
       matrix:
@@ -358,22 +311,19 @@ jobs:
       - name: Create tarball
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf learnp-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz learnp
-          mv learnp-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz ../../../
+          tar czf learnp-${{ needs.get-version.outputs.version }}-${{ matrix.target }}.tar.gz learnp
+          mv learnp-${{ needs.get-version.outputs.version }}-${{ matrix.target }}.tar.gz ../../../
 
-      - name: Upload macOS Binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./learnp-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz
-          asset_name: learnp-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz
-          asset_content_type: application/gzip
+          name: macos-${{ matrix.target }}
+          path: ./learnp-${{ needs.get-version.outputs.version }}-${{ matrix.target }}.tar.gz
+          retention-days: 1
 
   build-macos-universal:
     name: Build macOS Universal Binary
-    needs: [create-release, build-macos]
+    needs: [get-version, build-macos]
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -399,14 +349,59 @@ jobs:
 
       - name: Create tarball
         run: |
-          tar czf learnp-${{ needs.create-release.outputs.version }}-universal-apple-darwin.tar.gz learnp-universal
+          tar czf learnp-${{ needs.get-version.outputs.version }}-universal-apple-darwin.tar.gz learnp-universal
 
-      - name: Upload macOS Universal Binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./learnp-${{ needs.create-release.outputs.version }}-universal-apple-darwin.tar.gz
-          asset_name: learnp-${{ needs.create-release.outputs.version }}-universal-apple-darwin.tar.gz
-          asset_content_type: application/gzip
+          name: macos-universal
+          path: ./learnp-${{ needs.get-version.outputs.version }}-universal-apple-darwin.tar.gz
+          retention-days: 1
+
+  create-release:
+    name: Create Release
+    needs: [get-version, build-linux, build-deb, build-rpm, build-windows, build-windows-installer, build-macos, build-macos-universal]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            # First release - get all commits
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            # Get commits since last tag
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Save to file
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "$CHANGELOG" >> CHANGELOG.md
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.get-version.outputs.version }}
+          name: Release ${{ needs.get-version.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ (github.event_name == 'workflow_dispatch' && inputs.prerelease) || contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          files: |
+            artifacts/**/*
