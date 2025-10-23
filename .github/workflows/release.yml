@@ -308,17 +308,55 @@ jobs:
       - name: Strip binary
         run: strip target/${{ matrix.target }}/release/learnp
 
-      - name: Create tarball
+      - name: Create DMG
         run: |
-          cd target/${{ matrix.target }}/release
-          tar czf learnp-${{ needs.get-version.outputs.version }}-${{ matrix.target }}.tar.gz learnp
-          mv learnp-${{ needs.get-version.outputs.version }}-${{ matrix.target }}.tar.gz ../../../
+          # Set architecture-specific name
+          if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
+            ARCH="intel"
+          else
+            ARCH="arm64"
+          fi
+
+          DMG_NAME="learnp-${{ needs.get-version.outputs.version }}-${ARCH}.dmg"
+          STAGING_DIR="dmg_staging"
+
+          # Create staging directory
+          mkdir -p "${STAGING_DIR}"
+
+          # Copy binary
+          cp target/${{ matrix.target }}/release/learnp "${STAGING_DIR}/"
+
+          # Create README with installation instructions
+          cat > "${STAGING_DIR}/README.txt" << 'EOF'
+          learnp - Learn Programming App
+
+          Installation Instructions:
+
+          1. Copy the 'learnp' binary to a directory in your PATH
+             Recommended: /usr/local/bin/
+
+             sudo cp learnp /usr/local/bin/
+             sudo chmod +x /usr/local/bin/learnp
+
+          2. Verify installation:
+             learnp --version
+
+          3. Start using learnp!
+
+          For more information, visit the GitHub repository.
+          EOF
+
+          # Create DMG using hdiutil
+          hdiutil create -volname "learnp ${{ needs.get-version.outputs.version }}" \
+            -srcfolder "${STAGING_DIR}" \
+            -ov -format UDZO \
+            "${DMG_NAME}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.target }}
-          path: ./learnp-${{ needs.get-version.outputs.version }}-${{ matrix.target }}.tar.gz
+          path: ./learnp-${{ needs.get-version.outputs.version }}-*.dmg
           retention-days: 1
 
   build-macos-universal:
@@ -347,15 +385,50 @@ jobs:
             -output learnp-universal
           strip learnp-universal
 
-      - name: Create tarball
+      - name: Create DMG
         run: |
-          tar czf learnp-${{ needs.get-version.outputs.version }}-universal-apple-darwin.tar.gz learnp-universal
+          DMG_NAME="learnp-${{ needs.get-version.outputs.version }}-universal.dmg"
+          STAGING_DIR="dmg_staging"
+
+          # Create staging directory
+          mkdir -p "${STAGING_DIR}"
+
+          # Copy universal binary
+          cp learnp-universal "${STAGING_DIR}/learnp"
+
+          # Create README with installation instructions
+          cat > "${STAGING_DIR}/README.txt" << 'EOF'
+          learnp - Learn Programming App (Universal Binary)
+
+          This is a universal binary that works on both Intel and Apple Silicon Macs.
+
+          Installation Instructions:
+
+          1. Copy the 'learnp' binary to a directory in your PATH
+             Recommended: /usr/local/bin/
+
+             sudo cp learnp /usr/local/bin/
+             sudo chmod +x /usr/local/bin/learnp
+
+          2. Verify installation:
+             learnp --version
+
+          3. Start using learnp!
+
+          For more information, visit the GitHub repository.
+          EOF
+
+          # Create DMG using hdiutil
+          hdiutil create -volname "learnp ${{ needs.get-version.outputs.version }} (Universal)" \
+            -srcfolder "${STAGING_DIR}" \
+            -ov -format UDZO \
+            "${DMG_NAME}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-universal
-          path: ./learnp-${{ needs.get-version.outputs.version }}-universal-apple-darwin.tar.gz
+          path: ./learnp-${{ needs.get-version.outputs.version }}-universal.dmg
           retention-days: 1
 
   create-release:
