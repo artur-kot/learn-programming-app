@@ -126,15 +126,7 @@ your-course/
   "name": "JavaScript Fundamentals",
   "description": "Learn the basics of JavaScript",
   "author": "Your Name",
-  "version": "1.0.0",
-  "exercises": [
-    {
-      "id": "01-hello-world",
-      "title": "Hello World",
-      "description": "Your first JavaScript function",
-      "order": 1
-    }
-  ]
+  "version": "1.0.0"
 }
 ```
 

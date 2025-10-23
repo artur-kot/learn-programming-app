@@ -1,0 +1,7 @@
+{
+  "name": "001-hello-world",
+  "type": "module",
+  "scripts": {
+    "test": "node 001-hello-world.test.js"
+  }
+}

@@ -71,7 +71,7 @@ pub struct App {
 impl App {
     pub fn new(course_path: PathBuf) -> Result<Self> {
         let (course, exercises) = Course::load_from_path(&course_path)?;
-        let database = Database::new(&course.name)?;
+        let database = Database::new(&course_path)?;
         let test_runner = TestRunner::new(&course_path);
 
         // Find first incomplete exercise to select on startup

@@ -1,6 +1,6 @@
 [package]
 name = "learnp"
-version = "0.1.0"
+version = "0.8.0"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "Interactive TUI application for learning programming through exercises"
@@ -47,8 +47,16 @@ depends = "$auto"
 section = "education"
 priority = "optional"
 assets = [
-    ["target/release/learnp", "usr/bin/", "755"],
-    ["README.md", "usr/share/doc/learnp/", "644"],
+    [
+        "target/release/learnp",
+        "usr/bin/",
+        "755",
+    ],
+    [
+        "README.md",
+        "usr/share/doc/learnp/",
+        "644",
+    ],
 ]
 
 [package.metadata.generate-rpm]

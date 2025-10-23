@@ -15,11 +15,14 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 
-test-course/**/node_modules/
-
 # Test coverage
 coverage/
 *.lcov
 
 # Claude
 .claude/
+
+# Local course progress databases
+progress.db
+progress.db-shm
+progress.db-wal

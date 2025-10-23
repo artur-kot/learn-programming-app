@@ -1,8 +1,7 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use directories::ProjectDirs;
 use rusqlite::{params, Connection};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
@@ -21,13 +20,8 @@ pub struct ExerciseProgress {
 }
 
 impl Database {
-    pub fn new(course_name: &str) -> Result<Self> {
-        let db_path = Self::get_db_path(course_name)?;
-
-        // Ensure parent directory exists
-        if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
+    pub fn new<P: AsRef<Path>>(course_path: P) -> Result<Self> {
+        let db_path = Self::get_db_path(course_path)?;
 
         let conn = Connection::open(&db_path)
             .context(format!("Failed to open database at {:?}", db_path))?;
@@ -39,23 +33,13 @@ impl Database {
         Ok(db)
     }
 
-    fn get_db_path(course_name: &str) -> Result<PathBuf> {
-        let proj_dirs = ProjectDirs::from("com", "learnp", "Learn Programming")
-            .context("Failed to determine project directories")?;
+    fn get_db_path<P: AsRef<Path>>(course_path: P) -> Result<PathBuf> {
+        let course_path = course_path.as_ref();
 
-        let data_dir = proj_dirs.data_dir();
-        let sanitized_name = course_name
-            .chars()
-            .map(|c| {
-                if c.is_alphanumeric() || c == '-' || c == '_' {
-                    c
-                } else {
-                    '_'
-                }
-            })
-            .collect::<String>();
+        // Create progress.db in the course root directory
+        let db_path = course_path.join("progress.db");
 
-        Ok(data_dir.join(format!("{}.db", sanitized_name)))
+        Ok(db_path)
     }
 
     fn init_schema(&self) -> Result<()> {
