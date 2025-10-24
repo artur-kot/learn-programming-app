@@ -9,9 +9,44 @@ use anyhow::{Context, Result};
 use std::env;
 use std::path::PathBuf;
 
+fn print_help(program_name: &str) {
+    println!("learnp - Interactive TUI application for learning programming through exercises");
+    println!();
+    println!("USAGE:");
+    println!("    {} [OPTIONS] [course-directory]", program_name);
+    println!();
+    println!("OPTIONS:");
+    println!("    -h, --help       Print help information");
+    println!("    -v, --version    Print version information");
+    println!();
+    println!("ARGS:");
+    println!("    <course-directory>    Path to the course directory (optional, defaults to current directory)");
+    println!();
+    println!("DESCRIPTION:");
+    println!("    A course directory must contain:");
+    println!("      - course.json (course metadata)");
+    println!("      - exercises/ (directory with exercise folders)");
+    println!();
+    println!("EXAMPLES:");
+    println!("    {} ./my-course", program_name);
+    println!("    {}              # Uses current directory", program_name);
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
+
+    // Handle --version flag
+    if args.len() > 1 && (args[1] == "--version" || args[1] == "-v") {
+        println!("learnp version {}", env!("CARGO_PKG_VERSION"));
+        std::process::exit(0);
+    }
+
+    // Handle --help flag
+    if args.len() > 1 && (args[1] == "--help" || args[1] == "-h") {
+        print_help(&args[0]);
+        std::process::exit(0);
+    }
 
     let course_path = if args.len() > 1 {
         // Course path provided as argument

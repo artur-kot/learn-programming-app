@@ -1,6 +1,6 @@
 [package]
 name = "learnp"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "Interactive TUI application for learning programming through exercises"
