@@ -7,6 +7,7 @@ use anyhow::Result;
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+        MouseEventKind,
     },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -25,6 +26,7 @@ use tokio::sync::mpsc;
 
 pub enum DisplayMode {
     Readme,
+    ReadmeFocused,
     TestOutput,
     Hint,
     ModelSelection,
@@ -671,6 +673,22 @@ Hint:"#,
                     .unwrap_or(0)
                     .saturating_sub(1)
             }
+            DisplayMode::ReadmeFocused => {
+                // Calculate README line count
+                if let Some(exercise) = self.get_selected_exercise() {
+                    if exercise.readme_file.exists() {
+                        if let Ok(readme) = std::fs::read_to_string(&exercise.readme_file) {
+                            readme.lines().count().saturating_sub(1)
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
+            }
             _ => self.test_output_lines.len().saturating_sub(1),
         };
         self.scroll_position = max_scroll;
@@ -686,6 +704,22 @@ Hint:"#,
                     .saturating_sub(1)
             }
             DisplayMode::RunAllTests => self.run_all_output.len().saturating_sub(1),
+            DisplayMode::ReadmeFocused => {
+                // Calculate README line count
+                if let Some(exercise) = self.get_selected_exercise() {
+                    if exercise.readme_file.exists() {
+                        if let Ok(readme) = std::fs::read_to_string(&exercise.readme_file) {
+                            readme.lines().count().saturating_sub(1)
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
+            }
             _ => self.test_output_lines.len().saturating_sub(1),
         };
 
@@ -902,8 +936,28 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
 
             // Read all available events
             while event::poll(std::time::Duration::from_millis(0))? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
+                match event::read()? {
+                    Event::Mouse(mouse) => {
+                        // Handle mouse scroll events
+                        if matches!(
+                            app.display_mode,
+                            DisplayMode::TestOutput
+                                | DisplayMode::Hint
+                                | DisplayMode::RunAllTests
+                                | DisplayMode::ReadmeFocused
+                        ) {
+                            match mouse.kind {
+                                MouseEventKind::ScrollDown => {
+                                    scroll_delta += 3; // Scroll 3 lines at a time for smoother feel
+                                }
+                                MouseEventKind::ScrollUp => {
+                                    scroll_delta -= 3;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    Event::Key(key) if key.kind == KeyEventKind::Press => {
                         match key.code {
                             KeyCode::Char('q') => {
                                 should_quit = true;
@@ -943,6 +997,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     DisplayMode::TestOutput
                                         | DisplayMode::Hint
                                         | DisplayMode::RunAllTests
+                                        | DisplayMode::ReadmeFocused
                                 ) =>
                             {
                                 scroll_delta += 1;
@@ -953,6 +1008,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     DisplayMode::TestOutput
                                         | DisplayMode::Hint
                                         | DisplayMode::RunAllTests
+                                        | DisplayMode::ReadmeFocused
                                 ) =>
                             {
                                 scroll_delta -= 1;
@@ -970,6 +1026,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     DisplayMode::TestOutput
                                         | DisplayMode::Hint
                                         | DisplayMode::RunAllTests
+                                        | DisplayMode::ReadmeFocused
                                 ) =>
                             {
                                 scroll_delta += 1;
@@ -980,6 +1037,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     DisplayMode::TestOutput
                                         | DisplayMode::Hint
                                         | DisplayMode::RunAllTests
+                                        | DisplayMode::ReadmeFocused
                                 ) =>
                             {
                                 scroll_delta -= 1;
@@ -998,6 +1056,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     DisplayMode::TestOutput
                                         | DisplayMode::Hint
                                         | DisplayMode::RunAllTests
+                                        | DisplayMode::ReadmeFocused
                                 ) =>
                             {
                                 app.scroll_to_top();
@@ -1009,6 +1068,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     DisplayMode::TestOutput
                                         | DisplayMode::Hint
                                         | DisplayMode::RunAllTests
+                                        | DisplayMode::ReadmeFocused
                                 ) =>
                             {
                                 app.scroll_to_bottom();
@@ -1040,6 +1100,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 } else if matches!(app.display_mode, DisplayMode::TestOutput) {
                                     app.show_readme();
                                     scroll_delta = 0;
+                                } else if matches!(app.display_mode, DisplayMode::ReadmeFocused) {
+                                    app.show_readme();
+                                    scroll_delta = 0;
                                 }
                             }
                             KeyCode::Char('A') if key.modifiers.contains(KeyModifiers::SHIFT) => {
@@ -1065,9 +1128,11 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 }
                             }
                             KeyCode::Char('r') => {
-                                // Only allow 'r' from Readme mode to show readme
+                                // Switch to focused README mode with scrolling
                                 if matches!(app.display_mode, DisplayMode::Readme) {
-                                    app.show_readme();
+                                    app.display_mode = DisplayMode::ReadmeFocused;
+                                    app.scroll_position = 0;
+                                    app.status_message = String::from("Reading README | ↑/↓ PgUp/PgDn Home/End - scroll, Esc - back");
                                     scroll_delta = 0;
                                 }
                             }
@@ -1098,6 +1163,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                             _ => {}
                         }
                     }
+                    _ => {} // Ignore other events
                 }
             }
 
@@ -1109,7 +1175,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
             if scroll_delta != 0
                 && matches!(
                     app.display_mode,
-                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests
+                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests | DisplayMode::ReadmeFocused
                 )
             {
                 app.apply_scroll_delta(scroll_delta);
@@ -1124,6 +1190,7 @@ fn ui(f: &mut Frame, app: &App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Min(0),
+            Constraint::Length(3),
             Constraint::Length(3),
         ])
         .split(f.area());
@@ -1151,11 +1218,22 @@ fn ui(f: &mut Frame, app: &App) {
     // Exercise details
     render_exercise_details(f, app, main_chunks[1]);
 
+    // Description bar
+    let description_text = if let Some(exercise) = app.get_selected_exercise() {
+        exercise.description.clone()
+    } else {
+        String::new()
+    };
+    let description = Paragraph::new(description_text)
+        .style(Style::default().fg(Color::White))
+        .block(Block::default().borders(Borders::ALL).title("Description"));
+    f.render_widget(description, chunks[2]);
+
     // Status bar
     let status = Paragraph::new(app.status_message.clone())
         .style(Style::default().fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL).title("Status"));
-    f.render_widget(status, chunks[2]);
+    f.render_widget(status, chunks[3]);
 }
 
 fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) {
@@ -1222,42 +1300,45 @@ fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
-    let (content, title) = match app.display_mode {
+    let (content, title, border_color) = match app.display_mode {
         DisplayMode::Readme => {
             if let Some(exercise) = app.get_selected_exercise() {
-                let mut lines = vec![
-                    Line::from(vec![
-                        Span::styled("Title: ", Style::default().add_modifier(Modifier::BOLD)),
-                        Span::raw(&exercise.title),
-                    ]),
-                    Line::from(vec![
-                        Span::styled(
-                            "Description: ",
-                            Style::default().add_modifier(Modifier::BOLD),
-                        ),
-                        Span::raw(&exercise.description),
-                    ]),
-                    Line::from(""),
-                ];
+                let mut lines = vec![];
 
                 // Show README content if available
                 if exercise.readme_file.exists() {
                     if let Ok(readme) = std::fs::read_to_string(&exercise.readme_file) {
-                        lines.push(Line::from(Span::styled(
-                            "README:",
-                            Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-                        )));
-                        lines.push(Line::from(""));
-
                         for line in readme.lines() {
                             lines.push(Line::from(line.to_string()));
                         }
                     }
                 }
 
-                (Text::from(lines), "Exercise Details")
+                (Text::from(lines), "README", Color::White)
             } else {
-                (Text::from("No exercise selected"), "Exercise Details")
+                (Text::from("No exercise selected"), "README", Color::White)
+            }
+        }
+        DisplayMode::ReadmeFocused => {
+            if let Some(exercise) = app.get_selected_exercise() {
+                let mut all_lines = vec![];
+
+                // Show README content if available
+                if exercise.readme_file.exists() {
+                    if let Ok(readme) = std::fs::read_to_string(&exercise.readme_file) {
+                        for line in readme.lines() {
+                            all_lines.push(Line::from(line.to_string()));
+                        }
+                    }
+                }
+
+                // Apply scrolling
+                let visible_lines: Vec<Line> =
+                    all_lines.into_iter().skip(app.scroll_position).collect();
+
+                (Text::from(visible_lines), "README", Color::Green)
+            } else {
+                (Text::from("No exercise selected"), "README", Color::Green)
             }
         }
         DisplayMode::TestOutput => {
@@ -1316,7 +1397,7 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
             let visible_lines: Vec<Line> =
                 all_lines.into_iter().skip(app.scroll_position).collect();
 
-            (Text::from(visible_lines), "Test Output")
+            (Text::from(visible_lines), "Test Output", Color::White)
         }
         DisplayMode::Hint => {
             // Show hint header
@@ -1365,7 +1446,7 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
             let visible_lines: Vec<Line> =
                 all_lines.into_iter().skip(app.scroll_position).collect();
 
-            (Text::from(visible_lines), "Hint")
+            (Text::from(visible_lines), "Hint", Color::White)
         }
         DisplayMode::ModelSelection => {
             // Use List widget for model selection
@@ -1499,12 +1580,12 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
             let visible_lines: Vec<Line> =
                 all_lines.into_iter().skip(app.scroll_position).collect();
 
-            (Text::from(visible_lines), "Run All Tests")
+            (Text::from(visible_lines), "Run All Tests", Color::White)
         }
     };
 
     let paragraph = Paragraph::new(content)
-        .block(Block::default().borders(Borders::ALL).title(title))
+        .block(Block::default().borders(Borders::ALL).title(title).border_style(Style::default().fg(border_color)))
         .wrap(Wrap { trim: false });
 
     f.render_widget(paragraph, area);

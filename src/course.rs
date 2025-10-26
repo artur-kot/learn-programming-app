@@ -354,7 +354,7 @@ impl Course {
             let description = metadata
                 .description
                 .clone()
-                .unwrap_or_else(|| format!("Exercise: {}", title));
+                .unwrap_or_else(|| String::new());
 
             let readme_file = exercise_path.join("README.md");
 
