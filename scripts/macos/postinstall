@@ -1,0 +1,20 @@
+#!/bin/bash
+# This script runs after the package is installed
+
+set -e
+
+INSTALL_DIR="/usr/local/bin"
+BINARY_NAME="learnp"
+
+# Ensure the binary is executable
+chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
+
+# Verify installation
+if command -v learnp &> /dev/null; then
+    echo "learnp installed successfully!"
+    echo "Version: $(learnp --version)"
+else
+    echo "Warning: learnp was installed but is not in PATH"
+fi
+
+exit 0

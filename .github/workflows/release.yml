@@ -3,15 +3,15 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 0.1.0)'
+        description: "Version to release (e.g., 0.1.0)"
         required: true
         type: string
       prerelease:
-        description: 'Mark as pre-release'
+        description: "Mark as pre-release"
         required: false
         type: boolean
         default: false
@@ -61,7 +61,7 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl  # Static binary
+          - x86_64-unknown-linux-musl # Static binary
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -308,7 +308,7 @@ jobs:
       - name: Strip binary
         run: strip target/${{ matrix.target }}/release/learnp
 
-      - name: Create DMG
+      - name: Create PKG and DMG installer
         run: |
           # Set architecture-specific name
           if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
@@ -317,40 +317,11 @@ jobs:
             ARCH="arm64"
           fi
 
-          DMG_NAME="learnp-${{ needs.get-version.outputs.version }}-${ARCH}.dmg"
-          STAGING_DIR="dmg_staging"
+          # Make build script executable
+          chmod +x scripts/macos/build-pkg.sh
 
-          # Create staging directory
-          mkdir -p "${STAGING_DIR}"
-
-          # Copy binary
-          cp target/${{ matrix.target }}/release/learnp "${STAGING_DIR}/"
-
-          # Create README with installation instructions
-          cat > "${STAGING_DIR}/README.txt" << 'EOF'
-          learnp - Learn Programming App
-
-          Installation Instructions:
-
-          1. Copy the 'learnp' binary to a directory in your PATH
-             Recommended: /usr/local/bin/
-
-             sudo cp learnp /usr/local/bin/
-             sudo chmod +x /usr/local/bin/learnp
-
-          2. Verify installation:
-             learnp --version
-
-          3. Start using learnp!
-
-          For more information, visit the GitHub repository.
-          EOF
-
-          # Create DMG using hdiutil
-          hdiutil create -volname "learnp ${{ needs.get-version.outputs.version }}" \
-            -srcfolder "${STAGING_DIR}" \
-            -ov -format UDZO \
-            "${DMG_NAME}"
+          # Build the .pkg installer and DMG
+          ./scripts/macos/build-pkg.sh "${{ needs.get-version.outputs.version }}" "${ARCH}" "${{ matrix.target }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -385,44 +356,69 @@ jobs:
             -output learnp-universal
           strip learnp-universal
 
-      - name: Create DMG
+      - name: Create universal PKG and DMG installer
         run: |
-          DMG_NAME="learnp-${{ needs.get-version.outputs.version }}-universal.dmg"
-          STAGING_DIR="dmg_staging"
+          VERSION="${{ needs.get-version.outputs.version }}"
+          ARCH="universal"
+          BUILD_DIR="target/macos-pkg-${ARCH}"
+          INSTALL_ROOT="${BUILD_DIR}/root"
+          INSTALL_DIR="${INSTALL_ROOT}/usr/local/bin"
+          PKG_OUTPUT="learnp-${VERSION}-${ARCH}.pkg"
 
-          # Create staging directory
-          mkdir -p "${STAGING_DIR}"
+          # Create directory structure
+          mkdir -p "${INSTALL_DIR}"
+          mkdir -p "${BUILD_DIR}/scripts"
 
-          # Copy universal binary
-          cp learnp-universal "${STAGING_DIR}/learnp"
+          # Copy universal binary to install location
+          cp learnp-universal "${INSTALL_DIR}/learnp"
+          chmod +x "${INSTALL_DIR}/learnp"
 
-          # Create README with installation instructions
-          cat > "${STAGING_DIR}/README.txt" << 'EOF'
+          # Copy scripts
+          cp scripts/macos/postinstall "${BUILD_DIR}/scripts/"
+          chmod +x "${BUILD_DIR}/scripts/postinstall"
+
+          # Build the package
+          pkgbuild --root "${INSTALL_ROOT}" \
+              --identifier "com.learnp.cli" \
+              --version "${VERSION}" \
+              --install-location "/" \
+              --scripts "${BUILD_DIR}/scripts" \
+              "${PKG_OUTPUT}"
+
+          echo "Package created: ${PKG_OUTPUT}"
+
+          # Create a DMG containing the .pkg
+          DMG_NAME="learnp-${VERSION}-${ARCH}.dmg"
+          DMG_STAGING="${BUILD_DIR}/dmg_staging"
+
+          mkdir -p "${DMG_STAGING}"
+          cp "${PKG_OUTPUT}" "${DMG_STAGING}/"
+
+          # Create a README for the DMG
+          cat > "${DMG_STAGING}/README.txt" << 'EOF'
           learnp - Learn Programming App (Universal Binary)
 
           This is a universal binary that works on both Intel and Apple Silicon Macs.
 
           Installation Instructions:
 
-          1. Copy the 'learnp' binary to a directory in your PATH
-             Recommended: /usr/local/bin/
+          1. Double-click the .pkg file to install
+          2. Follow the installer prompts (administrator password required)
+          3. The installer will automatically place learnp in /usr/local/bin/
 
-             sudo cp learnp /usr/local/bin/
-             sudo chmod +x /usr/local/bin/learnp
-
-          2. Verify installation:
-             learnp --version
-
-          3. Start using learnp!
+          After installation, open Terminal and verify:
+            learnp --version
 
           For more information, visit the GitHub repository.
           EOF
 
-          # Create DMG using hdiutil
-          hdiutil create -volname "learnp ${{ needs.get-version.outputs.version }} (Universal)" \
-            -srcfolder "${STAGING_DIR}" \
-            -ov -format UDZO \
-            "${DMG_NAME}"
+          # Create DMG
+          hdiutil create -volname "learnp ${VERSION} (Universal)" \
+              -srcfolder "${DMG_STAGING}" \
+              -ov -format UDZO \
+              "${DMG_NAME}"
+
+          echo "DMG created: ${DMG_NAME}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -433,7 +429,17 @@ jobs:
 
   create-release:
     name: Create Release
-    needs: [get-version, build-linux, build-deb, build-rpm, build-windows, build-windows-installer, build-macos, build-macos-universal]
+    needs:
+      [
+        get-version,
+        build-linux,
+        build-deb,
+        build-rpm,
+        build-windows,
+        build-windows-installer,
+        build-macos,
+        build-macos-universal,
+      ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
