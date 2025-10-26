@@ -2,7 +2,7 @@
 name = "learnp"
 version = "0.8.2"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Artur Kot <artur.kot@outlook.com>"]
 description = "Interactive TUI application for learning programming through exercises"
 license = "MIT"
 homepage = "https://github.com/yourusername/learn-programming-app"
@@ -36,8 +36,8 @@ default = []
 vendored-openssl = ["openssl"]
 
 [package.metadata.deb]
-maintainer = "Your Name <your.email@example.com>"
-copyright = "2025, Your Name <your.email@example.com>"
+maintainer = "Artur Kot <artur.kot@outlook.com>"
+copyright = "2025, Artur Kot <artur.kot@outlook.com>"
 license-file = ["LICENSE", "4"]
 extended-description = """\
 Learn Programming is an interactive terminal-based application for learning \

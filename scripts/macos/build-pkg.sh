@@ -57,40 +57,4 @@ pkgbuild --root "${INSTALL_ROOT}" \
 
 echo "Package created: ${PKG_OUTPUT}"
 echo "Size: $(du -h "${PKG_OUTPUT}" | cut -f1)"
-
-# Optional: Create a DMG containing the .pkg for easier distribution
-DMG_NAME="learnp-${VERSION}-${ARCH}.dmg"
-DMG_STAGING="${BUILD_DIR}/dmg_staging"
-
-echo "Creating DMG..."
-mkdir -p "${DMG_STAGING}"
-cp "${PKG_OUTPUT}" "${DMG_STAGING}/"
-
-# Create a README for the DMG
-cat > "${DMG_STAGING}/README.txt" << 'EOF'
-learnp - Learn Programming App
-
-Installation Instructions:
-
-1. Double-click "learnp-${VERSION}-${ARCH}.pkg" to install
-2. Follow the installer prompts (administrator password required)
-3. The installer will automatically place learnp in /usr/local/bin/
-
-After installation, open Terminal and verify:
-  learnp --version
-
-For more information, visit the GitHub repository.
-EOF
-
-# Replace variables in README
-sed -i '' "s/\${VERSION}/${VERSION}/g" "${DMG_STAGING}/README.txt"
-sed -i '' "s/\${ARCH}/${ARCH}/g" "${DMG_STAGING}/README.txt"
-
-# Create DMG
-hdiutil create -volname "learnp ${VERSION} (${ARCH})" \
-    -srcfolder "${DMG_STAGING}" \
-    -ov -format UDZO \
-    "${DMG_NAME}"
-
-echo "DMG created: ${DMG_NAME}"
 echo "Done!"

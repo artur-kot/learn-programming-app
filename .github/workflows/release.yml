@@ -308,7 +308,7 @@ jobs:
       - name: Strip binary
         run: strip target/${{ matrix.target }}/release/learnp
 
-      - name: Create PKG and DMG installer
+      - name: Create PKG installer
         run: |
           # Set architecture-specific name
           if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
@@ -320,111 +320,14 @@ jobs:
           # Make build script executable
           chmod +x scripts/macos/build-pkg.sh
 
-          # Build the .pkg installer and DMG
+          # Build the .pkg installer
           ./scripts/macos/build-pkg.sh "${{ needs.get-version.outputs.version }}" "${ARCH}" "${{ matrix.target }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.target }}
-          path: ./learnp-${{ needs.get-version.outputs.version }}-*.dmg
-          retention-days: 1
-
-  build-macos-universal:
-    name: Build macOS Universal Binary
-    needs: [get-version, build-macos]
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-apple-darwin,aarch64-apple-darwin
-
-      - name: Build both architectures
-        run: |
-          cargo build --release --target x86_64-apple-darwin
-          cargo build --release --target aarch64-apple-darwin
-
-      - name: Create universal binary
-        run: |
-          lipo -create \
-            target/x86_64-apple-darwin/release/learnp \
-            target/aarch64-apple-darwin/release/learnp \
-            -output learnp-universal
-          strip learnp-universal
-
-      - name: Create universal PKG and DMG installer
-        run: |
-          VERSION="${{ needs.get-version.outputs.version }}"
-          ARCH="universal"
-          BUILD_DIR="target/macos-pkg-${ARCH}"
-          INSTALL_ROOT="${BUILD_DIR}/root"
-          INSTALL_DIR="${INSTALL_ROOT}/usr/local/bin"
-          PKG_OUTPUT="learnp-${VERSION}-${ARCH}.pkg"
-
-          # Create directory structure
-          mkdir -p "${INSTALL_DIR}"
-          mkdir -p "${BUILD_DIR}/scripts"
-
-          # Copy universal binary to install location
-          cp learnp-universal "${INSTALL_DIR}/learnp"
-          chmod +x "${INSTALL_DIR}/learnp"
-
-          # Copy scripts
-          cp scripts/macos/postinstall "${BUILD_DIR}/scripts/"
-          chmod +x "${BUILD_DIR}/scripts/postinstall"
-
-          # Build the package
-          pkgbuild --root "${INSTALL_ROOT}" \
-              --identifier "com.learnp.cli" \
-              --version "${VERSION}" \
-              --install-location "/" \
-              --scripts "${BUILD_DIR}/scripts" \
-              "${PKG_OUTPUT}"
-
-          echo "Package created: ${PKG_OUTPUT}"
-
-          # Create a DMG containing the .pkg
-          DMG_NAME="learnp-${VERSION}-${ARCH}.dmg"
-          DMG_STAGING="${BUILD_DIR}/dmg_staging"
-
-          mkdir -p "${DMG_STAGING}"
-          cp "${PKG_OUTPUT}" "${DMG_STAGING}/"
-
-          # Create a README for the DMG
-          cat > "${DMG_STAGING}/README.txt" << 'EOF'
-          learnp - Learn Programming App (Universal Binary)
-
-          This is a universal binary that works on both Intel and Apple Silicon Macs.
-
-          Installation Instructions:
-
-          1. Double-click the .pkg file to install
-          2. Follow the installer prompts (administrator password required)
-          3. The installer will automatically place learnp in /usr/local/bin/
-
-          After installation, open Terminal and verify:
-            learnp --version
-
-          For more information, visit the GitHub repository.
-          EOF
-
-          # Create DMG
-          hdiutil create -volname "learnp ${VERSION} (Universal)" \
-              -srcfolder "${DMG_STAGING}" \
-              -ov -format UDZO \
-              "${DMG_NAME}"
-
-          echo "DMG created: ${DMG_NAME}"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-universal
-          path: ./learnp-${{ needs.get-version.outputs.version }}-universal.dmg
+          path: ./learnp-${{ needs.get-version.outputs.version }}-*.pkg
           retention-days: 1
 
   create-release:
@@ -438,7 +341,6 @@ jobs:
         build-windows,
         build-windows-installer,
         build-macos,
-        build-macos-universal,
       ]
     runs-on: ubuntu-latest
     steps:
