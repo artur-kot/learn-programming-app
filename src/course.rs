@@ -351,10 +351,7 @@ impl Course {
                 .title
                 .clone()
                 .unwrap_or_else(|| Self::humanize_name(&id));
-            let description = metadata
-                .description
-                .clone()
-                .unwrap_or_default();
+            let description = metadata.description.clone().unwrap_or_default();
 
             let readme_file = exercise_path.join("README.md");
 

@@ -1097,7 +1097,10 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 ) {
                                     app.show_test_output();
                                     scroll_delta = 0;
-                                } else if matches!(app.display_mode, DisplayMode::TestOutput | DisplayMode::ReadmeFocused) {
+                                } else if matches!(
+                                    app.display_mode,
+                                    DisplayMode::TestOutput | DisplayMode::ReadmeFocused
+                                ) {
                                     app.show_readme();
                                     scroll_delta = 0;
                                 }
@@ -1172,7 +1175,10 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
             if scroll_delta != 0
                 && matches!(
                     app.display_mode,
-                    DisplayMode::TestOutput | DisplayMode::Hint | DisplayMode::RunAllTests | DisplayMode::ReadmeFocused
+                    DisplayMode::TestOutput
+                        | DisplayMode::Hint
+                        | DisplayMode::RunAllTests
+                        | DisplayMode::ReadmeFocused
                 )
             {
                 app.apply_scroll_delta(scroll_delta);
@@ -1582,7 +1588,12 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
     };
 
     let paragraph = Paragraph::new(content)
-        .block(Block::default().borders(Borders::ALL).title(title).border_style(Style::default().fg(border_color)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(title)
+                .border_style(Style::default().fg(border_color)),
+        )
         .wrap(Wrap { trim: false });
 
     f.render_widget(paragraph, area);
