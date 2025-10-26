@@ -1097,10 +1097,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 ) {
                                     app.show_test_output();
                                     scroll_delta = 0;
-                                } else if matches!(app.display_mode, DisplayMode::TestOutput) {
-                                    app.show_readme();
-                                    scroll_delta = 0;
-                                } else if matches!(app.display_mode, DisplayMode::ReadmeFocused) {
+                                } else if matches!(app.display_mode, DisplayMode::TestOutput | DisplayMode::ReadmeFocused) {
                                     app.show_readme();
                                     scroll_delta = 0;
                                 }
