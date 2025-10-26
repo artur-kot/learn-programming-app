@@ -25,10 +25,11 @@ tokio = { version = "1.40", features = ["full"] }
 anyhow = "1.0"
 directories = "5.0"
 chrono = "0.4"
-ollama-rs = "0.3.2"
+ollama-rs = { version = "0.3.2", default-features = false, features = ["rustls"] }
 futures-util = "0.3"
 glob = "0.3"
 ansi-to-tui = "6.0"
+
 
 [package.metadata.deb]
 maintainer = "Artur Kot <artur.kot@outlook.com>"
