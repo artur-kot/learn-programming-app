@@ -6,7 +6,7 @@ set -e
 # Check arguments
 if [ $# -lt 3 ]; then
     echo "Usage: $0 <version> <arch> <target>"
-    echo "Example: $0 0.8.2 intel x86_64-apple-darwin"
+    echo "Example: $0 0.1.0 intel x86_64-apple-darwin"
     exit 1
 fi
 
