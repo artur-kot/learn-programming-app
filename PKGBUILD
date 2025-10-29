@@ -1,6 +1,6 @@
 # Maintainer: Artur Kot <artur.kot@outlook.com>
 pkgname=learnp-bin
-pkgver=0.8.3
+pkgver=4
 pkgrel=1
 pkgdesc="Interactive TUI application for learning programming through exercises"
 arch=('x86_64')

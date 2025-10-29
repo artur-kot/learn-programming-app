@@ -1,6 +1,6 @@
 [package]
 name = "learnp"
-version = "0.8.3"
+version = "0.8.4"
 edition = "2021"
 authors = ["Artur Kot <artur.kot@outlook.com>"]
 description = "Interactive TUI application for learning programming through exercises"
@@ -25,7 +25,9 @@ tokio = { version = "1.40", features = ["full"] }
 anyhow = "1.0"
 directories = "5.0"
 chrono = "0.4"
-ollama-rs = { version = "0.3.2", default-features = false, features = ["rustls"] }
+ollama-rs = { version = "0.3.2", default-features = false, features = [
+    "rustls",
+] }
 futures-util = "0.3"
 glob = "0.3"
 ansi-to-tui = "6.0"
