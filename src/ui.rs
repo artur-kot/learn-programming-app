@@ -68,10 +68,12 @@ pub struct App {
     run_all_cancel_tx: Option<mpsc::Sender<()>>,
     // Setup tracking
     setup_start_index: Option<usize>, // Track where setup output starts
+    // Unblock all flag
+    unblock_all: bool,
 }
 
 impl App {
-    pub fn new(course_path: PathBuf) -> Result<Self> {
+    pub fn new(course_path: PathBuf, unblock_all: bool) -> Result<Self> {
         let (course, exercises) = Course::load_from_path(&course_path)?;
         let database = Database::new(&course_path)?;
         let test_runner = TestRunner::new(&course_path);
@@ -136,6 +138,7 @@ impl App {
             run_all_receiver: None,
             run_all_cancel_tx: None,
             setup_start_index: None,
+            unblock_all,
         })
     }
 
@@ -160,6 +163,11 @@ impl App {
     }
 
     fn is_exercise_unlocked(&self, index: usize) -> bool {
+        // Check if LEARNP_UNBLOCK_ALL environment variable is set or --unblock-all flag is used
+        if self.unblock_all || std::env::var("LEARNP_UNBLOCK_ALL").unwrap_or_default() == "1" {
+            return true;
+        }
+
         if let Some(first_incomplete) = self.get_first_incomplete_index() {
             // Allow navigation to completed exercises and the current (first incomplete) exercise
             index <= first_incomplete
@@ -174,8 +182,15 @@ impl App {
             return;
         }
 
-        let first_incomplete = self.get_first_incomplete_index();
-        let max_index = first_incomplete.unwrap_or(self.exercises.len() - 1);
+        // When LEARNP_UNBLOCK_ALL is set or --unblock-all flag is used, allow navigation to all exercises
+        let unblock_all =
+            self.unblock_all || std::env::var("LEARNP_UNBLOCK_ALL").unwrap_or_default() == "1";
+        let max_index = if unblock_all {
+            self.exercises.len() - 1
+        } else {
+            let first_incomplete = self.get_first_incomplete_index();
+            first_incomplete.unwrap_or(self.exercises.len() - 1)
+        };
 
         // Find next unlocked exercise
         let mut next_index = self.selected_index + 1;
@@ -898,7 +913,7 @@ Hint:"#,
     }
 }
 
-pub async fn run_app(course_path: PathBuf) -> Result<()> {
+pub async fn run_app(course_path: PathBuf, unblock_all: bool) -> Result<()> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -906,7 +921,7 @@ pub async fn run_app(course_path: PathBuf) -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(course_path)?;
+    let mut app = App::new(course_path, unblock_all)?;
     let res = run_app_loop(&mut terminal, &mut app).await;
 
     // Restore terminal
