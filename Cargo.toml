@@ -32,6 +32,8 @@ futures-util = "0.3"
 glob = "0.3"
 ansi-to-tui = "6.0"
 
+[dev-dependencies]
+tempfile = "3.13"
 
 [package.metadata.deb]
 maintainer = "Artur Kot <artur.kot@outlook.com>"

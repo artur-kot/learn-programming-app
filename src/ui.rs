@@ -275,7 +275,7 @@ impl App {
 
         if let Some(selected) = self.list_state.selected() {
             // Calculate context lines (25% of viewport, min 3, max 5)
-            let context_lines = (visible_height / 4).max(3).min(5);
+            let context_lines = (visible_height / 4).clamp(3, 5);
 
             let current_offset = self.list_state.offset();
             let relative_position = selected.saturating_sub(current_offset);
@@ -500,9 +500,7 @@ impl App {
                     self.playground_path = Some(playground_path.clone());
                     self.show_playground_success = true;
                     self.display_mode = DisplayMode::TestOutput;
-                    self.status_message = format!(
-                        "✓ Extracted to ./playground | p - extract again, Enter - run test, Esc - back"
-                    );
+                    self.status_message = "✓ Extracted to ./playground | p - extract again, Enter - run test, Esc - back".to_string();
                 }
                 Err(e) => {
                     self.display_mode = DisplayMode::TestOutput;
@@ -1729,37 +1727,33 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
             (Text::from(visible_lines), "Run All Tests", Color::White)
         }
         DisplayMode::PlaygroundConfirm => {
-            let mut all_lines = Vec::new();
-
             // Show confirmation prompt
-            all_lines.push(Line::from(Span::styled(
-                "⚠ Playground Already Exists",
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            )));
-            all_lines.push(Line::from(""));
-            all_lines.push(Line::from(Span::styled(
-                "─".repeat(50),
-                Style::default().fg(Color::DarkGray),
-            )));
-            all_lines.push(Line::from(""));
-            all_lines.push(Line::from(
-                "A playground folder already exists for this exercise.",
-            ));
-            all_lines.push(Line::from(""));
-            all_lines.push(Line::from("Do you want to overwrite it?"));
-            all_lines.push(Line::from(
-                "All existing files in the playground will be deleted.",
-            ));
-            all_lines.push(Line::from(""));
-            all_lines.push(Line::from(""));
-            all_lines.push(Line::from(Span::styled(
-                "Press 'y' to overwrite, 'n' or 'Esc' to cancel",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )));
+            let all_lines = vec![
+                Line::from(Span::styled(
+                    "⚠ Playground Already Exists",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "─".repeat(50),
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Line::from(""),
+                Line::from("A playground folder already exists for this exercise."),
+                Line::from(""),
+                Line::from("Do you want to overwrite it?"),
+                Line::from("All existing files in the playground will be deleted."),
+                Line::from(""),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "Press 'y' to overwrite, 'n' or 'Esc' to cancel",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+            ];
 
             (Text::from(all_lines), "Confirm Overwrite", Color::Yellow)
         }

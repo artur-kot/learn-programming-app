@@ -132,9 +132,12 @@ mod tests {
         let exercise = Exercise {
             id: "001-test".to_string(),
             title: "Test".to_string(),
+            description: "Test exercise".to_string(),
+            order: 1,
             path: exercise_path.clone(),
             language: crate::course::Language::JavaScript,
             metadata: Default::default(),
+            readme_file: exercise_path.join("README.md"),
         };
 
         // Extract to playground
@@ -164,9 +167,12 @@ mod tests {
         let exercise = Exercise {
             id: "001-test".to_string(),
             title: "Test".to_string(),
+            description: "Test exercise".to_string(),
+            order: 1,
             path: exercise_path.clone(),
             language: crate::course::Language::JavaScript,
             metadata: Default::default(),
+            readme_file: exercise_path.join("README.md"),
         };
 
         // Should not exist initially
@@ -189,9 +195,12 @@ mod tests {
         let exercise = Exercise {
             id: "001-test".to_string(),
             title: "Test".to_string(),
+            description: "Test exercise".to_string(),
+            order: 1,
             path: exercise_path.clone(),
             language: crate::course::Language::JavaScript,
             metadata: Default::default(),
+            readme_file: exercise_path.join("README.md"),
         };
 
         assert!(playground_exists(&exercise));
