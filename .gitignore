@@ -26,3 +26,6 @@ coverage/
 progress.db
 progress.db-shm
 progress.db-wal
+
+# Exercise playgrounds (user sandboxes)
+**/playground/

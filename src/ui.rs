@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::course::{Course, Exercise};
 use crate::database::Database;
+use crate::playground;
 use crate::test_runner::{TestResult, TestRunner};
 use ansi_to_tui::IntoText;
 use anyhow::Result;
@@ -31,6 +32,7 @@ pub enum DisplayMode {
     Hint,
     ModelSelection,
     RunAllTests,
+    PlaygroundConfirm,
 }
 
 pub struct App {
@@ -70,6 +72,9 @@ pub struct App {
     setup_start_index: Option<usize>, // Track where setup output starts
     // Unblock all flag
     unblock_all: bool,
+    // Playground state
+    playground_path: Option<PathBuf>,
+    show_playground_success: bool,
 }
 
 impl App {
@@ -139,6 +144,8 @@ impl App {
             run_all_cancel_tx: None,
             setup_start_index: None,
             unblock_all,
+            playground_path: None,
+            show_playground_success: false,
         })
     }
 
@@ -357,7 +364,7 @@ impl App {
                     match result {
                         TestResult::Passed => {
                             self.status_message = format!(
-                                "✓ {} passed! | ↑/↓ PgUp/PgDn Home/End - scroll, Enter - run again, Esc - back",
+                                "✓ {} passed! | p - extract to playground, ↑/↓ scroll, Enter - run again, Esc - back",
                                 title
                             );
                         }
@@ -432,6 +439,32 @@ impl App {
                 self.status_message = String::from("Enter - run tests, Esc - back");
             }
         }
+    }
+
+    fn extract_to_playground(&mut self) -> Result<()> {
+        if let Some(exercise) = self.get_selected_exercise() {
+            // Remove old playground if it exists
+            if playground::playground_exists(exercise) {
+                playground::remove_playground(exercise)?;
+            }
+
+            // Extract to playground
+            match playground::extract_to_playground(exercise) {
+                Ok(playground_path) => {
+                    self.playground_path = Some(playground_path.clone());
+                    self.show_playground_success = true;
+                    self.display_mode = DisplayMode::TestOutput;
+                    self.status_message = format!(
+                        "✓ Extracted to ./playground | p - extract again, Enter - run test, Esc - back"
+                    );
+                }
+                Err(e) => {
+                    self.display_mode = DisplayMode::TestOutput;
+                    self.status_message = format!("✗ Failed to extract playground: {} | Esc - back", e);
+                }
+            }
+        }
+        Ok(())
     }
 
     async fn fetch_available_models(&mut self) {
@@ -1108,7 +1141,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     scroll_delta = 0;
                                 } else if matches!(
                                     app.display_mode,
-                                    DisplayMode::Hint | DisplayMode::ModelSelection
+                                    DisplayMode::Hint | DisplayMode::ModelSelection | DisplayMode::PlaygroundConfirm
                                 ) {
                                     app.show_test_output();
                                     scroll_delta = 0;
@@ -1158,6 +1191,40 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     && !app.is_generating_hint
                                 {
                                     app.check_model_and_generate_hint().await?;
+                                    scroll_delta = 0;
+                                }
+                            }
+                            KeyCode::Char('p') => {
+                                // Extract to playground if tests passed
+                                if matches!(app.display_mode, DisplayMode::TestOutput)
+                                    && matches!(app.last_test_result, Some(TestResult::Passed))
+                                {
+                                    if let Some(exercise) = app.get_selected_exercise() {
+                                        // Check if playground already exists
+                                        if playground::playground_exists(exercise) {
+                                            app.display_mode = DisplayMode::PlaygroundConfirm;
+                                            app.status_message = String::from(
+                                                "Playground exists. Overwrite? y - yes, n - cancel"
+                                            );
+                                        } else {
+                                            // Extract directly
+                                            app.extract_to_playground()?;
+                                        }
+                                    }
+                                    scroll_delta = 0;
+                                }
+                            }
+                            KeyCode::Char('y') => {
+                                // Confirm playground overwrite
+                                if matches!(app.display_mode, DisplayMode::PlaygroundConfirm) {
+                                    app.extract_to_playground()?;
+                                    scroll_delta = 0;
+                                }
+                            }
+                            KeyCode::Char('n') => {
+                                // Cancel playground overwrite
+                                if matches!(app.display_mode, DisplayMode::PlaygroundConfirm) {
+                                    app.show_test_output();
                                     scroll_delta = 0;
                                 }
                             }
@@ -1599,6 +1666,37 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
                 all_lines.into_iter().skip(app.scroll_position).collect();
 
             (Text::from(visible_lines), "Run All Tests", Color::White)
+        }
+        DisplayMode::PlaygroundConfirm => {
+            let mut all_lines = Vec::new();
+
+            // Show confirmation prompt
+            all_lines.push(Line::from(Span::styled(
+                "⚠ Playground Already Exists",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            all_lines.push(Line::from(""));
+            all_lines.push(Line::from(Span::styled(
+                "─".repeat(50),
+                Style::default().fg(Color::DarkGray),
+            )));
+            all_lines.push(Line::from(""));
+            all_lines.push(Line::from("A playground folder already exists for this exercise."));
+            all_lines.push(Line::from(""));
+            all_lines.push(Line::from("Do you want to overwrite it?"));
+            all_lines.push(Line::from("All existing files in the playground will be deleted."));
+            all_lines.push(Line::from(""));
+            all_lines.push(Line::from(""));
+            all_lines.push(Line::from(Span::styled(
+                "Press 'y' to overwrite, 'n' or 'Esc' to cancel",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )));
+
+            (Text::from(all_lines), "Confirm Overwrite", Color::Yellow)
         }
     };
 

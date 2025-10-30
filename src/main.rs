@@ -2,6 +2,7 @@ mod config;
 mod course;
 mod database;
 mod git;
+mod playground;
 mod test_runner;
 mod ui;
 
