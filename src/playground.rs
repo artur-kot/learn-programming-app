@@ -36,13 +36,10 @@ pub fn remove_playground(exercise: &Exercise) -> Result<()> {
 /// Recursively copies a directory, excluding the playground folder itself
 fn copy_dir_recursive(src: &Path, dst: &Path, root: &Path) -> Result<()> {
     // Create destination directory
-    fs::create_dir_all(dst)
-        .with_context(|| format!("Failed to create directory {:?}", dst))?;
+    fs::create_dir_all(dst).with_context(|| format!("Failed to create directory {:?}", dst))?;
 
     // Iterate over directory entries
-    for entry in fs::read_dir(src)
-        .with_context(|| format!("Failed to read directory {:?}", src))?
-    {
+    for entry in fs::read_dir(src).with_context(|| format!("Failed to read directory {:?}", src))? {
         let entry = entry?;
         let file_type = entry.file_type()?;
         let src_path = entry.path();

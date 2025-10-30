@@ -75,6 +75,8 @@ pub struct App {
     // Playground state
     playground_path: Option<PathBuf>,
     show_playground_success: bool,
+    // List viewport height for smart scrolling
+    list_viewport_height: usize,
 }
 
 impl App {
@@ -146,6 +148,7 @@ impl App {
             unblock_all,
             playground_path: None,
             show_playground_success: false,
+            list_viewport_height: 20, // Default, will be updated during render
         })
     }
 
@@ -205,6 +208,7 @@ impl App {
             if self.is_exercise_unlocked(next_index) {
                 self.selected_index = next_index;
                 self.list_state.select(Some(self.selected_index));
+                self.update_list_scroll();
 
                 // Reset to readme when changing exercises
                 self.display_mode = DisplayMode::Readme;
@@ -233,6 +237,7 @@ impl App {
                 if self.is_exercise_unlocked(prev_index) {
                     self.selected_index = prev_index;
                     self.list_state.select(Some(self.selected_index));
+                    self.update_list_scroll();
 
                     // Reset to readme when changing exercises
                     self.display_mode = DisplayMode::Readme;
@@ -252,6 +257,47 @@ impl App {
             }
         }
         // If no unlocked exercise found backward, don't move
+    }
+
+    fn update_list_scroll(&mut self) {
+        // Smart scrolling with comfort zone (25% - 75%)
+        if self.exercises.is_empty() || self.list_viewport_height == 0 {
+            return;
+        }
+
+        let total_items = self.exercises.len();
+        let visible_height = self.list_viewport_height;
+
+        // Only apply smart scrolling if list is longer than viewport
+        if total_items <= visible_height {
+            return;
+        }
+
+        if let Some(selected) = self.list_state.selected() {
+            // Calculate context lines (25% of viewport, min 3, max 5)
+            let context_lines = (visible_height / 4).max(3).min(5);
+
+            let current_offset = self.list_state.offset();
+            let relative_position = selected.saturating_sub(current_offset);
+
+            // Comfort zone boundaries: 25% and 75%
+            let scroll_trigger_up = context_lines;
+            let scroll_trigger_down = visible_height.saturating_sub(context_lines);
+
+            // Scroll down if selection moved PAST 75% mark
+            if relative_position > scroll_trigger_down {
+                let new_offset = selected.saturating_sub(scroll_trigger_down);
+                let max_offset = total_items.saturating_sub(visible_height);
+                let new_offset = new_offset.min(max_offset);
+                *self.list_state.offset_mut() = new_offset;
+            }
+            // Scroll up if selection moved BEFORE 25% mark
+            else if relative_position < scroll_trigger_up && selected >= scroll_trigger_up {
+                let new_offset = selected.saturating_sub(scroll_trigger_up);
+                *self.list_state.offset_mut() = new_offset;
+            }
+            // Else: in comfort zone (25-75%), no scrolling
+        }
     }
 
     fn get_selected_exercise(&self) -> Option<&Exercise> {
@@ -460,7 +506,8 @@ impl App {
                 }
                 Err(e) => {
                     self.display_mode = DisplayMode::TestOutput;
-                    self.status_message = format!("✗ Failed to extract playground: {} | Esc - back", e);
+                    self.status_message =
+                        format!("✗ Failed to extract playground: {} | Esc - back", e);
                 }
             }
         }
@@ -974,7 +1021,12 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
         // Check for test output
         app.check_test_output();
 
-        terminal.draw(|f| ui(f, app))?;
+        // Draw UI and capture list viewport height for smart scrolling
+        let mut list_height = 20; // Default
+        terminal.draw(|f| {
+            list_height = ui(f, app);
+        })?;
+        app.list_viewport_height = list_height;
 
         // Poll for events with timeout
         if event::poll(std::time::Duration::from_millis(50))? {
@@ -1141,7 +1193,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     scroll_delta = 0;
                                 } else if matches!(
                                     app.display_mode,
-                                    DisplayMode::Hint | DisplayMode::ModelSelection | DisplayMode::PlaygroundConfirm
+                                    DisplayMode::Hint
+                                        | DisplayMode::ModelSelection
+                                        | DisplayMode::PlaygroundConfirm
                                 ) {
                                     app.show_test_output();
                                     scroll_delta = 0;
@@ -1204,7 +1258,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                         if playground::playground_exists(exercise) {
                                             app.display_mode = DisplayMode::PlaygroundConfirm;
                                             app.status_message = String::from(
-                                                "Playground exists. Overwrite? y - yes, n - cancel"
+                                                "Playground exists. Overwrite? y - yes, n - cancel",
                                             );
                                         } else {
                                             // Extract directly
@@ -1269,7 +1323,7 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
     }
 }
 
-fn ui(f: &mut Frame, app: &App) {
+fn ui(f: &mut Frame, app: &App) -> usize {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -1297,8 +1351,8 @@ fn ui(f: &mut Frame, app: &App) {
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(chunks[1]);
 
-    // Exercise list
-    render_exercise_list(f, app, main_chunks[0]);
+    // Exercise list (returns the viewport height for smart scrolling)
+    let list_height = render_exercise_list(f, app, main_chunks[0]);
 
     // Exercise details
     render_exercise_details(f, app, main_chunks[1]);
@@ -1319,9 +1373,12 @@ fn ui(f: &mut Frame, app: &App) {
         .style(Style::default().fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL).title("Status"));
     f.render_widget(status, chunks[3]);
+
+    // Return the list viewport height for smart scrolling
+    list_height
 }
 
-fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) {
+fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) -> usize {
     let progress_map: std::collections::HashMap<String, bool> = app
         .database
         .get_all_progress()
@@ -1382,6 +1439,10 @@ fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) {
 
     let mut state = app.list_state.clone();
     f.render_stateful_widget(list, area, &mut state);
+
+    // Return viewport height for smart scrolling
+    // Subtract 2 for borders, 1 for title
+    area.height.saturating_sub(3) as usize
 }
 
 fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
@@ -1683,10 +1744,14 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
                 Style::default().fg(Color::DarkGray),
             )));
             all_lines.push(Line::from(""));
-            all_lines.push(Line::from("A playground folder already exists for this exercise."));
+            all_lines.push(Line::from(
+                "A playground folder already exists for this exercise.",
+            ));
             all_lines.push(Line::from(""));
             all_lines.push(Line::from("Do you want to overwrite it?"));
-            all_lines.push(Line::from("All existing files in the playground will be deleted."));
+            all_lines.push(Line::from(
+                "All existing files in the playground will be deleted.",
+            ));
             all_lines.push(Line::from(""));
             all_lines.push(Line::from(""));
             all_lines.push(Line::from(Span::styled(
