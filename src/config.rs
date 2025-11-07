@@ -6,6 +6,8 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     pub ollama_model: Option<String>,
+    pub preferred_editor: Option<String>,
+    pub editor_args: Option<Vec<String>>,
 }
 
 impl Config {
@@ -37,7 +39,7 @@ impl Config {
         Ok(())
     }
 
-    fn get_config_path() -> Result<PathBuf> {
+    pub fn get_config_path() -> Result<PathBuf> {
         let proj_dirs = ProjectDirs::from("com", "learnp", "Learn Programming")
             .context("Failed to determine project directories")?;
 
@@ -51,5 +53,17 @@ impl Config {
 
     pub fn get_model(&self) -> Option<&str> {
         self.ollama_model.as_deref()
+    }
+
+    pub fn set_editor(&mut self, editor: String, args: Vec<String>) -> Result<()> {
+        self.preferred_editor = Some(editor);
+        self.editor_args = Some(args);
+        self.save()
+    }
+
+    pub fn get_editor(&self) -> Option<(&str, &[String])> {
+        self.preferred_editor
+            .as_deref()
+            .map(|editor| (editor, self.editor_args.as_deref().unwrap_or(&[])))
     }
 }

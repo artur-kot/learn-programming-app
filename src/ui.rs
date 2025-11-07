@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::course::{Course, Exercise};
 use crate::database::Database;
+use crate::editor::{self, Editor};
 use crate::playground;
 use crate::test_runner::{TestResult, TestRunner};
 use ansi_to_tui::IntoText;
@@ -25,6 +26,7 @@ use std::io;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 
+#[derive(PartialEq)]
 pub enum DisplayMode {
     Readme,
     ReadmeFocused,
@@ -33,6 +35,7 @@ pub enum DisplayMode {
     ModelSelection,
     RunAllTests,
     PlaygroundConfirm,
+    EditorSelection,
 }
 
 pub struct App {
@@ -46,6 +49,8 @@ pub struct App {
     last_test_result: Option<TestResult>,
     test_output_lines: Vec<String>,
     status_message: String,
+    status_message_timestamp: Option<std::time::Instant>,
+    default_status_message: String,
     is_running_test: bool,
     scroll_position: usize,
     output_receiver: Option<mpsc::Receiver<String>>,
@@ -61,6 +66,9 @@ pub struct App {
     available_models: Vec<String>,
     model_list_state: ListState,
     models_receiver: Option<mpsc::Receiver<Vec<String>>>,
+    // Editor selection state
+    available_editors: Vec<Editor>,
+    editor_list_state: ListState,
     // Run all tests state
     is_running_all_tests: bool,
     run_all_progress: Vec<(String, Option<TestResult>)>, // (exercise_id, result)
@@ -121,7 +129,11 @@ impl App {
             last_test_result: None,
             test_output_lines: Vec::new(),
             status_message: String::from(
-                "Enter - run test, Shift+A - run all tests, r - readme, q - quit",
+                "Enter - run test, Shift+A - run all tests, o - open in editor, r - readme, q - quit",
+            ),
+            status_message_timestamp: None,
+            default_status_message: String::from(
+                "Enter - run test, Shift+A - run all tests, o - open in editor, r - readme, q - quit",
             ),
             is_running_test: false,
             scroll_position: 0,
@@ -138,6 +150,8 @@ impl App {
             available_models: Vec::new(),
             model_list_state: ListState::default(),
             models_receiver: None,
+            available_editors: Vec::new(),
+            editor_list_state: ListState::default(),
             is_running_all_tests: false,
             run_all_progress: Vec::new(),
             run_all_current_index: 0,
@@ -445,8 +459,30 @@ impl App {
         self.result_receiver = None;
         self.last_test_result = None;
         self.running_exercise_id = None;
-        self.status_message =
-            String::from("Enter - run test, Shift+A - run all tests, r - readme, q - quit");
+        self.status_message = self.default_status_message.clone();
+        self.status_message_timestamp = None;
+    }
+
+    /// Set a temporary status message that will auto-hide after 3 seconds
+    fn set_temp_status(&mut self, message: String) {
+        self.status_message = message;
+        self.status_message_timestamp = Some(std::time::Instant::now());
+    }
+
+    /// Set a permanent status message (won't auto-hide)
+    fn set_status(&mut self, message: String) {
+        self.status_message = message;
+        self.status_message_timestamp = None;
+    }
+
+    /// Check if temporary status message should be cleared
+    fn check_status_timeout(&mut self) {
+        if let Some(timestamp) = self.status_message_timestamp {
+            if timestamp.elapsed().as_secs() >= 3 {
+                self.status_message = self.default_status_message.clone();
+                self.status_message_timestamp = None;
+            }
+        }
     }
 
     fn check_hint_generation(&mut self) {
@@ -601,6 +637,79 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    fn detect_editors(&mut self) {
+        self.available_editors = editor::detect_editors();
+        if !self.available_editors.is_empty() {
+            self.editor_list_state.select(Some(0));
+        }
+        self.display_mode = DisplayMode::EditorSelection;
+        self.set_status(String::from("↑/↓ - navigate, Enter - select, Esc - cancel"));
+    }
+
+    fn select_next_editor(&mut self) {
+        if self.available_editors.is_empty() {
+            return;
+        }
+        let current = self.editor_list_state.selected().unwrap_or(0);
+        let next = (current + 1) % self.available_editors.len();
+        self.editor_list_state.select(Some(next));
+    }
+
+    fn select_previous_editor(&mut self) {
+        if self.available_editors.is_empty() {
+            return;
+        }
+        let current = self.editor_list_state.selected().unwrap_or(0);
+        let previous = if current == 0 {
+            self.available_editors.len() - 1
+        } else {
+            current - 1
+        };
+        self.editor_list_state.select(Some(previous));
+    }
+
+    fn confirm_editor_selection(&mut self) -> Result<()> {
+        if let Some(selected_idx) = self.editor_list_state.selected() {
+            if let Some(editor) = self.available_editors.get(selected_idx) {
+                self.config
+                    .set_editor(editor.executable.clone(), editor.args.clone())?;
+                self.set_temp_status(format!("Editor '{}' selected and saved!", editor.name));
+                self.display_mode = DisplayMode::Readme;
+            }
+        }
+        Ok(())
+    }
+
+    fn open_exercise_in_editor(&mut self) {
+        if let Some(exercise) = self.get_selected_exercise() {
+            if let Some((editor_path, editor_args)) = self.config.get_editor() {
+                match editor::open_directory_in_editor(editor_path, editor_args, &exercise.path) {
+                    Ok(_) => {
+                        self.set_temp_status(format!(
+                            "Opening '{}' in editor...",
+                            exercise.metadata.title.as_deref().unwrap_or(&exercise.id)
+                        ));
+                    }
+                    Err(e) => {
+                        self.set_temp_status(format!(
+                            "Failed to open editor: {}. Check that '{}' is in your PATH.",
+                            e, editor_path
+                        ));
+                    }
+                }
+            } else {
+                // No editor configured, show editor selection dialog
+                self.detect_editors();
+                if self.available_editors.is_empty() {
+                    self.set_temp_status(String::from(
+                        "No editors found. Install VSCode, Vim, or set manually in config.json",
+                    ));
+                    self.display_mode = DisplayMode::Readme;
+                }
+            }
+        }
     }
 
     async fn check_model_and_generate_hint(&mut self) -> Result<()> {
@@ -1019,6 +1128,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
         // Check for test output
         app.check_test_output();
 
+        // Check if temporary status message should be cleared
+        app.check_status_timeout();
+
         // Draw UI and capture list viewport height for smart scrolling
         let mut list_height = 20; // Default
         terminal.draw(|f| {
@@ -1087,6 +1199,17 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 if matches!(app.display_mode, DisplayMode::ModelSelection) =>
                             {
                                 app.select_previous_model();
+                            }
+                            // Editor selection navigation
+                            KeyCode::Down
+                                if matches!(app.display_mode, DisplayMode::EditorSelection) =>
+                            {
+                                app.select_next_editor();
+                            }
+                            KeyCode::Up
+                                if matches!(app.display_mode, DisplayMode::EditorSelection) =>
+                            {
+                                app.select_previous_editor();
                             }
                             // Batch scrolling in test output, hint, and run-all modes
                             KeyCode::Down
@@ -1199,7 +1322,9 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     scroll_delta = 0;
                                 } else if matches!(
                                     app.display_mode,
-                                    DisplayMode::TestOutput | DisplayMode::ReadmeFocused
+                                    DisplayMode::EditorSelection
+                                        | DisplayMode::TestOutput
+                                        | DisplayMode::ReadmeFocused
                                 ) {
                                     app.show_readme();
                                     scroll_delta = 0;
@@ -1220,6 +1345,19 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                     app.confirm_model_selection()?;
                                     if let Some(model) = app.config.get_model() {
                                         app.generate_hint_with_model(model.to_string()).await?;
+                                    }
+                                    scroll_delta = 0;
+                                } else if matches!(app.display_mode, DisplayMode::EditorSelection) {
+                                    // Confirm editor selection and open exercise
+                                    if let Err(e) = app.confirm_editor_selection() {
+                                        app.set_temp_status(format!(
+                                            "Failed to save editor config: {}",
+                                            e
+                                        ));
+                                        app.display_mode = DisplayMode::Readme;
+                                    } else if app.display_mode == DisplayMode::Readme {
+                                        // If we just selected an editor, now open the exercise
+                                        app.open_exercise_in_editor();
                                     }
                                     scroll_delta = 0;
                                 } else if !app.is_running_test {
@@ -1277,6 +1415,13 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 // Cancel playground overwrite
                                 if matches!(app.display_mode, DisplayMode::PlaygroundConfirm) {
                                     app.show_test_output();
+                                    scroll_delta = 0;
+                                }
+                            }
+                            KeyCode::Char('o') => {
+                                // Open exercise in editor (only from Readme mode)
+                                if matches!(app.display_mode, DisplayMode::Readme) {
+                                    app.open_exercise_in_editor();
                                     scroll_delta = 0;
                                 }
                             }
@@ -1631,6 +1776,56 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
                 .highlight_symbol(">> ");
 
             let mut state = app.model_list_state.clone();
+            f.render_stateful_widget(list, area, &mut state);
+            return;
+        }
+        DisplayMode::EditorSelection => {
+            // Use List widget for editor selection
+            let items: Vec<ListItem> = if app.available_editors.is_empty() {
+                vec![ListItem::new(
+                    "No editors found. Install VSCode, Vim, or set manually in config.json",
+                )
+                .style(Style::default().fg(Color::Red))]
+            } else {
+                app.available_editors
+                    .iter()
+                    .map(|editor| {
+                        let is_current = app
+                            .config
+                            .get_editor()
+                            .map(|(path, _)| path == editor.executable)
+                            .unwrap_or(false);
+                        let content = if is_current {
+                            format!("✓ {} (current)", editor.name)
+                        } else {
+                            editor.name.clone()
+                        };
+
+                        let style = if is_current {
+                            Style::default().fg(Color::Green)
+                        } else {
+                            Style::default().fg(Color::White)
+                        };
+
+                        ListItem::new(content).style(style)
+                    })
+                    .collect()
+            };
+
+            let list = List::new(items)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Select Code Editor"),
+                )
+                .highlight_style(
+                    Style::default()
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .highlight_symbol(">> ");
+
+            let mut state = app.editor_list_state.clone();
             f.render_stateful_widget(list, area, &mut state);
             return;
         }
