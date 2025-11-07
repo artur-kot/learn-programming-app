@@ -84,7 +84,8 @@ Depending on the course language, you'll need:
 
 ## Courses
 
-- [JavaScript](https://github.com/artur-kot/learn-programming-javascript) — work in progress, contributions welcome
+- [Java](https://github.com/artur-kot/learn-programming-java) — work in progress, setting up and refining exercises
+- [JavaScript](https://github.com/artur-kot/learn-programming-javascript) — work in progress, there are too many exercises needing to be squashed
 
 ## Possible options
 
