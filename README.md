@@ -1,4 +1,5 @@
 # learnp
+Homepage: [learn-programming.app](https://learn-programming.app)
 
 A terminal app for learning programming through hands-on exercises with instant feedback.
 
