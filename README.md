@@ -42,15 +42,15 @@ Press `o` to open the current exercise in your preferred editor, make changes, t
 
 ## Key Features
 
-**Smart Testing** — One-keystroke test execution with real-time output. The app auto-detects your language (JavaScript, Python, Rust, Go) and runs the appropriate tests.
+**Smart Testing** - One-keystroke test execution with real-time output. The app auto-detects your language (JavaScript, Python, Rust, Go) and runs the appropriate tests.
 
-**AI Hints** — Stuck? Press `h` after a test failure to get context-aware hints. Requires [Ollama](https://ollama.com) installed locally.
+**AI Hints** - Stuck? Press `h` after a test failure to get context-aware hints. Requires [Ollama](https://ollama.com) installed locally.
 
-**Progress Tracking** — Completed exercises are marked with checkmarks. Run all tests at once with Shift+A.
+**Progress Tracking** - Completed exercises are marked with checkmarks. Run all tests at once with Shift+A.
 
-**Playground Mode** — Press `p` on a completed exercise to extract it to `./playground` for experimentation.
+**Playground Mode** - Press `p` on a completed exercise to extract it to `./playground` for experimentation.
 
-**Editor Integration** — Auto-detects VSCode, Cursor, JetBrains IDEs, Vim, and more.
+**Editor Integration** - Auto-detects VSCode, Cursor, JetBrains IDEs, Vim, and more.
 
 ## Optional Setup
 
@@ -84,8 +84,8 @@ Depending on the course language, you'll need:
 
 ## Courses
 
-- [Java](https://github.com/artur-kot/learn-programming-java) — work in progress, setting up and refining exercises
-- [JavaScript](https://github.com/artur-kot/learn-programming-javascript) — work in progress, there are too many exercises needing to be squashed
+- [Java](https://github.com/artur-kot/learn-programming-java) - work in progress, setting up and refining exercises
+- [JavaScript](https://github.com/artur-kot/learn-programming-javascript) - work in progress, there are too many exercises needing to be squashed
 
 ## Possible options
 
