@@ -40,7 +40,10 @@ pub enum DisplayMode {
 
 pub struct App {
     course: Course,
-    exercises: Vec<Exercise>,
+    all_exercises: Vec<Exercise>, // All exercises from course
+    current_folder_path: PathBuf, // Current folder being viewed
+    current_exercises: Vec<Exercise>, // Exercises in current folder
+    breadcrumb: Vec<String>, // Breadcrumb trail for navigation
     database: Database,
     test_runner: TestRunner,
     selected_index: usize,
@@ -85,13 +88,19 @@ pub struct App {
     show_playground_success: bool,
     // List viewport height for smart scrolling
     list_viewport_height: usize,
+    // Course path for folder navigation
+    course_path: PathBuf,
 }
 
 impl App {
     pub fn new(course_path: PathBuf, unblock_all: bool) -> Result<Self> {
-        let (course, exercises) = Course::load_from_path(&course_path)?;
+        let (course, all_exercises) = Course::load_from_path(&course_path)?;
         let database = Database::new(&course_path)?;
         let test_runner = TestRunner::new(&course_path);
+
+        // Start in the root exercises folder
+        let exercises_dir = course_path.join("exercises");
+        let current_exercises = Self::load_current_folder(&all_exercises, &exercises_dir);
 
         // Find first incomplete exercise to select on startup
         let progress_map: std::collections::HashMap<String, bool> = database
@@ -102,7 +111,10 @@ impl App {
             .collect();
 
         let mut initial_index = 0;
-        for (index, exercise) in exercises.iter().enumerate() {
+        for (index, exercise) in current_exercises.iter().enumerate() {
+            if exercise.is_folder {
+                continue; // Skip folders when looking for first incomplete
+            }
             let is_completed = progress_map.get(&exercise.id).copied().unwrap_or(false);
 
             if !is_completed {
@@ -112,7 +124,7 @@ impl App {
         }
 
         let mut list_state = ListState::default();
-        if !exercises.is_empty() {
+        if !current_exercises.is_empty() {
             list_state.select(Some(initial_index));
         }
 
@@ -120,7 +132,10 @@ impl App {
 
         Ok(Self {
             course,
-            exercises,
+            all_exercises: all_exercises.clone(),
+            current_folder_path: exercises_dir,
+            current_exercises,
+            breadcrumb: Vec::new(),
             database,
             test_runner,
             selected_index: initial_index,
@@ -129,11 +144,11 @@ impl App {
             last_test_result: None,
             test_output_lines: Vec::new(),
             status_message: String::from(
-                "Enter - run test, Shift+A - run all tests, o - open in editor, r - readme, q - quit",
+                "Enter - run/open, Backspace - go back, Shift+A - run all tests, o - open in editor, r - readme, q - quit",
             ),
             status_message_timestamp: None,
             default_status_message: String::from(
-                "Enter - run test, Shift+A - run all tests, o - open in editor, r - readme, q - quit",
+                "Enter - run/open, Backspace - go back, Shift+A - run all tests, o - open in editor, r - readme, q - quit",
             ),
             is_running_test: false,
             scroll_position: 0,
@@ -163,7 +178,87 @@ impl App {
             playground_path: None,
             show_playground_success: false,
             list_viewport_height: 20, // Default, will be updated during render
+            course_path,
         })
+    }
+
+    fn load_current_folder(all_exercises: &[Exercise], folder_path: &PathBuf) -> Vec<Exercise> {
+        all_exercises
+            .iter()
+            .filter(|ex| {
+                // Check if the exercise's parent directory matches the current folder path
+                if let Some(parent) = ex.path.parent() {
+                    parent == folder_path.as_path()
+                } else {
+                    false
+                }
+            })
+            .cloned()
+            .collect()
+    }
+
+    fn enter_folder(&mut self) {
+        if let Some(exercise) = self.current_exercises.get(self.selected_index) {
+            if exercise.is_folder {
+                // Navigate into folder
+                self.current_folder_path = exercise.path.clone();
+                self.breadcrumb.push(exercise.title.clone());
+                self.current_exercises = Self::load_current_folder(&self.all_exercises, &self.current_folder_path);
+                self.selected_index = 0;
+                self.list_state.select(Some(0));
+                self.display_mode = DisplayMode::Readme;
+                self.scroll_position = 0;
+            }
+        }
+    }
+
+    fn go_back_folder(&mut self) {
+        if !self.breadcrumb.is_empty() {
+            // Go up one level
+            self.breadcrumb.pop();
+            if let Some(parent) = self.current_folder_path.parent() {
+                self.current_folder_path = parent.to_path_buf();
+                self.current_exercises = Self::load_current_folder(&self.all_exercises, &self.current_folder_path);
+                self.selected_index = 0;
+                self.list_state.select(Some(0));
+                self.display_mode = DisplayMode::Readme;
+                self.scroll_position = 0;
+            }
+        }
+    }
+
+    fn get_folder_progress(&self, folder: &Exercise) -> (usize, usize) {
+        if !folder.is_folder {
+            return (0, 0);
+        }
+
+        let progress_map: std::collections::HashMap<String, bool> = self
+            .database
+            .get_all_progress()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| (p.exercise_id, p.completed))
+            .collect();
+
+        // Find all exercises that are descendants of this folder
+        let mut total = 0;
+        let mut completed = 0;
+
+        for exercise in &self.all_exercises {
+            if exercise.is_folder {
+                continue; // Skip nested folders, only count exercises
+            }
+
+            // Check if this exercise is a descendant of the folder
+            if exercise.path.starts_with(&folder.path) {
+                total += 1;
+                if progress_map.get(&exercise.id).copied().unwrap_or(false) {
+                    completed += 1;
+                }
+            }
+        }
+
+        (completed, total)
     }
 
     fn get_first_incomplete_index(&self) -> Option<usize> {
@@ -175,7 +270,10 @@ impl App {
             .map(|p| (p.exercise_id, p.completed))
             .collect();
 
-        for (index, exercise) in self.exercises.iter().enumerate() {
+        for (index, exercise) in self.current_exercises.iter().enumerate() {
+            if exercise.is_folder {
+                continue; // Skip folders
+            }
             let is_completed = progress_map.get(&exercise.id).copied().unwrap_or(false);
 
             if !is_completed {
@@ -202,7 +300,7 @@ impl App {
     }
 
     fn select_next(&mut self) {
-        if self.exercises.is_empty() {
+        if self.current_exercises.is_empty() {
             return;
         }
 
@@ -210,10 +308,10 @@ impl App {
         let unblock_all =
             self.unblock_all || std::env::var("LEARNP_UNBLOCK_ALL").unwrap_or_default() == "1";
         let max_index = if unblock_all {
-            self.exercises.len() - 1
+            self.current_exercises.len() - 1
         } else {
             let first_incomplete = self.get_first_incomplete_index();
-            first_incomplete.unwrap_or(self.exercises.len() - 1)
+            first_incomplete.unwrap_or(self.current_exercises.len() - 1)
         };
 
         // Find next unlocked exercise
@@ -240,7 +338,7 @@ impl App {
     }
 
     fn select_previous(&mut self) {
-        if self.exercises.is_empty() {
+        if self.current_exercises.is_empty() {
             return;
         }
 
@@ -275,11 +373,11 @@ impl App {
 
     fn update_list_scroll(&mut self) {
         // Smart scrolling with comfort zone (25% - 75%)
-        if self.exercises.is_empty() || self.list_viewport_height == 0 {
+        if self.current_exercises.is_empty() || self.list_viewport_height == 0 {
             return;
         }
 
-        let total_items = self.exercises.len();
+        let total_items = self.current_exercises.len();
         let visible_height = self.list_viewport_height;
 
         // Only apply smart scrolling if list is longer than viewport
@@ -315,7 +413,7 @@ impl App {
     }
 
     fn get_selected_exercise(&self) -> Option<&Exercise> {
-        self.exercises.get(self.selected_index)
+        self.current_exercises.get(self.selected_index)
     }
 
     async fn run_current_test(&mut self) -> Result<()> {
@@ -942,9 +1040,9 @@ Hint:"#,
         self.display_mode = DisplayMode::RunAllTests;
         self.scroll_position = 0;
 
-        // Initialize progress tracking for all exercises
-        self.run_all_progress = self
-            .exercises
+        // Initialize progress tracking for all exercises (excluding folders)
+        let exercises_only: Vec<Exercise> = self.all_exercises.iter().filter(|ex| !ex.is_folder).cloned().collect();
+        self.run_all_progress = exercises_only
             .iter()
             .map(|ex| (ex.id.clone(), None))
             .collect();
@@ -961,13 +1059,12 @@ Hint:"#,
         self.run_all_cancel_tx = Some(cancel_tx);
 
         // Clone data needed for the background task
-        let exercises = self.exercises.clone();
         let test_runner = self.test_runner.clone();
         let db = self.database.clone();
 
         // Spawn background task to run all tests sequentially
         tokio::spawn(async move {
-            for (index, exercise) in exercises.iter().enumerate() {
+            for (index, exercise) in exercises_only.iter().enumerate() {
                 // Check for cancellation
                 if cancel_rx.try_recv().is_ok() {
                     break;
@@ -1032,7 +1129,7 @@ Hint:"#,
 
                     // Add to output
                     let exercise_id = &self.run_all_progress[index].0;
-                    let exercise = self.exercises.iter().find(|e| &e.id == exercise_id);
+                    let exercise = self.all_exercises.iter().find(|e| &e.id == exercise_id);
                     let title = exercise.map(|e| e.title.as_str()).unwrap_or(exercise_id);
 
                     let status_line = match result {
@@ -1044,7 +1141,7 @@ Hint:"#,
                 }
 
                 // Check if all tests completed
-                if self.run_all_current_index >= self.exercises.len() {
+                if self.run_all_current_index >= self.run_all_progress.len() {
                     should_complete = true;
                 }
             }
@@ -1188,6 +1285,27 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                 if matches!(app.display_mode, DisplayMode::Readme) =>
                             {
                                 app.select_previous();
+                            }
+                            // Folder navigation - enter folder
+                            KeyCode::Right if matches!(app.display_mode, DisplayMode::Readme) => {
+                                app.enter_folder();
+                            }
+                            KeyCode::Char('l')
+                                if matches!(app.display_mode, DisplayMode::Readme) =>
+                            {
+                                app.enter_folder();
+                            }
+                            // Folder navigation - go back
+                            KeyCode::Left if matches!(app.display_mode, DisplayMode::Readme) => {
+                                app.go_back_folder();
+                            }
+                            KeyCode::Char('h')
+                                if matches!(app.display_mode, DisplayMode::Readme) =>
+                            {
+                                app.go_back_folder();
+                            }
+                            KeyCode::Backspace if matches!(app.display_mode, DisplayMode::Readme) => {
+                                app.go_back_folder();
                             }
                             // Model selection navigation
                             KeyCode::Down
@@ -1360,6 +1478,16 @@ async fn run_app_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> 
                                         app.open_exercise_in_editor();
                                     }
                                     scroll_delta = 0;
+                                } else if matches!(app.display_mode, DisplayMode::Readme) {
+                                    // In Readme mode, Enter either enters a folder or runs a test
+                                    if let Some(exercise) = app.get_selected_exercise() {
+                                        if exercise.is_folder {
+                                            app.enter_folder();
+                                        } else if !app.is_running_test {
+                                            app.run_current_test().await?;
+                                        }
+                                    }
+                                    scroll_delta = 0;
                                 } else if !app.is_running_test {
                                     app.run_current_test().await?;
                                     scroll_delta = 0;
@@ -1477,8 +1605,13 @@ fn ui(f: &mut Frame, app: &App) -> usize {
         ])
         .split(f.area());
 
-    // Title
-    let title = Paragraph::new(app.course.name.clone())
+    // Title with breadcrumb
+    let title_text = if app.breadcrumb.is_empty() {
+        app.course.name.clone()
+    } else {
+        format!("{} > {}", app.course.name, app.breadcrumb.join(" > "))
+    };
+    let title = Paragraph::new(title_text)
         .style(
             Style::default()
                 .fg(Color::Cyan)
@@ -1531,7 +1664,7 @@ fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) -> usize {
         .collect();
 
     let items: Vec<ListItem> = app
-        .exercises
+        .current_exercises
         .iter()
         .enumerate()
         .map(|(index, exercise)| {
@@ -1540,31 +1673,58 @@ fn render_exercise_list(f: &mut Frame, app: &App, area: Rect) -> usize {
             let is_running = app.running_exercise_id.as_ref() == Some(&exercise.id);
             let is_locked = !app.is_exercise_unlocked(index);
 
-            // Status icon: checkmark if completed, blinking dot if running, space otherwise
-            let status_icon = if is_completed {
-                "✓"
-            } else if is_running {
-                if app.blink_toggle {
-                    "●"
+            // Determine icon based on type
+            let (content, style) = if exercise.is_folder {
+                // Get folder progress
+                let (completed_count, total_count) = app.get_folder_progress(exercise);
+                let all_completed = total_count > 0 && completed_count == total_count;
+
+                // Folder icon with progress
+                let icon = if all_completed { "✓" } else { "📁" };
+                let progress_text = if total_count > 0 {
+                    format!(" {}/{}", completed_count, total_count)
+                } else {
+                    String::new()
+                };
+
+                let content = format!("{} {}{}", icon, exercise.title, progress_text);
+
+                // Determine style based on completion
+                let style = if all_completed {
+                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                };
+
+                (content, style)
+            } else {
+                // Status icon: checkmark if completed, blinking dot if running, space otherwise
+                let status_icon = if is_completed {
+                    "✓"
+                } else if is_running {
+                    if app.blink_toggle {
+                        "●"
+                    } else {
+                        " "
+                    }
                 } else {
                     " "
-                }
-            } else {
-                " "
-            };
+                };
+                let content = format!("{} {} - {}", status_icon, exercise.order, exercise.title);
 
-            let content = format!("{} {} - {}", status_icon, exercise.order, exercise.title);
+                // Determine style based on state
+                let style = if is_locked {
+                    // Locked exercises are dimmed
+                    Style::default().fg(Color::Rgb(128, 128, 128))
+                } else if is_completed {
+                    Style::default().fg(Color::Green)
+                } else if is_running {
+                    Style::default().fg(Color::Yellow)
+                } else {
+                    Style::default().fg(Color::White)
+                };
 
-            // Determine style based on state
-            let style = if is_locked {
-                // Locked exercises are dimmed
-                Style::default().fg(Color::Rgb(128, 128, 128))
-            } else if is_completed {
-                Style::default().fg(Color::Green)
-            } else if is_running {
-                Style::default().fg(Color::Yellow)
-            } else {
-                Style::default().fg(Color::White)
+                (content, style)
             };
 
             ListItem::new(content).style(style)
@@ -1842,7 +2002,7 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
             all_lines.push(Line::from(""));
 
             // Progress bar
-            let total = app.exercises.len();
+            let total = app.run_all_progress.len();
             let completed = app.run_all_current_index;
             let percentage = if total > 0 {
                 (completed * 100) / total
@@ -1898,20 +2058,22 @@ fn render_exercise_details(f: &mut Frame, app: &App, area: Rect) {
 
             // Show currently running test
             if app.is_running_all_tests && completed < total {
-                if let Some(exercise) = app.exercises.get(completed) {
-                    all_lines.push(Line::from(""));
-                    let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-                    let spinner =
-                        spinner_frames[(app.blink_counter as usize) % spinner_frames.len()];
-                    all_lines.push(Line::from(vec![
-                        Span::styled(
-                            spinner,
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::BOLD),
-                        ),
-                        Span::raw(format!("  Running: {}", exercise.title)),
-                    ]));
+                if let Some((exercise_id, _)) = app.run_all_progress.get(completed) {
+                    if let Some(exercise) = app.all_exercises.iter().find(|e| &e.id == exercise_id) {
+                        all_lines.push(Line::from(""));
+                        let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+                        let spinner =
+                            spinner_frames[(app.blink_counter as usize) % spinner_frames.len()];
+                        all_lines.push(Line::from(vec![
+                            Span::styled(
+                                spinner,
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(Modifier::BOLD),
+                            ),
+                            Span::raw(format!("  Running: {}", exercise.title)),
+                        ]));
+                    }
                 }
             }
 

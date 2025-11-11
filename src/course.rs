@@ -46,6 +46,7 @@ pub struct Exercise {
     pub language: Language,
     pub metadata: ExerciseMetadata,
     pub readme_file: PathBuf,
+    pub is_folder: bool,
 }
 
 impl Exercise {
@@ -314,9 +315,15 @@ impl Course {
         }
 
         // Auto-discover exercises from the exercises folder
+        let exercises = Self::load_exercises_from_dir(&exercises_dir, &exercises_dir)?;
+
+        Ok((course, exercises))
+    }
+
+    fn load_exercises_from_dir(dir: &Path, _root_dir: &Path) -> Result<Vec<Exercise>> {
         let mut exercises = Vec::new();
-        let mut entries: Vec<_> = std::fs::read_dir(&exercises_dir)
-            .context("Failed to read exercises directory")?
+        let mut entries: Vec<_> = std::fs::read_dir(dir)
+            .context(format!("Failed to read directory {:?}", dir))?
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.path().is_dir())
             .collect();
@@ -324,12 +331,15 @@ impl Course {
         // Sort entries alphabetically by folder name
         entries.sort_by_key(|a| a.file_name());
 
-        for (index, entry) in entries.iter().enumerate() {
+        for (_index, entry) in entries.iter().enumerate() {
             let exercise_path = entry.path();
             let folder_name = entry.file_name();
             let folder_name_str = folder_name.to_string_lossy();
 
-            // Generate ID from folder name (strip leading zeros and numbers if present)
+            // Check if this is a folder (ends with '+')
+            let is_folder = folder_name_str.ends_with('+');
+
+            // Generate ID from folder name (strip leading zeros/numbers and '+' if present)
             let id = Self::generate_exercise_id(&folder_name_str);
 
             // Detect language
@@ -355,31 +365,44 @@ impl Course {
 
             let readme_file = exercise_path.join("README.md");
 
+            // Calculate order based on position relative to root exercises directory
+            let order = exercises.len() + 1;
+
             exercises.push(Exercise {
                 id,
                 title,
                 description,
-                order: index + 1,
-                path: exercise_path,
+                order,
+                path: exercise_path.clone(),
                 language,
                 metadata,
                 readme_file,
+                is_folder,
             });
+
+            // If this is a folder (not an exercise), recursively load its contents
+            if is_folder {
+                let sub_exercises = Self::load_exercises_from_dir(&exercise_path, _root_dir)?;
+                exercises.extend(sub_exercises);
+            }
         }
 
-        Ok((course, exercises))
+        Ok(exercises)
     }
 
     /// Generate exercise ID from folder name
-    /// Examples: "01-hello-world" -> "hello-world", "hello-world" -> "hello-world"
+    /// Examples: "01-hello-world" -> "hello-world", "hello-world" -> "hello-world", "01-basics+" -> "basics"
     fn generate_exercise_id(folder_name: &str) -> String {
+        // Remove trailing '+' if present (folder marker)
+        let without_folder_marker = folder_name.trim_end_matches('+');
+
         // Remove leading digits and hyphens (e.g., "01-" or "001-")
         let without_prefix =
-            folder_name.trim_start_matches(|c: char| c.is_ascii_digit() || c == '-');
+            without_folder_marker.trim_start_matches(|c: char| c.is_ascii_digit() || c == '-');
 
         // If we removed everything, use the original name
         if without_prefix.is_empty() {
-            folder_name.to_string()
+            without_folder_marker.to_string()
         } else {
             without_prefix.to_string()
         }
